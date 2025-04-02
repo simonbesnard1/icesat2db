@@ -19,12 +19,12 @@ import pandas as pd
 import yaml
 from dask.distributed import Client
 
-from gedidb.core.gedidatabase import GEDIDatabase
-from gedidb.core.gedigranule import GEDIGranule
-from gedidb.downloader.authentication import EarthDataAuthenticator
-from gedidb.downloader.data_downloader import CMRDataDownloader, H5FileDownloader
-from gedidb.utils.constants import GediProduct
-from gedidb.utils.geo_processing import _temporal_tiling, check_and_format_shape
+from icesat2db.core.gedidatabase import GEDIDatabase
+from icesat2db.core.gedigranule import GEDIGranule
+from icesat2db.downloader.authentication import EarthDataAuthenticator
+from icesat2db.downloader.data_downloader import CMRDataDownloader, H5FileDownloader
+from icesat2db.utils.constants import IceSat2Product
+from icesat2db.utils.geo_processing import _temporal_tiling, check_and_format_shape
 
 # Configure logging
 logging.basicConfig(
@@ -473,7 +473,7 @@ class GEDIProcessor:
         # Sequentially download each product
         download_results = []
         for url, product, _ in product_info:
-            result = downloader.download(granule_id, url, GediProduct(product))
+            result = downloader.download(granule_id, url, IceSat2Product(product))
             download_results.append(result)
 
         # Process granule

@@ -9,7 +9,7 @@
 from enum import Enum
 
 
-class GediProduct(Enum):
+class IceSat2Product(Enum):
     """
     Enum representing different GEDI data products.
 
@@ -20,11 +20,9 @@ class GediProduct(Enum):
         L4C (str): Level 4C GEDI product (ecosystem carbon and dynamics).
     """
 
-    L2A = "level2A"
-    L2B = "level2B"
-    L4A = "level4A"
-    L4C = "level4C"
-
+    ATL08 = "atl08"
+    ATL06 = "atl06"
+    
     @classmethod
     def list_products(cls):
         """

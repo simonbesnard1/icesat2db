@@ -12,8 +12,8 @@ from typing import Iterable, List, Union
 import h5py
 import pandas as pd
 
-from gedidb.beam.Beam import beam_handler
-from gedidb.granule.granule_name import GediNameMetadata, parse_granule_filename
+from icesat2db.beam.Beam import beam_handler
+from icesat2db.granule.granule_name import GediNameMetadata, parse_granule_filename
 
 
 class granule_handler(h5py.File):

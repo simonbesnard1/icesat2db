@@ -11,12 +11,10 @@ from typing import Dict, Optional
 
 import pandas as pd
 
-from gedidb.granule.Granule import granule_handler
-from gedidb.granule.l2a_granule import L2AGranule
-from gedidb.granule.l2b_granule import L2BGranule
-from gedidb.granule.l4a_granule import L4AGranule
-from gedidb.granule.l4c_granule import L4CGranule
-from gedidb.utils.constants import GediProduct
+from icesat2db.granule.Granule import granule_handler
+from icesat2db.granule.atl08_granule import ATL08Granule
+from icesat2db.granule.atl06_granule import ATL06Granule
+from icesat2db.utils.constants import IceSat2Product
 
 
 class GranuleParser:
@@ -76,19 +74,19 @@ class GranuleParser:
         raise NotImplementedError("This method should be implemented in child classes")
 
 
-class L2AGranuleParser(GranuleParser):
-    """Parser for L2A granules."""
+class ATL08GranuleParser(GranuleParser):
+    """Parser for ATL08 granules."""
 
     def __init__(self, file: str, data_info: Optional[dict] = None):
         super().__init__(file, data_info)
-        self.variables = self.data_info.get("level_2a", {}).get("variables", [])
+        self.variables = self.data_info.get("level_atl08", {}).get("variables", [])
 
     def parse(self) -> pd.DataFrame:
-        with L2AGranule(self.file, self.variables) as granule:
+        with ATL08Granule(self.file, self.variables) as granule:
             return self.parse_granule(granule)
 
 
-class L2BGranuleParser(GranuleParser):
+class ATL06GranuleParser(GranuleParser):
     """Parser for L2B granules."""
 
     def __init__(self, file: str, data_info: Optional[dict] = None):
@@ -96,36 +94,12 @@ class L2BGranuleParser(GranuleParser):
         self.variables = self.data_info.get("level_2b", {}).get("variables", [])
 
     def parse(self) -> pd.DataFrame:
-        with L2BGranule(self.file, self.variables) as granule:
-            return self.parse_granule(granule)
-
-
-class L4AGranuleParser(GranuleParser):
-    """Parser for L4A granules."""
-
-    def __init__(self, file: str, data_info: Optional[dict] = None):
-        super().__init__(file, data_info)
-        self.variables = self.data_info.get("level_4a", {}).get("variables", [])
-
-    def parse(self) -> pd.DataFrame:
-        with L4AGranule(self.file, self.variables) as granule:
-            return self.parse_granule(granule)
-
-
-class L4CGranuleParser(GranuleParser):
-    """Parser for L4C granules."""
-
-    def __init__(self, file: str, data_info: Optional[dict] = None):
-        super().__init__(file, data_info)
-        self.variables = self.data_info.get("level_4c", {}).get("variables", [])
-
-    def parse(self) -> pd.DataFrame:
-        with L4CGranule(self.file, self.variables) as granule:
+        with ATL06Granule(self.file, self.variables) as granule:
             return self.parse_granule(granule)
 
 
 def parse_h5_file(
-    file: str, product: GediProduct, data_info: Optional[Dict] = None
+    file: str, product: IceSat2Product, data_info: Optional[Dict] = None
 ) -> pd.DataFrame:
     """
     Parse an HDF5 file based on the product type and return a GeoDataFrame.
@@ -142,10 +116,8 @@ def parse_h5_file(
         ValueError: If the provided product is not supported.
     """
     parser_classes = {
-        GediProduct.L2A.value: L2AGranuleParser,
-        GediProduct.L2B.value: L2BGranuleParser,
-        GediProduct.L4A.value: L4AGranuleParser,
-        GediProduct.L4C.value: L4CGranuleParser,
+        IceSat2Product.ATL08.value: ATL08GranuleParser,
+        IceSat2Product.ATL06.value: ATL06GranuleParser,
     }
 
     parser_class = parser_classes.get(product)

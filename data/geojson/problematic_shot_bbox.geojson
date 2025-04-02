@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[58.4913, 29.493299999999998], [58.5113, 29.493299999999998], [58.5113, 29.5133], [58.4913, 29.5133], [58.4913, 29.493299999999998]]]}, "properties": {"description": "Bounding box around problematic GEDI shot (corrected)"}}]}

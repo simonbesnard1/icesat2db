@@ -17,11 +17,11 @@ import tiledb
 from dask.distributed import Client
 from retry import retry
 
-from gedidb.utils.geo_processing import (
+from icesat2db.utils.geo_processing import (
     _datetime_to_timestamp_days,
     convert_to_days_since_epoch,
 )
-from gedidb.utils.tiledb_consolidation import SpatialConsolidationPlanner
+from icesat2db.utils.tiledb_consolidation import SpatialConsolidationPlanner
 
 # Configure the logger
 logger = logging.getLogger(__name__)
