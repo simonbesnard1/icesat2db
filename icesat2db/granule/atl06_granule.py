@@ -81,4 +81,4 @@ class ATL06Granule(granule_handler):
             L2BBeam: The corresponding L2BBeam object for the given beam name.
         """
         self.validate_beam_name(beam)
-        return L2BBeam(self, beam, self.field_mapping)
+        return ATL06Beam(self, beam, self.field_mapping)

@@ -81,4 +81,4 @@ class ATL08Granule(granule_handler):
             L2ABeam: The corresponding L2ABeam object for the given beam name.
         """
         self.validate_beam_name(beam)
-        return L2ABeam(self, beam, self.field_mapping)
+        return ATL08Beam(self, beam, self.field_mapping)
