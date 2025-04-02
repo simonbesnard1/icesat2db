@@ -14,8 +14,8 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from gedidb.granule import granule_parser
-from gedidb.utils.constants import GediProduct
+from icesat2db.granule import granule_parser
+from icesat2db.utils.constants import IceSat2Product
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -142,10 +142,8 @@ class GEDIGranule:
             Joined DataFrame or None if the required data is missing or if the join fails.
         """
         required_products = [
-            GediProduct.L2A,
-            GediProduct.L2B,
-            GediProduct.L4A,
-            GediProduct.L4C,
+            IceSat2Product.ATL08,
+            IceSat2Product.ATL06,
         ]
 
         try:
@@ -155,7 +153,7 @@ class GEDIGranule:
                     return None
 
             # Start joining with the L2A product
-            df = df_dict[GediProduct.L2A.value].reset_index(drop=True)
+            df = df_dict[IceSat2Product.ATL08.value].reset_index(drop=True)
 
             for product in required_products[1:]:
                 product_df = df_dict[product.value].set_index("shot_number")

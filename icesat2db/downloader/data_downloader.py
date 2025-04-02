@@ -28,8 +28,8 @@ from retry import retry
 from urllib3.exceptions import NewConnectionError
 import h5py
 
-from gedidb.downloader.cmr_query import GranuleQuery
-from gedidb.utils.constants import GediProduct
+from icesat2db.downloader.cmr_query import GranuleQuery
+from icesat2db.utils.constants import IceSat2Product
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ class CMRDataDownloader(GEDIDownloader):
         total_size_mb = 0.0
 
         # Iterate over each required product and collect granule information
-        for product in GediProduct:
+        for product in IceSat2Product:
             try:
                 granule_query = GranuleQuery(
                     product,
@@ -149,9 +149,8 @@ class CMRDataDownloader(GEDIDownloader):
 
         # Log the total number of granules and total size of the data
         logger.info(
-            f"NASA's CMR service found {int(total_granules / len(GediProduct))} granules for a total size of {total_size_mb / 1024:.2f} GB ({total_size_mb / 1_048_576:.2f} TB)."
+            f"NASA's CMR service found {int(total_granules / len(IceSat2Product))} granules for a total size of {total_size_mb / 1024:.2f} GB ({total_size_mb / 1_048_576:.2f} TB)."
         )
-
         return filtered_cmr_dict
 
     def _filter_granules_with_all_products(self, granules: dict) -> dict:

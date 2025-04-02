@@ -8,14 +8,14 @@
 
 from typing import Dict
 
-from gedidb.beam.Beam import beam_handler
-from gedidb.beam.l4c_beam import L4CBeam
-from gedidb.granule.Granule import granule_handler
+from icesat2db.beam.Beam import beam_handler
+from icesat2db.beam.atl06_beam import ATL06Beam
+from icesat2db.granule.Granule import granule_handler
 
 
-class L4CGranule(granule_handler):
+class ATL06Granule(granule_handler):
     """
-    Represents a GEDI Level 4C granule, providing access to its beams and related data.
+    Represents a GEDI Level 2B granule, providing access to its beams and related data.
 
     This class extends the base Granule class and initializes with a specific file path and
     a field mapping that maps product variables to the corresponding data fields in the granule.
@@ -26,10 +26,10 @@ class L4CGranule(granule_handler):
 
     def __init__(self, file_path: str, field_mapping: Dict[str, str]):
         """
-        Initialize an L4CGranule object.
+        Initialize an L2BGranule object.
 
         Parameters:
-            file_path (str): Path to the GEDI Level 4C granule file (HDF5 format).
+            file_path (str): Path to the GEDI Level 2B granule file (HDF5 format).
             field_mapping (Dict[str, str]): Dictionary containing the mapping of product variables to data fields.
         """
         self.field_mapping = (
@@ -78,7 +78,7 @@ class L4CGranule(granule_handler):
             beam (str): The name of the beam to retrieve (e.g., "BEAM0000").
 
         Returns:
-            L4CBeam: The corresponding L4CBeam object for the given beam name.
+            L2BBeam: The corresponding L2BBeam object for the given beam name.
         """
         self.validate_beam_name(beam)
-        return L4CBeam(self, beam, self.field_mapping)
+        return ATL06Beam(self, beam, self.field_mapping)

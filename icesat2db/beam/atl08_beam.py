@@ -11,11 +11,11 @@ from typing import Dict, Optional
 import numpy as np
 import pandas as pd
 
-from gedidb.beam.Beam import beam_handler
-from gedidb.granule.Granule import granule_handler
+from icesat2db.beam.Beam import beam_handler
+from icesat2db.granule.Granule import granule_handler
 
 
-class L2ABeam(beam_handler):
+class ATL08Beam(beam_handler):
     """
     Represents a Level 2A (L2A) GEDI beam and processes the beam data.
     This class extracts geolocation and elevation data, applies quality filters,

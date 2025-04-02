@@ -7,7 +7,7 @@ requires = [
 ]
 
 [project]
-name = "gedidb"
+name = "icesat2db"
 dynamic = ["version"]
 description = "A toolbox to download, process, store and visualise Global Ecosystem Dynamics Investigation (GEDI) L2A-B and L4A-C data"
 readme = "README.md"
@@ -42,10 +42,10 @@ dependencies = [
 ]
 
 [project.urls]
-homepage = "https://github.com/simonbesnard1/gedidb"
-documentation = "https://gedidb.readthedocs.io/en/latest/"
-source = "https://github.com/simonbesnard1/gedidb"
-tracker = "https://github.com/simonbesnard1/gedidb/issues"
+homepage = "https://github.com/simonbesnard1/icesat2db"
+documentation = "https://icesat2db.readthedocs.io/en/latest/"
+source = "https://github.com/simonbesnard1/icesat2db"
+tracker = "https://github.com/simonbesnard1/icesat2db/issues"
 
 [project.optional-dependencies]
 accel = [
@@ -100,7 +100,7 @@ enable_error_code = ["ignore-without-code", "redundant-self", "redundant-expr"]
 exclude = [
   'build',
 ]
-files = "gedidb"
+files = "icesat2db"
 show_error_context = true
 warn_redundant_casts = true
 warn_unused_configs = true
@@ -114,7 +114,7 @@ extend-exclude = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["gedidb/tests*", "gedidb/tests/*", "gedidb/tests/**/*", "scripts*"]
+exclude = ["icesat2db/tests*", "icesat2db/tests/*", "icesat2db/tests/**/*", "scripts*"]
 
 [tool.setuptools_scm]
 fallback_version = "9999"

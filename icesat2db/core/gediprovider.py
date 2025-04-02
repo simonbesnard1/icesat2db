@@ -16,8 +16,8 @@ import pandas as pd
 import xarray as xr
 from scipy.spatial import cKDTree
 
-from gedidb.providers.tiledb_provider import TileDBProvider
-from gedidb.utils.geo_processing import (
+from icesat2db.providers.tiledb_provider import TileDBProvider
+from icesat2db.utils.geo_processing import (
     _datetime_to_timestamp_days,
     _timestamp_to_datetime,
     check_and_format_shape,

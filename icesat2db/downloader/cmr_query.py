@@ -16,8 +16,8 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from gedidb.granule import granule_name
-from gedidb.utils.constants import GediProduct
+from icesat2db.granule import granule_name
+from icesat2db.utils.constants import IceSat2Product
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class CMRQuery:
 
     @staticmethod
     def _construct_query_params(
-        product: GediProduct,
+        product: IceSat2Product,
         geom: gpd.GeoSeries,
         start_date: datetime,
         end_date: datetime,
@@ -134,7 +134,7 @@ class GranuleQuery(CMRQuery):
 
     def __init__(
         self,
-        product: GediProduct,
+        product: IceSat2Product,
         geom: gpd.GeoSeries,
         start_date: datetime = None,
         end_date: datetime = None,

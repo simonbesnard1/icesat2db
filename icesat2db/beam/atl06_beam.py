@@ -10,13 +10,13 @@ from typing import Dict, Optional
 
 import numpy as np
 
-from gedidb.beam.Beam import beam_handler
-from gedidb.granule.Granule import granule_handler
+from icesat2db.beam.Beam import beam_handler
+from icesat2db.granule.Granule import granule_handler
 
 
-class L4ABeam(beam_handler):
+class ATL06Beam(beam_handler):
     """
-    Represents a Level 4A (L4A) GEDI beam and processes the beam data.
+    Represents a Level 2B (L2B) GEDI beam and processes the beam data.
     This class extracts geolocation, time, and elevation data, applies quality filters,
     and returns the filtered beam data as a dictionary.
     """
@@ -28,7 +28,7 @@ class L4ABeam(beam_handler):
         field_mapping: Dict[str, Dict[str, str]],
     ):
         """
-        Initialize the L4ABeam class.
+        Initialize the L2BBeam class.
 
         Args:
             granule (Granule): The parent granule object.
@@ -36,12 +36,20 @@ class L4ABeam(beam_handler):
             field_mapping (Dict[str, Dict[str, str]]): A dictionary mapping fields to SDS names.
         """
         super().__init__(granule, beam, field_mapping)
+
         self._filtered_index: Optional[np.ndarray] = None  # Cache for filtered indices
-        self.DEFAULT_QUALITY_FILTERS = None
+        self.DEFAULT_QUALITY_FILTERS = {
+            "water_persistence": lambda: self[
+                "land_cover_data/landsat_water_persistence"
+            ][()]
+            < 10,
+            "urban_proportion": lambda: self["land_cover_data/urban_proportion"][()]
+            < 50,
+        }
 
     def _get_main_data(self) -> Optional[Dict[str, np.ndarray]]:
         """
-        Extract the main data for the beam, including time and other variables.
+        Extract the main data for the beam, including time and elevation differences.
         This method applies quality filters to the data.
 
         Returns:
@@ -53,7 +61,11 @@ class L4ABeam(beam_handler):
         # Populate data dictionary with fields from field mapping
         for key, source in self.field_mapper.items():
             sds_name = source["SDS_Name"]
-            if key == "beam_name":
+            if key == "dz":
+                data[key] = np.repeat(self[sds_name][()], self.n_shots)
+            elif key == "waveform_start":
+                data[key] = np.array(self[sds_name][()] - 1)  # Adjusting waveform start
+            elif key == "beam_name":
                 data[key] = np.array([self.name] * self.n_shots)
             else:
                 data[key] = np.array(self[sds_name][()])

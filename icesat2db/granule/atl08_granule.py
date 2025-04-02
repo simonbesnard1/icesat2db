@@ -8,12 +8,12 @@
 
 from typing import Dict
 
-from gedidb.beam.Beam import beam_handler
-from gedidb.beam.l2a_beam import L2ABeam
-from gedidb.granule.Granule import granule_handler
+from icesat2db.beam.Beam import beam_handler
+from icesat2db.beam.atl08_beam import ATL08Beam
+from icesat2db.granule.Granule import granule_handler
 
 
-class L2AGranule(granule_handler):
+class ATL08Granule(granule_handler):
     """
     Represents a GEDI Level 2A granule, providing access to its beams and related data.
 
@@ -81,4 +81,4 @@ class L2AGranule(granule_handler):
             L2ABeam: The corresponding L2ABeam object for the given beam name.
         """
         self.validate_beam_name(beam)
-        return L2ABeam(self, beam, self.field_mapping)
+        return ATL08Beam(self, beam, self.field_mapping)
