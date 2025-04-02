@@ -1,0 +1,11 @@
+{
+ "gdb.GEDIProvider": [
+  {
+   "is_class": false,
+   "is_explicit": false,
+   "module": "gedidb",
+   "module_short": "gedidb",
+   "name": "GEDIProvider"
+  }
+ ]
+}

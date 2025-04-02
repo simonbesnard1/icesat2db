@@ -1,0 +1,121 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [
+    "setuptools>=64",
+    "wheel",
+    "setuptools-scm>=8"
+]
+
+[project]
+name = "gedidb"
+dynamic = ["version"]
+description = "A toolbox to download, process, store and visualise Global Ecosystem Dynamics Investigation (GEDI) L2A-B and L4A-C data"
+readme = "README.md"
+authors = [
+    { name = "Simon Besnard", email = "besnard@gfz.de" },
+    { name = "Felix Dombrowski", email = "felix.dombrowski@uni-potsdam.de" },
+    { name = "Amelia Holcomb", email = "amelia.holcomb@gmail.com" }
+]
+license = { file = "LICENSE" }
+keywords = ["geospatial", "GEDI", "database"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: European Union Public Licence 1.2 (EUPL 1.2)"
+]
+requires-python = ">=3.10"
+dependencies = [
+    "dask",
+    "distributed",
+    "geopandas",
+    "h5py",
+    "numpy",
+    "pandas",
+    "requests",
+    "retry",
+    "scipy",
+    "tiledb",
+    "xarray"
+]
+
+[project.urls]
+homepage = "https://github.com/simonbesnard1/gedidb"
+documentation = "https://gedidb.readthedocs.io/en/latest/"
+source = "https://github.com/simonbesnard1/gedidb"
+tracker = "https://github.com/simonbesnard1/gedidb/issues"
+
+[project.optional-dependencies]
+accel = [
+    "bottleneck",
+    "numbagg",
+    "flox",
+    "opt_einsum",
+    "numba",
+    "cython"
+]
+dev = [
+    "hypothesis",
+    "mypy",
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "pytest-env",
+    "pytest-xdist",
+    "pytest-timeout",
+    "ruff",
+    "gedidb[complete]",
+    "black",
+    "isort"
+]
+io = [
+    "boto3",
+    "netCDF4",
+    "h5netcdf",
+    'pydap; python_version<"3.10"',
+    "zarr",
+    "fsspec",
+    "cftime",
+    "pooch",
+    "rasterio",
+    "pyproj"
+]
+viz = [
+    "cartopy",
+    "matplotlib",
+    "seaborn",
+    "nc-time-axis",
+    "plotly",
+    "holoviews"
+]
+debug = [
+    "rich",
+    "loguru"
+]
+
+[tool.mypy]
+enable_error_code = ["ignore-without-code", "redundant-self", "redundant-expr"]
+exclude = [
+  'build',
+]
+files = "gedidb"
+show_error_context = true
+warn_redundant_casts = true
+warn_unused_configs = true
+warn_unused_ignores = true
+
+[tool.ruff]
+extend-exclude = [
+  "doc",
+  "_typed_ops.pyi",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["gedidb/tests*", "gedidb/tests/*", "gedidb/tests/**/*", "scripts*"]
+
+[tool.setuptools_scm]
+fallback_version = "9999"
+
