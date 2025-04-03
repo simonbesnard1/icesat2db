@@ -14,7 +14,7 @@ from icesat2db.beam.Beam import beam_handler
 from icesat2db.granule.Granule import granule_handler
 
 
-class ATL06Beam(beam_handler):
+class ATL03Beam(beam_handler):
     """
     Represents a Level 2B (L2B) GEDI beam and processes the beam data.
     This class extracts geolocation, time, and elevation data, applies quality filters,
