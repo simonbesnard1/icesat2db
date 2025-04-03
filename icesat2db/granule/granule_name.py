@@ -33,17 +33,16 @@ class GediNameMetadata:
 
     product: str
     year: str
-    julian_day: str
+    month: str
+    day: str
     hour: str
     minute: str
     second: str
-    orbit: str
-    sub_orbit_granule: str
-    ground_track: str
-    positioning: str
-    release_number: str
-    granule_production_version: str
-    major_version_number: str
+    rgt: str
+    cycle : str
+    segment : str
+    version: str
+    revision: str
 
 
 # Precompile the GEDI filename pattern for efficient reuse
