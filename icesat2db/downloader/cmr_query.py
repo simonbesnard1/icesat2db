@@ -88,7 +88,8 @@ class CMRQuery:
         :return: Granule ID.
         """
         metadata = granule_name.parse_granule_filename(name)
-        return f"{metadata.orbit}_{metadata.sub_orbit_granule}"
+        #return f"{metadata.orbit}_{metadata.sub_orbit_granule}"
+        return f"{metadata.ref_ground_track}_{metadata.cycle_number}_{metadata.segment_number}"
 
     @staticmethod
     def _get_name(item: dict) -> str:
