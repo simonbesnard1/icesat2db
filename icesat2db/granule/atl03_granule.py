@@ -9,11 +9,11 @@
 from typing import Dict
 
 from icesat2db.beam.Beam import beam_handler
-from icesat2db.beam.atl06_beam import ATL06Beam
+from icesat2db.beam.atl03_beam import ATL03Beam
 from icesat2db.granule.Granule import granule_handler
 
 
-class ATL06Granule(granule_handler):
+class ATL03Granule(granule_handler):
     """
     Represents a GEDI Level 2B granule, providing access to its beams and related data.
 
@@ -81,4 +81,4 @@ class ATL06Granule(granule_handler):
             L2BBeam: The corresponding L2BBeam object for the given beam name.
         """
         self.validate_beam_name(beam)
-        return ATL06Beam(self, beam, self.field_mapping)
+        return ATL03Beam(self, beam, self.field_mapping)
