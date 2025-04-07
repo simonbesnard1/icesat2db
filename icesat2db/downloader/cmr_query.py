@@ -103,7 +103,7 @@ class CMRQuery:
         granule_name = None
 
         # Try to get the granule name from 'producer_granule_id' (preferred)
-        if "LPCLOUD" in item["data_center"]:
+        if "NSIDC_CPRD" in item["data_center"]:
             granule_name = item["producer_granule_id"]
         # If 'producer_granule_id' is not available, fallback to 'title'
         elif "ORNL" in item["data_center"]:
