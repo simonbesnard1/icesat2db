@@ -4,10 +4,10 @@
 # SPDX-FileCopyrightText: 2025 Felix Dombrowski
 # SPDX-FileCopyrightText: 2025 Simon Besnard
 # SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-#
 
 import logging
 from collections import defaultdict
+import re
 from typing import Dict, List, Optional, Tuple, Union
 
 import geopandas as gpd
@@ -16,14 +16,12 @@ import pandas as pd
 import xarray as xr
 from scipy.spatial import cKDTree
 
-from icesat2db.providers.tiledb_provider import TileDBProvider
-from icesat2db.utils.geo_processing import (
-    _datetime_to_timestamp_days,
+from gedidb.providers.tiledb_provider import TileDBProvider
+from gedidb.utils.geo_processing import (
     _timestamp_to_datetime,
     check_and_format_shape,
 )
 
-# Configure the logger
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -94,6 +92,7 @@ class GEDIProvider(TileDBProvider):
         radius: float,
         start_time: Optional[np.datetime64] = None,
         end_time: Optional[np.datetime64] = None,
+        decode_time: bool = False,
         **quality_filters,
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         """
@@ -135,12 +134,10 @@ class GEDIProvider(TileDBProvider):
         - The number of shots returned may be fewer than `num_shots` if fewer points meet the criteria.
 
         """
-
         scalar_vars = variables + DEFAULT_DIMS
-        start_timestamp = (
-            _datetime_to_timestamp_days(start_time) if start_time else None
-        )
-        end_timestamp = _datetime_to_timestamp_days(end_time) if end_time else None
+
+        start_timestamp = start_time if start_time else None
+        end_timestamp = end_time if end_time else None
 
         lon_min, lat_min = point[0] - radius, point[1] - radius
         lon_max, lat_max = point[0] + radius, point[1] + radius
@@ -153,6 +150,7 @@ class GEDIProvider(TileDBProvider):
             lon_max,
             start_timestamp,
             end_timestamp,
+            decode_time,
             **quality_filters,
         )
 
@@ -170,14 +168,14 @@ class GEDIProvider(TileDBProvider):
             )
             return {}, {}
 
+        # Efficient KD-tree search
         tree = cKDTree(np.column_stack((longitudes, latitudes)))
         distances, indices = tree.query(point, k=min(num_shots, len(longitudes)))
-        nearest_shots = scalar_data_subset["shot_number"][indices]
 
-        scalar_data = {
-            k: np.array(v)[np.isin(scalar_data_subset["shot_number"], nearest_shots)]
-            for k, v in scalar_data_subset.items()
-        }
+        # Normalize to 1D array of indices
+        indices = np.atleast_1d(indices)
+
+        scalar_data = {k: v[indices] for k, v in scalar_data_subset.items()}
 
         return scalar_data, profile_vars
 
@@ -187,6 +185,8 @@ class GEDIProvider(TileDBProvider):
         geometry: Optional[gpd.GeoDataFrame] = None,
         start_time: Optional[str] = None,
         end_time: Optional[str] = None,
+        decode_time: bool = False,
+        use_polygon_filter: bool = "auto",
         **quality_filters,
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         """
@@ -219,7 +219,6 @@ class GEDIProvider(TileDBProvider):
         -----
         - Quality filters are applied as boolean masks to the queried data arrays, supporting compound expressions.
         """
-
         if geometry is None:
             raise ValueError(
                 "A valid geometry (GeoDataFrame) must be provided to limit the query. "
@@ -229,34 +228,50 @@ class GEDIProvider(TileDBProvider):
         geometry = check_and_format_shape(geometry, simplify=True)
         lon_min, lat_min, lon_max, lat_max = geometry.total_bounds
 
-        if start_time:
-            start_time = np.datetime64(start_time)
-            start_timestamp = _datetime_to_timestamp_days(start_time)
-        else:
-            start_timestamp = None
+        # Convert timestamps efficiently
+        if start_time is not None:
+            start_time = np.datetime64(start_time, "D")
+        if end_time is not None:
+            end_time = np.datetime64(end_time, "D")
 
-        if end_time:
-            end_time = np.datetime64(end_time)
-            end_timestamp = _datetime_to_timestamp_days(end_time)
-        else:
-            end_timestamp = None
+        # Auto-detect polygon filtering need
+        if use_polygon_filter == "auto":
 
-        # Determine variables, including dimension variables
+            # Check if geometry is complex (not just a rectangle)
+            geom = (
+                geometry.unary_union if len(geometry) > 1 else geometry.geometry.iloc[0]
+            )
+            bbox_area = (lon_max - lon_min) * (lat_max - lat_min)
+            geom_area = geom.area
+
+            # If geometry fills less than 80% of bbox, use polygon filter
+            use_polygon_filter = (
+                (geom_area / bbox_area) < 0.9 if bbox_area > 0 else False
+            )
+
+            if use_polygon_filter:
+                logger.info(
+                    f"Auto-enabled polygon filter (geometry covers "
+                    f"{100 * geom_area / bbox_area:.1f}% of bounding box)"
+                )
+
+        # Query with optimized filtering
         scalar_vars = variables + DEFAULT_DIMS
-
-        # Query tileDB array within the specified bounds and time range
-        scalar_data = self._query_array(
+        scalar_data, profile_vars = self._query_array(
             scalar_vars,
             lat_min,
             lat_max,
             lon_min,
             lon_max,
-            start_timestamp,
-            end_timestamp,
+            start_time,
+            end_time,
+            decode_time,
+            geometry=geometry,
+            use_polygon_filter=use_polygon_filter,
             **quality_filters,
         )
 
-        return scalar_data
+        return scalar_data, profile_vars
 
     def get_data(
         self,
@@ -269,11 +284,13 @@ class GEDIProvider(TileDBProvider):
         point: Optional[Tuple[float, float]] = None,
         num_shots: Optional[int] = None,
         radius: Optional[float] = None,
+        use_polygon_filter: bool = "auto",
+        decode_time: bool = False,
         **quality_filters,
     ) -> Union[pd.DataFrame, xr.Dataset, None]:
         """
         Retrieve GEDI data based on spatial, temporal, and quality filters,
-        and return it in either Pandas or Xarray format.
+        and return it in either Pandas Dataframe or Xarray format.
 
         This function allows flexible querying of GEDI data, either by bounding box or
         nearest-point selection, with optional filtering based on time and quality criteria.
@@ -292,7 +309,7 @@ class GEDIProvider(TileDBProvider):
             End of the time range for filtering data. Should be in a format compatible
             with `np.datetime64`.
         return_type : str, default "xarray"
-            Format in which to return the data. Options are 'pandas' or 'xarray'.
+            Format in which to return the data. Options are 'dataframe' or 'xarray'.
         query_type : str, default "bounding_box"
             Type of query to perform. Options are:
             - "bounding_box": Retrieve data within the specified geometry or bounding box.
@@ -319,13 +336,13 @@ class GEDIProvider(TileDBProvider):
         - The `query_type` parameter determines the querying mode (bounding box or nearest shot).
         - Ensure the TileDB context (`self.ctx`) and array URIs are correctly configured before calling this function.
         """
-        # Ensure query_type is valid
+        # Validate query_type
         if query_type not in {"bounding_box", "nearest"}:
             raise ValueError(
                 f"Invalid query_type '{query_type}'. Must be 'bounding_box' or 'nearest'."
             )
 
-        # Ensure return_type is valid
+        # Validate return_type
         if return_type not in {"xarray", "dataframe"}:
             raise ValueError(
                 f"Invalid return_type '{return_type}'. Must be either 'xarray' or 'dataframe'."
@@ -353,6 +370,7 @@ class GEDIProvider(TileDBProvider):
                     "For 'nearest' queries, 'radius' must be a positive float."
                 )
 
+        # Execute query
         if query_type == "nearest":
             scalar_data, profile_vars = self.query_nearest_shots(
                 variables,
@@ -361,24 +379,39 @@ class GEDIProvider(TileDBProvider):
                 radius,
                 start_time,
                 end_time,
+                decode_time,
                 **quality_filters,
             )
         elif query_type == "bounding_box":
             scalar_data, profile_vars = self.query_data(
-                variables, geometry, start_time, end_time, **quality_filters
+                variables,
+                geometry,
+                start_time,
+                end_time,
+                decode_time,
+                use_polygon_filter=use_polygon_filter,
+                **quality_filters,
             )
 
         if not scalar_data:
             logger.info("No data found for specified criteria.")
             return None
 
+        # Return in requested format
         if return_type == "xarray":
             metadata = self.get_available_variables()
-            return self.to_xarray(scalar_data, metadata, profile_vars)
+            return self.to_xarray(
+                scalar_data, metadata, profile_vars, decode_time=decode_time
+            )
         elif return_type == "dataframe":
-            return self.to_dataframe(scalar_data)
+            return self.to_dataframe(scalar_data, profile_vars, decode_time=decode_time)
 
-    def to_dataframe(self, scalar_data: Dict[str, np.ndarray]) -> pd.DataFrame:
+    def to_dataframe(
+        self,
+        scalar_data: Dict[str, np.ndarray],
+        profile_vars: Dict[str, List[str]] = None,
+        decode_time: bool = False,
+    ) -> pd.DataFrame:
         """
         Convert scalar and profile data dictionaries into a unified pandas DataFrame.
 
@@ -411,12 +444,20 @@ class GEDIProvider(TileDBProvider):
           alignment between the two datasets.
 
         """
-        # Convert scalar data to DataFrame
-        scalar_data["time"] = _timestamp_to_datetime(scalar_data["time"])
+        # Create DataFrame (optimized with from_dict)
         scalar_df = pd.DataFrame.from_dict(scalar_data)
-        scalar_df = scalar_df.sort_values(by="time")
 
-        # Merge scalar and profile data on shot_number
+        if decode_time and "time" in scalar_df:
+            scalar_df["time"] = _timestamp_to_datetime(scalar_df["time"])
+
+        # Reconstruct profile variables if present
+        if profile_vars:
+            for var_name, profile_cols in profile_vars.items():
+                if all(col in scalar_df.columns for col in profile_cols):
+                    # Vectorized list creation
+                    scalar_df[var_name] = scalar_df[profile_cols].values.tolist()
+                    scalar_df = scalar_df.drop(columns=profile_cols)
+
         return scalar_df
 
     def to_xarray(
@@ -424,6 +465,7 @@ class GEDIProvider(TileDBProvider):
         scalar_data: Dict[str, np.ndarray],
         metadata: pd.DataFrame,
         profile_vars: Dict[str, List[str]],
+        decode_time: bool = False,
     ) -> xr.Dataset:
         """
         Convert scalar and profile data to an Xarray Dataset, with metadata attached.
@@ -457,9 +499,17 @@ class GEDIProvider(TileDBProvider):
         - The Dataset is annotated with metadata (descriptions, units, etc.) from the provided metadata DataFrame.
         """
 
+        if decode_time:
+            time_coord = _timestamp_to_datetime(scalar_data["time"])
+        else:
+            time_coord = scalar_data["time"]
+
+        # Extract profile variable components
         profile_var_components = [
             item for sublist in profile_vars.values() for item in sublist
         ]
+
+        # Identify scalar variables
         scalar_vars = [
             var
             for var in scalar_data
@@ -468,54 +518,49 @@ class GEDIProvider(TileDBProvider):
             + profile_var_components
         ]
 
-        times = _timestamp_to_datetime(scalar_data["time"])
+        # Create dataset with data_vars dict (faster than merging)
+        data_vars = {}
 
-        scalar_ds = xr.Dataset(
-            {
-                var: xr.DataArray(
-                    scalar_data[var],
-                    coords={"shot_number": scalar_data["shot_number"]},
-                    dims=["shot_number"],
-                )
-                for var in scalar_vars
-            }
-        )
-
-        profile_ds = xr.Dataset()
-
-        for base_var, components in profile_vars.items():
-            # Number of profile points (columns)
-            num_profile_points = len(components)
-
-            # Preallocate an array with shape (num_shots, num_profile_points)
-            profile_data = np.empty(
-                (len(scalar_data["shot_number"]), num_profile_points),
-                dtype=np.float32,
+        # Add scalar variables
+        for var in scalar_vars:
+            data_vars[var] = xr.DataArray(
+                scalar_data[var],
+                coords={"shot_number": scalar_data["shot_number"]},
+                dims=["shot_number"],
             )
 
-            # Fill the preallocated array directly
-            for idx, comp in enumerate(components):
-                profile_data[:, idx] = scalar_data[comp]
+        # Pre-allocate profile arrays (keep existing optimization)
+        for base_var, components in profile_vars.items():
+            num_profile_points = len(components)
+            profile_data = np.stack(
+                [scalar_data[comp] for comp in components],
+                axis=-1,
+            ).astype(np.float32, copy=False)
 
-            # Add the preallocated array to Xarray Dataset
-            profile_ds[base_var] = xr.DataArray(
+            # Add to data_vars dict
+            data_vars[base_var] = xr.DataArray(
                 profile_data,
                 coords={
                     "shot_number": scalar_data["shot_number"],
-                    "profile_points": range(num_profile_points),
+                    "profile_points": np.arange(
+                        num_profile_points, dtype="int16" or "int32"
+                    ),
                 },
                 dims=["shot_number", "profile_points"],
             )
-        dataset = xr.merge([scalar_ds, profile_ds])
-        dataset = dataset.assign_coords(
-            {
+
+        # Create dataset once with all variables (no merge needed)
+        dataset = xr.Dataset(
+            data_vars=data_vars,
+            coords={
+                "shot_number": scalar_data["shot_number"],
                 "latitude": ("shot_number", scalar_data["latitude"]),
                 "longitude": ("shot_number", scalar_data["longitude"]),
-                "time": ("shot_number", times),
-            }
+                "time": ("shot_number", time_coord),
+            },
         )
-        dataset = dataset.sortby("time")
 
+        # Attach metadata
         self._attach_metadata(dataset, metadata)
 
         return dataset
@@ -558,6 +603,28 @@ class GEDIProvider(TileDBProvider):
             lambda: {"description": "", "units": "", "product_level": ""}
         )
 
+        # Variables that can have _<percentile> variants
+        base_vars_with_percentiles = {"rh", "cover_z", "pai_z", "pavd_z"}
+
         for var in dataset.variables:
             var_metadata = metadata_dict.get(var, default_metadata)
+
+            # Check for percentile variants (e.g., rh_95)
+            match = re.match(r"^(.+?)_(\d+)$", var)
+            if match:
+                base_var = match.group(1)
+                percentile = match.group(2)
+
+                if base_var in base_vars_with_percentiles:
+                    base_metadata = metadata_dict.get(base_var)
+                    if base_metadata:
+                        # Copy and modify metadata
+                        var_metadata = base_metadata.copy()
+                        desc = var_metadata.get("description", "")
+                        var_metadata["description"] = (
+                            f"{desc} ({percentile}th percentile)"
+                            if desc
+                            else f"{percentile}th percentile of {base_var}"
+                        )
+
             dataset[var].attrs.update(var_metadata)
