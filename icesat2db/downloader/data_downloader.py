@@ -45,9 +45,9 @@ class WarningFilter(logging.Filter):
 logger.addFilter(WarningFilter())
 
 
-class GEDIDownloader:
+class IceSat2Downloader:
     """
-    Base class for GEDI data downloaders.
+    Base class for IceSat2 data downloaders.
     """
 
     def _download(self, *args, **kwargs):
@@ -57,9 +57,9 @@ class GEDIDownloader:
         raise NotImplementedError("This method should be implemented by subclasses.")
 
 
-class CMRDataDownloader(GEDIDownloader):
+class CMRDataDownloader(IceSat2Downloader):
     """
-    Downloader for GEDI granules from NASA's CMR service.
+    Downloader for IceSat2 granules from NASA's CMR service.
     """
 
     def __init__(
@@ -92,7 +92,7 @@ class CMRDataDownloader(GEDIDownloader):
     )
     def download(self) -> dict:
         """
-        Download granules across all GEDI products and ensure ID consistency.
+        Download granules across all IceSat2 products and ensure ID consistency.
         Returns a dictionary organized by granule ID with a list of (url, product) tuples.
         Retry mechanism is applied if the IDs across products are inconsistent.
 
@@ -160,7 +160,8 @@ class CMRDataDownloader(GEDIDownloader):
         :param granules: Dictionary where keys are granule IDs and values are lists of (url, product) tuples.
         :return: Filtered dictionary containing only granules with all required products.
         """
-        required_products = {"level2A", "level2B", "level4A", "level4C"}
+        # TODO: Make required products configurable
+        required_products = {"atl08"}
         filtered_granules = {}
 
         for granule_id, product_info in granules.items():

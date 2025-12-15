@@ -88,10 +88,11 @@ class CMRQuery:
         :return: Granule ID.
         """
         metadata = granule_name.parse_granule_filename(name)
-        return f"{metadata.orbit}_{metadata.sub_orbit_granule}"
+        return f"{metadata.ref_ground_track}_{metadata.cycle_number}_{metadata.segment_number}"
 
     @staticmethod
     def _get_name(item: dict) -> str:
+        # TODO: do we still need to support multiple data centers here?
         """
         Extract the name of the granule from the CMR response item.
         Removes the '.h5' extension if present and strips whitespace.
@@ -102,7 +103,7 @@ class CMRQuery:
         granule_name = None
 
         # Try to get the granule name from 'producer_granule_id' (preferred)
-        if "LPCLOUD" in item["data_center"]:
+        if "NSIDC_CPRD" in item["data_center"]:
             granule_name = item["producer_granule_id"]
         # If 'producer_granule_id' is not available, fallback to 'title'
         elif "ORNL" in item["data_center"]:
@@ -123,13 +124,12 @@ class CMRQuery:
         # Remove '.h5' extension if present
         if granule_name.endswith(".h5"):
             granule_name = granule_name[:-3]
-
         return granule_name
 
 
 class GranuleQuery(CMRQuery):
     """
-    Class for querying GEDI granules from CMR.
+    Class for querying IceSat2 granules from CMR.
     """
 
     def __init__(
@@ -143,7 +143,7 @@ class GranuleQuery(CMRQuery):
         """
         Initialize the GranuleQuery class.
 
-        :param product: The GEDI product to query.
+        :param product: The IceSat2 product to query.
         :param geom: The geometry for spatial filtering.
         :param start_date: The start date for temporal filtering.
         :param end_date: The end date for temporal filtering.

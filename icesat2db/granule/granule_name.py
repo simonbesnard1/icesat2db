@@ -33,35 +33,47 @@ class GediNameMetadata:
 
     product: str
     year: str
-    julian_day: str
+    month: str
+    day: str
     hour: str
     minute: str
     second: str
-    orbit: str
-    sub_orbit_granule: str
-    ground_track: str
-    positioning: str
-    release_number: str
-    granule_production_version: str
-    major_version_number: str
+    rgt: str
+    cycle : str
+    segment : str
+    version: str
+    revision: str
 
 
 # Precompile the GEDI filename pattern for efficient reuse
 GEDI_FILENAME_PATTERN = re.compile(
     (
-        r"(?P<product>\w+_\w)"  # Product identifier (e.g., GEDI_L2A)
-        r"_(?P<year>\d{4})"  # Year (4 digits)
-        r"(?P<julian_day>\d{3})"  # Julian day (3 digits)
-        r"(?P<hour>\d{2})"  # Hour (2 digits)
-        r"(?P<minute>\d{2})"  # Minute (2 digits)
-        r"(?P<second>\d{2})"  # Second (2 digits)
-        r"_(?P<orbit>O\d+)"  # Orbit (O followed by digits)
-        r"_(?P<sub_orbit_granule>\d{2})"  # Sub-orbit granule (2 digits)
-        r"_(?P<ground_track>T\d+)"  # Ground track (T followed by digits)
-        r"_(?P<positioning>\d{2})"  # Positioning number (2 digits)
-        r"_(?P<release_number>\d{3})"  # Release number (3 digits)
-        r"_(?P<granule_production_version>\d{2})"  # Granule production version (2 digits)
-        r"_(?P<major_version_number>V\d+)"  # Major version number (V followed by digits)
+        #r"(?P<product>\w+_\w)"  # Product identifier (e.g., GEDI_L2A)
+        #r"_(?P<year>\d{4})"  # Year (4 digits)
+        #r"(?P<julian_day>\d{3})"  # Julian day (3 digits)
+        #r"(?P<hour>\d{2})"  # Hour (2 digits)
+        #r"(?P<minute>\d{2})"  # Minute (2 digits)
+        #r"(?P<second>\d{2})"  # Second (2 digits)
+        #r"_(?P<orbit>O\d+)"  # Orbit (O followed by digits)
+        #r"_(?P<sub_orbit_granule>\d{2})"  # Sub-orbit granule (2 digits)
+        #r"_(?P<ground_track>T\d+)"  # Ground track (T followed by digits)
+        #r"_(?P<positioning>\d{2})"  # Positioning number (2 digits)
+        #r"_(?P<release_number>\d{3})"  # Release number (3 digits)
+        #r"_(?P<granule_production_version>\d{2})"  # Granule production version (2 digits)
+        #r"_(?P<major_version_number>V\d+)"  # Major version number (V followed by digits)
+
+        r"(?P<product>\w+)"           # Product identifier (e.g., ATL08)        
+        r"(?P<year>\d{4})"            # Year (4 digits)
+        r"(?P<month>\d{2})"           # Month (2 digits)
+        r"(?P<day>\d{2})"             # Day (2 digits)
+        r"(?P<hour>\d{2})"            # Hour (2 digits)
+        r"(?P<minute>\d{2})"          # Minute (2 digits)
+        r"(?P<second>\d{2})"          # Second (2 digits)          
+        r"(?P<ref_ground_track>\d{4})"  # Reference Ground Track (4 digits)
+        r"(?P<cycle_number>\d{2})"     # Cycle Number (2 digits)
+        r"(?P<segment_number>\d{2})"   # Segment Number (2 digits)    
+        r"(?P<version>\d{3})"         # Version (3 digits)    
+        r"(?P<revision>\d{2})"        # Revision (2 digits)    
     )
 )
 

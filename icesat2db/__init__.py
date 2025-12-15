@@ -16,10 +16,10 @@ try:
 except Exception:
     __version__ = "9999"
 
-from icesat2db.beam import Beam, atl08_beam, atl06_beam
+from icesat2db.beam import Beam, atl08_beam, atl03_beam
 from icesat2db.beam.Beam import beam_handler
 from icesat2db.beam.atl08_beam import ATL08Beam
-from icesat2db.beam.atl06_beam import ATL06Beam
+from icesat2db.beam.atl03_beam import ATL03Beam
 from icesat2db.core import gedidatabase, gedigranule, gediprocessor, gediprovider
 from icesat2db.core.gedidatabase import GEDIDatabase
 from icesat2db.core.gedigranule import GEDIGranule
@@ -38,13 +38,13 @@ from icesat2db.granule import (
     granule_name,
     granule_parser,
     atl08_granule,
-    atl06_granule,
+    atl03_granule,
 )
 from icesat2db.granule.Granule import granule_handler
 from icesat2db.granule.granule_name import GediNameMetadata
 from icesat2db.granule.granule_parser import GranuleParser
 from icesat2db.granule.atl08_granule import ATL08Granule
-from icesat2db.granule.atl06_granule import ATL06Granule
+from icesat2db.granule.atl03_granule import ATL03Granule
 from icesat2db.providers import tiledb_provider
 from icesat2db.providers.tiledb_provider import TileDBProvider
 from icesat2db.utils import constants, geo_processing, print_versions, tiledb_consolidation
@@ -81,19 +81,19 @@ __all__ = [
     "granule_parser",
     "GranuleParser",
     "ATL08Granule",
-    "ATL06Granule",
+    "ATL03Granule",
     "Beam",
     "beam_handler",
     "atl08_beam",
-    "atl06_beam",
+    "atl03_beam",
     "ATL08Beam",
-    "ATL06Beam",
+    "ATL03Beam",
     "granule_name",
     "Granule",
     "granule_handler",
     "GediNameMetadata",
     "atl08_granule",
-    "atl06_granule",
+    "atl03_granule",
     "TileDBProvider",
     "show_versions",
     "__version__",
