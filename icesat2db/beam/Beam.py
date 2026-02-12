@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class beam_handler(h5py.Group):
     """
-    Represents a single beam in a GEDI granule file, inheriting from h5py.Group.
+    Represents a single beam in a IceSat2 granule file, inheriting from h5py.Group.
     Provides methods to extract and process the beam data, including filtering, caching, and SQL formatting.
     """
 
@@ -77,7 +77,7 @@ class beam_handler(h5py.Group):
         Returns:
             int: The number of shots in the beam.
         """
-        return len(self["beam"])
+        return len(self["signal_photons/delta_time"])
 
     @property
     def beam_type(self) -> str:

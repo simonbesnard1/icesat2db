@@ -168,7 +168,7 @@ class GranuleQuery(CMRQuery):
         # Configure retry strategy for the HTTP session
         retry_strategy = Retry(
             total=3,
-            backoff_factor=0.1,
+            backoff_factor=0.3,
             status_forcelist=[429, 500, 502, 503, 504],
             allowed_methods=["GET"],
         )

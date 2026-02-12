@@ -26,7 +26,7 @@ local_path = "/path/to/processed/gedi/data"  # Update with your local TileDB pat
 s3_bucket = None  # Set the S3 bucket name if using S3 storage
 
 # Step 2: Initialize the GEDIProvider
-provider = gdb.GEDIProvider(
+provider = gdb.IceSat2Provider(
     storage_type=storage_type,
     local_path=local_path,
     s3_bucket=s3_bucket,

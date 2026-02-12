@@ -5,7 +5,7 @@
 # SPDX-FileCopyrightText: 2025 Simon Besnard
 # SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
 #
-
+import hashlib
 from typing import Dict, Optional
 
 import numpy as np
@@ -37,28 +37,48 @@ class ATL08Beam(beam_handler):
 
         self._filtered_index: Optional[np.ndarray] = None  # Cache for filtered indices
         self.DEFAULT_QUALITY_FILTERS = {
-            "quality_flag": lambda: self["quality_flag"][()] == 1,
-            "sensitivity_a0": lambda: (
-                (self["sensitivity"][()] >= 0.5) & (self["sensitivity"][()] <= 1.0)
+
+            "h_te_uncertainty": lambda: (
+                (self["land_segments/terrain/h_te_uncertainty"][()] < 3.402823e+23) &
+                (self["land_segments/terrain/h_te_uncertainty"][()] > -999)
             ),
-            "sensitivity_a2": lambda: (
-                (self["geolocation/sensitivity_a2"][()] > 0.7)
-                & (self["geolocation/sensitivity_a2"][()] <= 1.0)
+
+            "h_te_best_fit": lambda: (
+                (self["land_segments/terrain/h_te_best_fit"][()] < 3.402823e+23) &
+                (self["land_segments/terrain/h_te_best_fit"][()] > -999)
             ),
-            "degrade_flag": lambda: np.isin(
-                self["degrade_flag"][()],
-                [0, 3, 8, 10, 13, 18, 20, 23, 28, 30, 33, 38, 40, 43, 48, 60, 63, 68],
+
+            "h_te_median": lambda: (
+                    (self["land_segments/terrain/h_te_median"][()] < 3.402823e+23) |
+                    (self["land_segments/terrain/h_te_median"][()] > -999)
             ),
-            "surface_flag": lambda: self["surface_flag"][()] == 1,
-            "elevation_difference_tdx": lambda: (
-                (self["elev_lowestmode"][()] - self["digital_elevation_model"][()])
-                > -150
-            )
-            & (
-                (self["elev_lowestmode"][()] - self["digital_elevation_model"][()])
-                < 150
-            ),
+
+            "h_canopy": lambda: self["land_segments/canopy/h_canopy"][()] < 3.402823e+23,
+            "h_canopy_uncertainty": lambda: self["land_segments/canopy/h_canopy_uncertainty"][()] < 3.402823e+23,
+            "urban_flag": lambda: self["land_segments/urban_flag"][()] == 0,
+            "segment_watermask": lambda: self["land_segments/segment_watermask"][()] == 0,
+
         }
+
+    def construct_shot_number(self) -> np.ndarray:
+        """
+        Construct shot numbers for the beam based on the number of shots.
+
+        Returns:
+            np.ndarray: An array of shot numbers.
+        """
+
+        dt = np.round(self["land_segments/delta_time"], 9)
+        lat = np.round(self["land_segments/latitude"], 9)
+        lon = np.round(self["land_segments/longitude"], 9)
+
+        shot_str = (
+                dt.astype(str) + "_" +
+                lat.astype(str) + "_" +
+                lon.astype(str)
+        )
+
+        return shot_str
 
     def _get_main_data(self) -> Optional[Dict[str, np.ndarray]]:
         """
@@ -68,36 +88,34 @@ class ATL08Beam(beam_handler):
         Returns:
             Optional[Dict[str, np.ndarray]]: The filtered data as a dictionary or None if no data is present.
         """
-        # Define GEDI mission start time and calculate actual timestamps
-        gedi_count_start = pd.to_datetime("2018-01-01T00:00:00Z")
-        delta_time = self["delta_time"][()]
+        # Define IceSat-2 mission start time and calculate actual timestamps
+        icesat2_count_start = pd.to_datetime("2018-01-01T00:00:00.000000Z")
+        delta_time = self["land_segments/delta_time"][()]
+        # instead of delta_time we can use start_delta_time and end_delta_time for segments as mid point
+
 
         # Initialize the data dictionary with calculated fields
-        data = {
-            "time": gedi_count_start + pd.to_timedelta(delta_time, unit="seconds"),
-            "longitude": self["lon_lowestmode"][()],
-            "latitude": self["lat_lowestmode"][()],
+        land_data = {
+            "time": icesat2_count_start + pd.to_timedelta(delta_time, unit="seconds"),
+            "longitude": self["land_segments/longitude"][()],
+            "latitude": self["land_segments/latitude"][()],
+            "shot_number": self.construct_shot_number()
         }
 
         # Populate data dictionary with fields from field mapping
         for key, source in self.field_mapper.items():
             sds_name = source["SDS_Name"]
-            if key == "beam_type":
-                beam_type = getattr(self, sds_name)
-                data[key] = np.array([beam_type] * self.n_shots)
-            elif key == "beam_name":
-                data[key] = np.array([self.name] * self.n_shots)
-            else:
-                data[key] = np.array(self[sds_name][()])
+            if "land_segments" in sds_name:
+                land_data[key] = np.array(self[sds_name][()])
 
         # Apply quality filters and store filtered index
         self._filtered_index = self.apply_filter(
-            data, filters=self.DEFAULT_QUALITY_FILTERS
+            land_data, filters=self.DEFAULT_QUALITY_FILTERS
         )
 
         # Filter the data based on the quality filters
-        filtered_data = {
-            key: value[self._filtered_index] for key, value in data.items()
+        land_data_filtered = {
+            key: value[self._filtered_index] for key, value in land_data.items()
         }
 
-        return filtered_data if filtered_data else None
+        return land_data_filtered if land_data_filtered else None

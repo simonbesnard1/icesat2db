@@ -16,7 +16,7 @@ import geopandas as gpd
 from shapely import contains_xy
 import tiledb
 
-from gedidb.utils.geo_processing import (
+from icesat2db.utils.geo_processing import (
     _datetime_to_timestamp_days,
 )
 

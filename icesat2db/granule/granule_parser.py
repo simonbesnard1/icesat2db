@@ -13,7 +13,6 @@ import pandas as pd
 
 from icesat2db.granule.Granule import granule_handler
 from icesat2db.granule.atl08_granule import ATL08Granule
-from icesat2db.granule.atl03_granule import ATL03Granule
 from icesat2db.utils.constants import IceSat2Product
 
 
@@ -55,6 +54,7 @@ class GranuleParser:
             if main_data is not None:
                 granule_data.append(main_data)
 
+
         if granule_data:
             try:
                 df = pd.concat(granule_data, ignore_index=True)
@@ -85,19 +85,6 @@ class ATL08GranuleParser(GranuleParser):
         with ATL08Granule(self.file, self.variables) as granule:
             return self.parse_granule(granule)
 
-
-class ATL03GranuleParser(GranuleParser):
-    """Parser for ATL03 granules."""
-
-    def __init__(self, file: str, data_info: Optional[dict] = None):
-        super().__init__(file, data_info)
-        self.variables = self.data_info.get("level_atl03", {}).get("variables", [])
-
-    def parse(self) -> pd.DataFrame:
-        with ATL03Granule(self.file, self.variables) as granule:
-            return self.parse_granule(granule)
-
-
 def parse_h5_file(
     file: str, product: IceSat2Product, data_info: Optional[Dict] = None
 ) -> pd.DataFrame:
@@ -117,7 +104,6 @@ def parse_h5_file(
     """
     parser_classes = {
         IceSat2Product.ATL08.value: ATL08GranuleParser,
-        IceSat2Product.ATL03.value: ATL03GranuleParser,
     }
 
     parser_class = parser_classes.get(product)

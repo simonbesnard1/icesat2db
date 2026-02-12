@@ -27,7 +27,7 @@ local_path = "/path/to/processed/gedi/data"
 s3_bucket = None  # Only required if using "s3"
 
 # Initialize the GEDIProvider
-provider = gdb.GEDIProvider(
+provider = gdb.IceSat2Provider(
     storage_type=storage_type,
     local_path=local_path,
     s3_bucket=s3_bucket,

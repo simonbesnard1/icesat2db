@@ -65,7 +65,7 @@ dask_client = Client(cluster)
 # ------------------------------------------------------------
 # Here, we demonstrate usage with `concurrent.futures.ThreadPoolExecutor`.
 # You can replace `parallel_engine=concurrent_engine` with `parallel_engine=dask_client` to use Dask instead.
-with gdb.GEDIProcessor(
+with gdb.IceSat2Processor(
     config_file=config_file,
     geometry=geojson_path,
     start_date=start_date,

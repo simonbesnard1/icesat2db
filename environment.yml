@@ -1,4 +1,4 @@
-name: gedi_toolbox
+name: icesat2db
 channels:
   - conda-forge
 dependencies:

@@ -16,8 +16,8 @@ import pandas as pd
 import xarray as xr
 from scipy.spatial import cKDTree
 
-from gedidb.providers.tiledb_provider import TileDBProvider
-from gedidb.utils.geo_processing import (
+from icesat2db.providers.tiledb_provider import TileDBProvider
+from icesat2db.utils.geo_processing import (
     _timestamp_to_datetime,
     check_and_format_shape,
 )
@@ -30,9 +30,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_DIMS = ["shot_number"]
 
 
-class GEDIProvider(TileDBProvider):
+class IceSat2Provider(TileDBProvider):
     """
-    GEDIProvider class to interface with GEDI data stored in TileDB, with support for flexible storage types.
+    IceSat2Provider class to interface with IceSat2 data stored in TileDB, with support for flexible storage types.
 
     Attributes
     ----------
@@ -63,16 +63,16 @@ class GEDIProvider(TileDBProvider):
         credentials: Optional[dict] = None,
     ):
         """
-        Initialize GEDIProvider with URIs for scalar and profile data arrays, configured based on storage type.
+        Initialize IceSat2Provider with URIs for scalar and profile data arrays, configured based on storage type.
 
         Parameters
         ----------
         storage_type : str, optional
             Storage type, either 's3' or 'local'. Defaults to 'local'.
         s3_bucket : str, optional
-            The S3 bucket name for GEDI data storage. Required if `storage_type` is 's3'.
+            The S3 bucket name for IceSat2 data storage. Required if `storage_type` is 's3'.
         local_path : str, optional
-            The local path for storing GEDI data arrays. Used if `storage_type` is 'local'.
+            The local path for storing IceSat2 data arrays. Used if `storage_type` is 'local'.
         url : str, optional
             Custom endpoint URL for S3-compatible object stores (e.g., MinIO).
         region : str, optional
@@ -96,16 +96,16 @@ class GEDIProvider(TileDBProvider):
         **quality_filters,
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         """
-        Retrieve data for the nearest GEDI shots around a specified reference point, within a given radius.
+        Retrieve data for the nearest IceSat2 shots around a specified reference point, within a given radius.
 
-        This function queries GEDI data for the closest shot locations to a specified longitude and latitude,
+        This function queries IceSat2 data for the closest shot locations to a specified longitude and latitude,
         limiting the search to a bounding box defined by a radius around the point. It filters both scalar
         and profile variables by proximity, time range, and additional quality parameters if provided.
 
         Parameters
         ----------
         variables : List[str]
-            List of variable names to retrieve from the GEDI data.
+            List of variable names to retrieve from the IceSat2 data.
         point : Tuple[float, float]
             Longitude and latitude coordinates representing the reference point for the nearest-shot search.
         num_shots : int
@@ -122,7 +122,7 @@ class GEDIProvider(TileDBProvider):
         Returns
         -------
         Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]
-            Two dictionaries containing the nearest GEDI shots:
+            Two dictionaries containing the nearest IceSat2 shots:
             - The first dictionary holds scalar data variables, with variable names as keys and arrays of values as items.
             - The second dictionary holds profile data variables, similarly structured.
 
@@ -190,13 +190,13 @@ class GEDIProvider(TileDBProvider):
         **quality_filters,
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         """
-        Query GEDI data from TileDB arrays within a specified spatial bounding box and time range,
+        Query IceSat2 data from TileDB arrays within a specified spatial bounding box and time range,
         applying optional quality filters with flexible filter expressions.
 
         Parameters
         ----------
         variables : List[str]
-            List of variable names to retrieve from the GEDI data.
+            List of variable names to retrieve from the IceSat2 data.
         geometry : geopandas.GeoDataFrame, optional
             A spatial geometry defining the bounding box for data filtering.
             If provided, the bounding box is extracted from the geometry's total bounds.
@@ -211,7 +211,7 @@ class GEDIProvider(TileDBProvider):
         Returns
         -------
         Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]
-            Two dictionaries containing GEDI data filtered within the specified bounds:
+            Two dictionaries containing IceSat2 data filtered within the specified bounds:
             - The first dictionary holds scalar data variables, with variable names as keys and arrays of values as items.
             - The second dictionary holds profile data variables, similarly structured.
 
@@ -289,17 +289,17 @@ class GEDIProvider(TileDBProvider):
         **quality_filters,
     ) -> Union[pd.DataFrame, xr.Dataset, None]:
         """
-        Retrieve GEDI data based on spatial, temporal, and quality filters,
+        Retrieve IceSat2 data based on spatial, temporal, and quality filters,
         and return it in either Pandas Dataframe or Xarray format.
 
-        This function allows flexible querying of GEDI data, either by bounding box or
+        This function allows flexible querying of IceSat2 data, either by bounding box or
         nearest-point selection, with optional filtering based on time and quality criteria.
         Data can be returned as a Pandas DataFrame or Xarray Dataset.
 
         Parameters
         ----------
         variables : List[str]
-            A list of variable names to retrieve from the GEDI data.
+            A list of variable names to retrieve from the IceSat2 data.
         geometry : geopandas.GeoDataFrame, optional
             Spatial filter defined as a GeoDataFrame. Used when `query_type` is 'bounding_box'.
         start_time : str, optional
@@ -313,7 +313,7 @@ class GEDIProvider(TileDBProvider):
         query_type : str, default "bounding_box"
             Type of query to perform. Options are:
             - "bounding_box": Retrieve data within the specified geometry or bounding box.
-            - "nearest": Retrieve the nearest GEDI shots to a specified point.
+            - "nearest": Retrieve the nearest IceSat2 shots to a specified point.
         point : Tuple[float, float], optional
             A tuple (longitude, latitude) representing the reference point for a nearest-shot query.
             Required if `query_type` is "nearest".

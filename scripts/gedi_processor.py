@@ -14,7 +14,7 @@ config_file = "/home/simon/Documents/science/GFZ/projects/icesat2db/data/config_
 concurrent_engine = concurrent.futures.ThreadPoolExecutor(max_workers=6)
 
 # Initialize the GEDIProcessor and compute
-with idb.GEDIProcessor(
+with idb.IceSat2Processor(
     config_file=config_file,
     geometry="/home/simon/Documents/science/GFZ/projects/icesat2db/data/geojson/global_geojson.geojson",
     start_date="2018-01-01",
