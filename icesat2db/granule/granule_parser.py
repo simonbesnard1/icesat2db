@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
-# SPDX-FileCopyrightText: 2025 Amelia Holcomb
-# SPDX-FileCopyrightText: 2025 Felix Dombrowski
-# SPDX-FileCopyrightText: 2025 Simon Besnard
-# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-#
+# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
+# SPDX-FileCopyrightText: 2026 Felix Dombrowski
+# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
+# SPDX-FileCopyrightText: 2026 Simon Besnard
+# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+
 
 from pathlib import Path
 from typing import Dict, Optional
@@ -18,8 +18,8 @@ from icesat2db.utils.constants import IceSat2Product
 
 class GranuleParser:
     """
-    Base class for parsing GEDI granule data into a GeoDataFrame.
-    Provides common parsing logic for different GEDI product types.
+    Base class for parsing IceSat2 granule data into a GeoDataFrame.
+    Provides common parsing logic for different IceSat2 product types.
     """
 
     def __init__(self, file: str, data_info: Optional[dict] = None):
@@ -93,7 +93,7 @@ def parse_h5_file(
 
     Args:
         file (str): Path to the HDF5 file.
-        product (GediProduct): Type of GEDI product (L2A, L2B, L4A, L4C).
+        product (IceSat2Product): Type of IceSat2 product (ATL08).
         data_info (dict, optional): Information about the data structure.
 
     Returns:

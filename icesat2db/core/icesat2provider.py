@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
-# SPDX-FileCopyrightText: 2025 Amelia Holcomb
-# SPDX-FileCopyrightText: 2025 Felix Dombrowski
-# SPDX-FileCopyrightText: 2025 Simon Besnard
-# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
+# SPDX-FileCopyrightText: 2026 Felix Dombrowski
+# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
+# SPDX-FileCopyrightText: 2026 Simon Besnard
+# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
 
 import logging
 from collections import defaultdict
@@ -483,8 +483,8 @@ class IceSat2Provider(TileDBProvider):
             DataFrame containing variable metadata (e.g., descriptions and units). The index
             should match the variable names in `scalar_data` and `profile_vars`.
         profile_vars : Dict[str, List[str]]
-            Dictionary where keys are base names of profile variables (e.g., 'rh') and values
-            are lists of associated variable names (e.g., ['rh_1', 'rh_2', ...]).
+            Dictionary where keys are base names of profile variables (e.g., 'h_canopy_20m') and values
+            are lists of associated variable names (e.g., ['h_canopy_20m_1', 'h_canopy_20m_2', ...]).
 
         Returns
         -------
@@ -604,7 +604,8 @@ class IceSat2Provider(TileDBProvider):
         )
 
         # Variables that can have _<percentile> variants
-        base_vars_with_percentiles = {"rh", "cover_z", "pai_z", "pavd_z"}
+        # base_vars_with_percentiles = {"rh", "cover_z", "pai_z", "pavd_z"}
+        base_vars_with_percentiles = { }
 
         for var in dataset.variables:
             var_metadata = metadata_dict.get(var, default_metadata)

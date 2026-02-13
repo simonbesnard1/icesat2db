@@ -5,17 +5,16 @@ end_date: '2020-12-31'
 
 # database parameters
 tiledb:
-  storage_type: 'local' # either local or s3
+  storage_type: 'local'
   local_path: ''     # TileDB URI for storing data
-  overwrite: true                                  # Whether to overwrite existing arrays
-  temporal_tiling: "weekly"
-  chunk_size: 25
+  overwrite: false                                  # Whether to overwrite existing arrays
+  # temporal_batching:
   time_range:                                      # Global time range for data
-    start_time: "2018-01"
+    start_time: "2018-01-01"
     end_time: "2030-12-31"
   spatial_range:                                   # Global spatial range (bounding box)
-    lat_min: -56.0
-    lat_max: 56.0
+    lat_min: -90.0
+    lat_max: 90.0
     lon_min: -180.0
     lon_max: 180.0
   dimensions: ['latitude', 'longitude', 'time']
@@ -28,710 +27,1197 @@ tiledb:
 
 # Data directory for downloading GEDI data
 data_dir: ''
+progress_dir: ''
 
 # Configuration for accessing NASA's Earthdata Search API to query granule data.
 earth_data_info:
  CMR_URL: "https://cmr.earthdata.nasa.gov/search/granules.json"
  CMR_PRODUCT_IDS:
-   GediProduct.L2A: 'C2142771958-LPCLOUD'
-   GediProduct.L2B: 'C2142776747-LPCLOUD'
-   GediProduct.L4A: 'C2237824918-ORNL_CLOUD'
-   GediProduct.L4C: 'C3049900163-ORNL_CLOUD'
+   # IceSatProduct.ATL08: 'C2565090645-NSIDC_ECS'
+   IceSat2Product.ATL08: 'C2613553260-NSIDC_CPRD'
 
 # Variables list for each GEDI level product - SDS_Name is science dataset name the native h5 file retrieved from the NASA API
-level_2a:
+level_atl08:
   variables:
-    shot_number:
-      SDS_Name: "shot_number"
-      description: "Unique shot number for each beam"
-      units: "adimensional"
-      dtype: "uint64"
-      valid_range: "N/A"
-      product_level: 'L2A'
-
-    beam_type:
-      SDS_Name: "beam_type"
-      description: "Type of beam used"
-      units: "adimensional"
-      dtype: "U10"
-      valid_range: "0 to 12"
-      product_level: 'L2A'
-
-    beam_name:
-      SDS_Name: "name"
-      description: "Name of the beam"
-      units: "adimensional"
-      dtype: "U10"
-      valid_range: "0 to 12"
-      product_level: 'L2A'
-
-    sensitivity:
-      SDS_Name: "sensitivity"
-      description: "Maxmimum canopy cover that can be penetrated"
-      units: "adimensional"
+    asr:
+      SDS_Name: "land_segments/asr"
       dtype: "float32"
-      valid_range: "0, 1"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "auxiliaryInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Apparent surface reflectance"
+      long_name: "apparent surface reflectance"
+      source: "ATL09"
+      units: "1"
 
-    sensitivity_a1:
-      SDS_Name: "geolocation/sensitivity_a1"
-      description: "Geolocation sensitivity factor A1"
-      units: "adimensional"
+    atlas_pa:
+      SDS_Name: "land_segments/atlas_pa"
       dtype: "float32"
-      valid_range: "0, 1"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Off nadir pointing angle (in radians) of the satellite to increase spatial sampling in the non-polar regions. ATLAS_PA =radians(90degs-beam_coelev)."
+      long_name: "atlas pointing angle"
+      source: "ATL03"
+      units: "radians"
 
-    sensitivity_a2:
-      SDS_Name: "geolocation/sensitivity_a2"
-      description: "Geolocation sensitivity factor A2"
-      units: "adimensional"
+    beam_azimuth:
+      SDS_Name: "land_segments/beam_azimuth"
       dtype: "float32"
-      valid_range: "0, 1"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Azimuth(in radians) of the unit pointing vector for the reference photon in the local ENU frame in radians.  The angle is measured from north and positive towards East."
+      long_name: "beam azimuth"
+      source: "ATL03"
+      units: "radians"
 
-    degrade_flag:
-      SDS_Name: "degrade_flag"
-      description: "Flag indicating degraded state of pointing and/or positioning information"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0 to 99"
-      product_level: 'L2A'
-
-    leaf_off_flag:
-      SDS_Name: "land_cover_data/leaf_off_flag"
-      description: "GEDI 1 km EASE 2.0 grid flag"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0 to 1"
-      product_level: 'L2A'
-
-    leaf_off_doy:
-      SDS_Name: "land_cover_data/leaf_off_doy"
-      description: "GEDI 1 km EASE 2.0 grid leaf-off start day-of-year"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "1 to 365"
-      product_level: 'L2A'
-
-    leaf_on_cycle:
-      SDS_Name: "land_cover_data/leaf_on_cycle"
-      description: "Flag that indicates the vegetation growing cycle for leaf-on observations"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "1 to 2"
-      product_level: 'L2A'
-
-    leaf_on_doy :
-      SDS_Name: "land_cover_data/leaf_on_doy"
-      description: "GEDI 1 km EASE 2.0 grid leaf-on start day-of-year"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "1 to 365"
-      product_level: 'L2A'
-
-    landsat_treecover :
-      SDS_Name: "land_cover_data/landsat_treecover"
-      description: "Tree cover in the year 2010, defined as canopy closure for all vegetation taller than 5 m in height as a percentage per output grid cell"
-      units: "Percent"
+    beam_coelev:
+      SDS_Name: "land_segments/beam_coelev"
       dtype: "float32"
-      valid_range: "0 to 100"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Co-elevation (CE) is direction from vertical of the laser beam as seen by an observer located at the laser ground spot."
+      long_name: "beam co-elevation"
+      source: "ATL03"
+      units: "radians"
 
-    modis_treecover :
-      SDS_Name: "land_cover_data/modis_treecover"
-      description: "Percent tree cover from MODIS MOD44B V6 data"
-      units: "Percent"
-      dtype: "float32"
-      valid_range: "0 to 100"
-      product_level: 'L2A'
+    brightness_flag:
+      SDS_Name: "land_segments/brightness_flag"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "127"
+      contentType: "qualityInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Flag indicating that the ground surface is bright (e.g. snow-covered or other bright surfaces)"
+      flag_meanings: "not_bright_surface bright_surface"
+      flag_values: "[0 1]"
+      long_name: "brightness flag"
+      source: "Land ATBD section 2.4.21"
+      units: "1"
 
-    modis_treecover_sd :
-      SDS_Name: "land_cover_data/modis_treecover_sd"
-      description: "Percent tree cover standard deviation from MODIS MOD44B V6 data"
-      units: "Percent"
+    can_noise:
+      SDS_Name: "land_segments/canopy/can_noise"
       dtype: "float32"
-      valid_range: "0 to 100"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Number of noise photons calculated that fall within the canopy height for each 100 m segment based on ATL03 background rate parameters."
+      long_name: "canopy noise rate"
+      source: "Land ATBD section X.X"
+      units: "count/meter"
+      valid_min: "0.0"
 
-    modis_nonvegetated :
-      SDS_Name: "land_cover_data/modis_nonvegetated"
-      description: "Percent non-vegetated from MODIS MOD44B V6 data"
-      units: "Percent"
+    canopy_h_metrics:
+      SDS_Name: "land_segments/canopy/canopy_h_metrics"
       dtype: "float32"
-      valid_range: "0 to 100"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)
+ array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "auxiliaryInformation"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Height metrics based on the cumulative distribution of relative canopy heights above the interpolated ground surface.  The height metrics are calculated at the following percentiles: 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95%."
+      long_name: "canopy height metrics"
+      source: "Land ATBD 15May2020 section 2.2.4"
+      units: "meters"
+      is_profile: True
+      profile_length: 18
 
-    modis_nonvegetated_sd :
-      SDS_Name: "land_cover_data/modis_nonvegetated_sd"
-      description: "Percent non-vegetated standard deviation from MODIS MOD44B V6 data"
-      units: "Percent"
-      dtype: "float32"
-      valid_range: "0 to 100"
-      product_level: 'L2A'
+      
 
-    solar_elevation:
-      SDS_Name: "solar_elevation"
-      description: "Solar elevation angle at the time of the shot"
-      units: "Degrees"
+    canopy_h_metrics_abs:
+      SDS_Name: "land_segments/canopy/canopy_h_metrics_abs"
       dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)
+ array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "auxiliaryInformation"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Height metrics based on the cumulative distribution of absolute canopy heights above the WGS84 Ellipsoid.  The height metrics are calculated at the following percentiles: 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95%."
+      long_name: "canopy absolute height metrics"
+      source: "Land ATBD section 2.2.3"
+      units: "meters"
+      is_profile: True
+      profile_length: 18
+      
+
+    canopy_openness:
+      SDS_Name: "land_segments/canopy/canopy_openness"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "auxiliaryInformation"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Standard Deviation of all photons classified as canopy photons within the segment to provide inference of canopy openness."
+      long_name: "canopy openness"
+      source: "Land ATBD section 4.12"
+      units: "1"
+
+    canopy_rh_conf:
+      SDS_Name: "land_segments/canopy/canopy_rh_conf"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Canopy relative height confidence flag based on percentage of ground and canopy photons within a segment: 0 (<5% canopy), 1 (>5% canopy, <5% ground), 2 (>5% canopy, >5% ground)."
+      flag_meanings: "<5%_canopy >=5%_canopy_<5%_ground >=5%_canopy_>=5%_ground"
+      flag_values: "[0 1 2]"
+      long_name: "canopy relative height confidence"
+      source: "Land/Veg ATBD 13March2019, Section 2.2.21"
+      units: "1"
+      valid_max: "2"
+      valid_min: "0"
+
+    centroid_height:
+      SDS_Name: "land_segments/canopy/centroid_height"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Optical centroid of all photons classified as either canopy or ground points within the segment.  The heights used in this calculation are absolute heights above the reference ellipsoid. This parameter is equivalent to the centroid height produced ICESat GLA14."
+      long_name: "centroid height"
+      source: "Land ATBD section 2.2.22"
+      units: "meters"
+
+    h_canopy:
+      SDS_Name: "land_segments/canopy/h_canopy"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "98% height of all the individual canopy relative heights for the segment above the estimated terrain surface. Relative canopy heights have been computed by differencing the canopy photon height from the estimated terrain surface."
+      long_name: "height canopy"
+      source: "Land ATBD section 4.12"
+      units: "meters"
+
+    h_canopy_20m:
+      SDS_Name: "land_segments/canopy/h_canopy_20m"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)
+ array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../latitude ../longitude ../delta_time"
+      description: "Canopy height for each 20m geosegment with each 100m land segment."
+      long_name: "canopy height 20m"
+      source: "ATBD January 2021, section TBD"
+      units: "m"
+      is_subsegment: True # change this to subsegment
+      subsegment_length: 5 # vertical length
+
+    h_canopy_abs:
+      SDS_Name: "land_segments/canopy/h_canopy_abs"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The 98% height of all the absolute individual canopy heights referenced above the WGS84 ellipsoid."
+      long_name: "absolute segment canopy height"
+      source: "Land ATBD section 2.2.2"
+      units: "meters"
+
+    h_canopy_quad:
+      SDS_Name: "land_segments/canopy/h_canopy_quad"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The quadratic mean height of individual classified relative canopy photon heights above the estimated terrain surface."
+      long_name: "canopy quadratic mean"
+      source: "Land ATBD section 4.12"
+      units: "meters"
+
+    h_canopy_uncertainty:
+      SDS_Name: "land_segments/canopy/h_canopy_uncertainty"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "qualityInformation"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Uncertainty of the relative canopy heights for the segment. Incorporates all systematic uncertainties as well as uncertainty from errors of identified photons. See section 1 and equations 1.4 and 1.5 in the Land ATBD"
+      long_name: "segment canopy height uncertainty"
+      source: "Land ATBD section 1.5"
+      units: "meters"
+
+    h_dif_canopy:
+      SDS_Name: "land_segments/canopy/h_dif_canopy"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Difference between h_canopy and h_median_canopy"
+      long_name: "canopy diff to median height"
+      source: "Land ATBD section 4.12"
+      units: "meters"
+
+    h_max_canopy:
+      SDS_Name: "land_segments/canopy/h_max_canopy"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Relative maximum of individual canopy heights within segment. Relative canopy heights have been computed by differencing the canopy photon height from the estimated terrain surface. Should be equivalent to RH100 metric reported in the literature."
+      long_name: "maximum canopy height"
+      source: "Land ATBD section 2.2.12"
+      units: "meters"
+
+    h_max_canopy_abs:
+      SDS_Name: "land_segments/canopy/h_max_canopy_abs"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Maximum of individual absolute canopy heights within segment referenced above the WGS84 ellipsoid."
+      long_name: "absolute maximum canopy height"
+      source: "Land ATBD section 2.2.11"
+      units: "meters"
+
+    h_mean_canopy:
+      SDS_Name: "land_segments/canopy/h_mean_canopy"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Mean of individual relative canopy heights within segment.  Relative canopy heights have been computed by differencing the canopy photon height from the estimated terrain surface."
+      long_name: "mean canopy height"
+      source: "Land ATBD section 4.12"
+      units: "meters"
+
+    h_mean_canopy_abs:
+      SDS_Name: "land_segments/canopy/h_mean_canopy_abs"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Mean of the individual absolute canopy heights within segment referenced above the WGS84 Ellipsoid."
+      long_name: "absolute mean canopy height"
+      source: "Land ATBD section 2.2.4"
+      units: "meters"
+
+    h_median_canopy:
+      SDS_Name: "land_segments/canopy/h_median_canopy"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The median of individual relative canopy heights within segment. Relative canopy heights have been computed by differencing the canopy photon height from the estimated terrain surface. This parameter should be equivalent to RH50 reported in the literature."
+      long_name: "median canopy height"
+      source: "Land ATBD section 2.2.8"
+      units: "meters"
+
+    h_median_canopy_abs:
+      SDS_Name: "land_segments/canopy/h_median_canopy_abs"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The median of individual absolute canopy heights within segment referenced above the WGS84 Ellipsoid."
+      long_name: "absolute segment median canopy height"
+      source: "Land ATBD section 2.2.6"
+      units: "meters"
+
+    h_min_canopy:
+      SDS_Name: "land_segments/canopy/h_min_canopy"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The minimum of relative individual canopy heights within segment. Relative canopy heights have been computed by differencing the canopy photon height from the estimated terrain surface."
+      long_name: "minimum canopy height"
+      source: "Land ATBD section 2.2.10"
+      units: "meters"
+
+    h_min_canopy_abs:
+      SDS_Name: "land_segments/canopy/h_min_canopy_abs"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The minimum of absolute individual canopy heights within segment referenced above the WGS84 Ellipsoid."
+      long_name: "absolute minimum canopy height"
+      source: "Land ATBD section 2.2.9"
+      units: "meters"
+
+    n_ca_photons:
+      SDS_Name: "land_segments/canopy/n_ca_photons"
+      dtype: "int32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The number of photons classified as canopy within the segment."
+      long_name: "number canopy photons"
+      source: "Land ATBD section 4.12"
+      units: "1"
+
+    n_toc_photons:
+      SDS_Name: "land_segments/canopy/n_toc_photons"
+      dtype: "int32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The number of photons classified as top of canopy within the segment."
+      long_name: "number top of canopy photons"
+      source: "Land ATBD section 4.12"
+      units: "1"
+
+    photon_rate_can:
+      SDS_Name: "land_segments/canopy/photon_rate_can"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Calculated photon rate of canopy photons within each 100m segment"
+      long_name: "Canopy photon rate"
+      source: "Land/Veg ATBD July 2020"
+      units: "s^-1"
+      valid_min: "0.0"
+
+    photon_rate_can_nr:
+      SDS_Name: "land_segments/canopy/photon_rate_can_nr"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Noise removed photon canopy rate within each 100 m segment."
+      long_name: "noise reduced number of canopy photons"
+      source: "Land ATBD section X.X"
+      units: "s^-1"
+      valid_min: "0.0"
+
+    segment_cover:
+      SDS_Name: "land_segments/canopy/segment_cover"
+      dtype: "int16"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "32767"
+      contentType: "auxiliaryInformation"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Average percentage value of the valid (value <= 100) Copernicus fractional cover product for each 100 m segment"
+      long_name: "canopy cover percentage"
+      source: "Land ATBD section 2.4.19"
+      units: "1"
+
+    subset_can_flag:
+      SDS_Name: "land_segments/canopy/subset_can_flag"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)
+ array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "127"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Quality flag indicating the canopy photons populating the 100 m segment statistics are derived from less than 100 m worth of photons and/or less than 5 20m ATL03 segments."
+      flag_meanings: "no_photon_data_within_geosegment no_canopy_photons_within_geosegment canopy_photons_present_within_geosegment"
+      flag_values: "[-1  0  1]"
+      long_name: "subset canopy flag"
+      source: "Land/Veg ATBD 15 Novemebr 2019, Section 2.2.25"
+      units: "1"
+      valid_max: "1"
+      valid_min: "-1"
+      is_subsegment: True # change this to subsegment
+      subsegment_length: 5 # vertical length
+
+    toc_roughness:
+      SDS_Name: "land_segments/canopy/toc_roughness"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Standard deviation of the relative heights of all photons classified as top of canopy within the segment"
+      long_name: "top of canopy roughness"
+      source: "Land ATBD section 4.12"
+      units: "meters"
+
+    cloud_flag_atm:
+      SDS_Name: "land_segments/cloud_flag_atm"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "127"
+      contentType: "qualityInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Cloud confidence flag from ATL09 that indicates the number of cloud or aerosol layers identified in each 25Hz atmospheric profile. If the flag is greater than 0, aerosols or clouds could be present. Valid range is 0 - 10."
+      long_name: "cloud flag atm"
+      source: "ATL09"
+      units: "1"
+      valid_max: "10"
+      valid_min: "0"
+
+    cloud_fold_flag:
+      SDS_Name: "land_segments/cloud_fold_flag"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "127"
+      contentType: "modelResult"
+      coordinates: "delta_time latitude longitude"
+      description: "Flag that indicates this profile likely contains cloud signal folded down from above 15 km to the last 2-3 km of the profile. See ATL09 ATBD Table 3.9 for detailed flag value meanings."
+      flag_meanings: "no_folding goes5_indicates profile_indicates both_indicate"
+      flag_values: "[0 1 2 3]"
+      long_name: "cloud folding flag"
+      source: "ATL09"
+      units: "1"
+      valid_max: "3"
+      valid_min: "0"
+
+    delta_time:
+      SDS_Name: "land_segments/delta_time"
+      dtype: "float64"
+      CLASS: "DIMENSION_SCALE"
+      NAME: "delta_time"
+      REFERENCE_LIST: "[(<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)
+ (<HDF5 object reference>, 0) (<HDF5 object reference>, 0)]"
+      contentType: "referenceInformation"
+      coordinates: "latitude longitude"
+      description: "Mean time for the segment in number of GPS seconds since the ATLAS SDP epoch. The ATLAS Standard Data Products (SDP) epoch offset is defined within /ancillary_data/atlas_sdp_gps_epoch as the number of GPS seconds between the GPS epoch (1980-01-06T00:00:00.000000Z UTC) and the ATLAS SDP epoch. By adding the offset contained within atlas_sdp_gps_epoch to delta time parameters, the time in gps_seconds relative to the GPS epoch can be computed."
+      long_name: "mean_pass_time"
+      source: "Land ATBD section 2.4"
+      standard_name: "time"
+      units: "seconds since 2018-01-01"
+
+    delta_time_beg:
+      SDS_Name: "land_segments/delta_time_beg"
+      dtype: "float64"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Time of the first photon contained within the data segment, in seconds since the ATLAS SDP GPS Epoch. The ATLAS Standard Data Products (SDP) epoch offset is defined within /ancillary_data/atlas_sdp_gps_epoch as the number of GPS seconds between the GPS epoch (1980-01-06T00:00:00.000000Z UTC) and the ATLAS SDP epoch. By adding the offset contained within atlas_sdp_gps_epoch to delta time parameters, the time in gps_seconds relative to the GPS epoch can be computed."
+      long_name: "delta time begin"
+      source: "Derived (gps_seconds-gps_sec_offset)"
+      units: "seconds since 2018-01-01"
+
+    delta_time_end:
+      SDS_Name: "land_segments/delta_time_end"
+      dtype: "float64"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Time of the last photon contained within the data segment, in seconds since the ATLAS SDP epoch. The ATLAS Standard Data Products (SDP) epoch offset is defined within /ancillary_data/atlas_sdp_gps_epoch as the number of GPS seconds between the GPS epoch (1980-01-06T00:00:00.000000Z UTC) and the ATLAS SDP epoch. By adding the offset contained within atlas_sdp_gps_epoch to delta time parameters, the time in gps_seconds relative to the GPS epoch can be computed."
+      long_name: "delta time end"
+      source: "Derived (gps_seconds-gps_sec_offset)"
+      units: "seconds since 2018-01-01"
+
+    dem_flag:
+      SDS_Name: "land_segments/dem_flag"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "127"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Indicates source of the DEM height. Values: 0=None, 1=Arctic, 2=Global, 3=MSS, 4=Antarctic."
+      flag_meanings: "none arctic global mss antarctic"
+      flag_values: "[0 1 2 3 4]"
+      long_name: "dem source flag"
+      source: "Atmosphere ATBD"
+      units: "1"
+      valid_max: "4"
+      valid_min: "0"
+
+    dem_h:
+      SDS_Name: "land_segments/dem_h"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Best available DEM (in priority of Arctic/Antarctic/Global/MSS) value at the geolocation point.  Height is in meters above the WGS84 Ellipsoid."
+      long_name: "dem height"
+      source: "Arctic, Antarctic, Global, MSS DEM"
+      units: "meters"
+
+    dem_removal_flag:
+      SDS_Name: "land_segments/dem_removal_flag"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "qualityInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Flag indicating more than dem_removal_percent_limit (default 20.0) removed from land segment due to failing DEM-QA tests"
+      flag_meanings: "below_threshold above_threshold"
+      flag_values: "[0 1]"
+      long_name: "dem removal flag"
+      source: "ATBD section 2.4.11"
+      units: "1"
+
+    h_dif_ref:
+      SDS_Name: "land_segments/h_dif_ref"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "delta_time latitude longitude"
+      description: "Difference between h_te_median and ref_DEM"
+      long_name: "h dif from reference"
+      source: "Land ATBD section 2.4"
+      units: "meters"
+
+    last_seg_extend:
+      SDS_Name: "land_segments/last_seg_extend"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "auxiliaryInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "The distance (km) that the last ATL08 processing segment in a file is either extended or overlapped with the previous ATL08 processing segment."
+      long_name: "last segment extended"
+      source: "Land ATBD 13March2019, Section 2.4.20"
+      standard_name: "last_seg_extend"
+      units: "kilometers"
+
+#    latitude:
+#      SDS_Name: "land_segments/latitude"
+#      dtype: "float32"
+#      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+#      contentType: "modelResult"
+#      coordinates: "delta_time longitude"
+#      description: "Latitude of the center-most signal photon within each segment."
+#      long_name: "latitude"
+#      source: "Land ATBD section 2.4"
+#      standard_name: "latitude"
+#      units: "degrees"
+#      valid_max: "90.0"
+#      valid_min: "-90.0"
+
+    latitude_20m:
+      SDS_Name: "land_segments/latitude_20m"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)
+ array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "latitude longitude delta_time"
+      description: "Center latitude of 20m geosegments within each 100m land segment."
+      long_name: "latitude of 20m segments"
+      source: "ATBD January 2021, Section TBD"
+      units: "degree"
+      valid_max: "90.0"
+      valid_min: "-90.0"
+      is_subsegment: True # change this to subsegment
+      subsegment_length: 5 # vertical length
+
+    layer_flag:
+      SDS_Name: "land_segments/layer_flag"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "modelResult"
+      coordinates: "delta_time latitude longitude"
+      description: "This flag is a combination of multiple flags (cloud_flag_atm, cloud_flag_asr, and bsnow_con) and takes daytime/nighttime into consideration. A value of 1 means clouds or blowing snow are likely present. A value of 0 indicates the likely absence of clouds or blowing snow."
+      flag_meanings: "likely_clear likely_cloudy"
+      flag_values: "[0 1]"
+      long_name: "consolidated cloud flag"
+      source: "ATL09"
+      units: "1"
+
+#    longitude:
+#      SDS_Name: "land_segments/longitude"
+#      dtype: "float32"
+#      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+#      contentType: "modelResult"
+#      coordinates: "delta_time latitude"
+#      description: "Longitude of the center-most signal photon within each segment."
+#      long_name: "longitude"
+#      source: "Land ATBD section 2.4"
+#      standard_name: "longitude"
+#      units: "degrees"
+#      valid_max: "180.0"
+#      valid_min: "-180.0"
+
+    longitude_20m:
+      SDS_Name: "land_segments/longitude_20m"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)
+ array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "latitude longitude delta_time"
+      description: "Center longitude of 20m geosegments within each 100m land segment."
+      long_name: "longitude of 20m segments"
+      source: "ATBD January 2021, section TBD"
+      units: "degree"
+      valid_max: "180.0"
+      valid_min: "-180.0"
+      is_subsegment: True # change this to subsegment
+      subsegment_length: 5 # vertical length
+
+    msw_flag:
+      SDS_Name: "land_segments/msw_flag"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "127"
+      contentType: "qualityInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Multiple Scattering warning flag. The multiple scattering warning flag (ATL09 parameter msw_flag) has values from -1 to 5 where zero means no multiple scattering and 5 the greatest. If no layers were detected, then msw_flag = 0. If blowing snow is detected and its estimated optical depth is greater than or equal to 0.5, then msw_flag = 5. If the blowing snow optical depth is less than 0.5, then msw_flag = 4. If no blowing snow is detected but there are cloud or aerosol layers detected, the msw_flag assumes values of 1 to 3 based on the height of the bottom of the lowest layer: < 1 km, msw_flag = 3; 1-3 km, msw_flag = 2; > 3km, msw_flag = 1. A value of -1 indicates that the signal to noise of the data was too low to reliably ascertain the presence of cloud or blowing snow. We expect values of -1 to occur only during daylight."
+      flag_meanings: "cannot_determine no_layers layer_gt_3km layer_between_1_and_3_km layer_lt_1km blow_snow_od_lt_0.5 blow_snow_od_gt_0.5"
+      flag_values: "[-1  0  1  2  3  4  5]"
+      long_name: "multiple scattering warning flag"
+      source: "ATL09"
+      units: "1"
+
+    n_seg_ph:
+      SDS_Name: "land_segments/n_seg_ph"
+      dtype: "int32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "auxiliaryInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Number of photons within each land segment."
+      long_name: "number of photons"
+      source: "Derived"
+      units: "1"
+
+    night_flag:
+      SDS_Name: "land_segments/night_flag"
+      dtype: "int32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "2147483647"
+      contentType: "auxiliaryInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Flag indicating the data were acquired in night conditions: 0=day, 1=night.  Flag is derived from solar elevation at the geolocated segment.  IF solar elevation is above threshold it is day, if not then it is night.  Threshold is set in atlas_l3a_const_mod."
+      flag_meanings: "day night"
+      flag_values: "[0 1]"
+      long_name: "night flag"
+      source: "Land ATBD section 2.4.8"
+      units: "1"
+
+    ph_ndx_beg:
+      SDS_Name: "land_segments/ph_ndx_beg"
+      dtype: "int64"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "auxiliaryInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Index (1-based) within the photon-rate data (/land_segments/photons) of the first photon within this each land segment."
+      long_name: "photon index begin"
+      source: "Derived"
+      units: "1"
+
+    ph_removal_flag:
+      SDS_Name: "land_segments/ph_removal_flag"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "auxiliaryInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Flag indicating more than ph_removal_percent_limit (default 50.0) removed from land segment due to failing QA tests"
+      flag_meanings: "below_threshold above_threshold"
+      flag_values: "[0 1]"
+      long_name: "ph removal flag"
+      source: "ATBD section 4.13"
+      units: "1"
+
+    psf_flag:
+      SDS_Name: "land_segments/psf_flag"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Flag is set to 1 if the point spread function (computed as sigma_atlas_land) has exceeded the threshold (1 m)"
+      flag_meanings: "below_threshold above_threshold"
+      flag_values: "[0 1]"
+      long_name: "point spread function flag"
+      source: "Land/Veg ATBD"
+      units: "1"
+      valid_max: "1"
+      valid_min: "0"
+
+    rgt:
+      SDS_Name: "land_segments/rgt"
+      dtype: "int16"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "The reference ground track (RGT) is the track on the earth at which a specified unit vector within the observatory is pointed. Under nominal operating conditions, there will be no data collected along the RGT, as the RGT is spanned by GT3 and GT4.  During slews or off-pointing, it is possible that ground tracks may intersect the RGT. The ICESat-2 mission has 1387 RGTs."
+      long_name: "reference ground track"
+      source: "Operations"
+      units: "1"
+      valid_max: "1387"
+      valid_min: "1"
+
+    sat_flag:
+      SDS_Name: "land_segments/sat_flag"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "127"
+      contentType: "auxiliaryInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Flag derived from full_sat_fract on the ATL03 data product, averaged over 5 geosegments in 100m land segment"
+      flag_meanings: "no_saturation_detected saturation_detected not_enough_valid_data"
+      flag_values: "[ 0  1 -1]"
+      long_name: "saturation flag"
+      source: "ATL03, Land ATBD 15Apr2020, section 2.5.23"
+      units: "1"
+      valid_max: "1"
+      valid_min: "-1"
+
+    segment_id_beg:
+      SDS_Name: "land_segments/segment_id_beg"
+      dtype: "int32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Geolocation segment number of the first photon in the land segment."
+      long_name: "begin geolocation segment bin"
+      source: "ATL03"
+      units: "1"
+
+    segment_id_end:
+      SDS_Name: "land_segments/segment_id_end"
+      dtype: "int32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Geolocation segment number of the last photon in the land segment."
+      long_name: "end geolocation segment bin"
+      source: "ATL03"
+      units: "1"
+
+    segment_landcover:
+      SDS_Name: "land_segments/segment_landcover"
+      dtype: "int16"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "255"
+      contentType: "auxiliaryInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "UN-FAO Land Cover Surface type classification as reference from Copernicus Land Cover(ANC18) at the 100m resolution."
+      flag_meanings: "No_data Closed_forest_evergreen_needle_leaf Closed_forest_deciduous_needle_leaf Closed_forest_evergreen_broad_leaf Closed_forest_deciduous_broad_leaf Closed_forest_mixed Closed_forest_unknown Open_forest_evergreen_needle_leaf Open_forest_deciduous_needle_leaf Open_forest_evergreen_broad_leaf Open_forest_deciduous_broad_leaf Open_forest_mixed Open_forest_unknown Shrubs Herbaceous Herbaceous_wetleand Moss_and_lichen Bare_sparse_vegetation Cultivated_and_managed_vegetation_agriculture Urban_built_up Snow_and_ice Permanent_water_bodies Open_sea"
+      flag_values: "[  0 111 113 112 114 115 116 121 123 122 124 125 126  20  30  90 100  60
+  40  50  70  80 200]"
+      long_name: "segment landcover"
+      source: "15 May 2021 ATBD section 2.4.16"
+      units: "1"
+      valid_max: "200"
+      valid_min: "0"
+
+    segment_snowcover:
+      SDS_Name: "land_segments/segment_snowcover"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "127"
+      contentType: "auxiliaryInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Daily snow/ice cover from ATL09 at the 25 Hz rate(275m) indicating likely presence of snow and ice within each segment. 0=ice free water; 1=snow free land;  2=snow; 3=ice."
+      flag_meanings: "ice_free_water snow_free_land snow ice"
+      flag_values: "[0 1 2 3]"
+      long_name: "segment snowcover"
+      source: "ATBD section 4.2.16"
+      units: "1"
+      valid_max: "3"
+      valid_min: "0"
+
+    segment_watermask:
+      SDS_Name: "land_segments/segment_watermask"
+      dtype: "int32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "255"
+      contentType: "auxiliaryInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Water mask(i.e. flag) indicating inland water as referenced from the Global Raster Water Mask(ANC33) at 250 m spatial resolution."
+      flag_meanings: "no_water water"
+      flag_values: "[0 1]"
+      long_name: "segment watermask"
+      source: "ATBD section 2.4.15"
+      units: "1"
+      valid_max: "1"
+      valid_min: "0"
+
+    sigma_across:
+      SDS_Name: "land_segments/sigma_across"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Total cross-track uncertainty due to PPD and POD knowledge.  Read from ATL03 product gtx/geolocation/sigma_across. Sigma_atlas_y is reported on ATL08 as the uncertainty of the center-most reference photon of the 100m ATL08 segment."
+      long_name: "sigma atlas y"
+      source: "ATL03"
+      units: "1"
+
+    sigma_along:
+      SDS_Name: "land_segments/sigma_along"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Total along-track uncertainty due to PPD and POD knowledge.  Read from ATL03 product gtx/geolocation/sigma_along. Sigma_atlas_x is reported on ATL08 as the uncertainty of the center-most reference photon of the 100m ATL08 segment."
+      long_name: "sigma atlas x"
+      source: "ATL03"
+      units: "1"
+
+    sigma_atlas_land:
+      SDS_Name: "land_segments/sigma_atlas_land"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Total vertical geolocation error due to ranging and local surface slope.  The parameter is computed for ATL08 as described in equation 1.2."
+      long_name: "sigma atlas land"
+      source: "Land ATBD section 2.5.13"
+      units: "1"
+
+    sigma_h:
+      SDS_Name: "land_segments/sigma_h"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Estimated uncertainty for the reference photon bounce point ellipsoid height: 1- sigma (m) provided at the geolocation segment rate on ATL03.  Sigma_h is reported on ATL08 as the uncertainty of the center-most reference photon of the 100m ATL08 segment."
+      long_name: "height uncertainty"
+      source: "ATL03"
+      units: "1"
+
+    sigma_topo:
+      SDS_Name: "land_segments/sigma_topo"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Total uncertainty that include sigma_h plus geolocation uncertainty due to local slope (equation 1.3).  The local slope is multiplied by the geolocation uncertainty factor. This will be used to determine the total vertical geolocation error due to ranging and local slope."
+      long_name: "sigma atlas topo"
+      source: "Land ATBD section 2.5.12"
+      units: "1"
+
+    snr:
+      SDS_Name: "land_segments/snr"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "delta_time latitude longitude"
+      description: "The signal to noise ratio of geolocated photons as determined by the ratio of the superset of ATL03 signal and DRAGANN found signal photons used for processing the ATL08 segments to the background photons (i.e. noise) within the same ATL08 segments."
+      long_name: "signal to noise ratio"
+      source: "ATBD section 2.5.14"
+      units: "1"
 
     solar_azimuth:
-      SDS_Name: "solar_azimuth"
-      description: "Solar azimuth angle at the time of the shot"
-      units: "Degrees"
+      SDS_Name: "land_segments/solar_azimuth"
       dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "The direction, eastwards from north, of the sun vector as seen by an observer at the laser ground spot."
+      long_name: "solar azimuth"
+      source: "ATL03g ATBD"
+      units: "degrees_east"
 
-    energy_total:
-      SDS_Name: "energy_total"
-      description: "Total energy detected in the waveform"
-      units: "adimensional"
+    solar_elevation:
+      SDS_Name: "land_segments/solar_elevation"
       dtype: "float32"
-      valid_range: "-5000 to 5000000"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Solar Angle above or below the plane tangent to the ellipsoid surface at the laser spot. Positive values mean the sun is above the horizon, while  negative values mean it is below the horizon. The effect of atmospheric refraction is not included. This is a low precision value, with approximately TBD degree accuracy."
+      long_name: "solar elevation"
+      source: "ATL03g ATBD"
+      units: "degrees"
 
-    digital_elevation_model:
-      SDS_Name: "digital_elevation_model"
-      description: "TanDEM-X elevation at GEDI footprint location"
-      units: "Meters"
+    surf_type:
+      SDS_Name: "land_segments/surf_type"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)
+ array([<HDF5 object reference>], dtype=object)]"
+      contentType: "referenceInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Flags describing which surface types this interval is associated with. 0=not type, 1=is type. Order of array is land, ocean, sea ice, land ice, inland water."
+      flag_meanings: "not_type is_type"
+      flag_values: "[0 1]"
+      long_name: "surface type"
+      source: "ATL03 ATBD, Section 4"
+      units: "1"
+      valid_max: "1"
+      valid_min: "0"
+      is_subsegment: True # change this to subsegment
+      subsegment_length: 5 # vertical length
+
+    h_te_best_fit:
+      SDS_Name: "land_segments/terrain/h_te_best_fit"
       dtype: "float32"
-      valid_range: "-962.0, 10038.0"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The best fit terrain elevation at the the mid-point location of each 100m segment. The mid-segment terrain elevation is determined by selecting the best of three fits- linear, 3rd order and 4th order polynomials - to the terrain photons and interpolating the elevation at the mid-point location of the 100 m segment. For the linear fit, a slope correction and weighting is applied to each ground photon based on the distance to the slope height at the center of the segment."
+      long_name: "segment terrain height best fit"
+      source: "Land ATBD section 2.1.15"
+      units: "meters"
 
-    digital_elevation_model_srtm:
-      SDS_Name: "digital_elevation_model_srtm"
-      description: "STRM elevation at GEDI footprint location"
-      units: "Meters"
+    h_te_best_fit_20m:
+      SDS_Name: "land_segments/terrain/h_te_best_fit_20m"
       dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)
+ array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../latitude ../longitude ../delta_time"
+      description: "Best fit terrain height to center of each 20m geosegment within each 100m land segment."
+      long_name: "best fit 20m"
+      source: "ATBD January 2021, section TBD"
+      units: "m"
+      is_subsegment: True # change this to subsegment
+      subsegment_length: 5 # vertical length
 
-    elev_lowestmode:
-      SDS_Name: "elev_lowestmode"
-      description: "Elevation of center of lowest mode relative to reference ellipsoid"
-      units: "Meters"
+    h_te_interp:
+      SDS_Name: "land_segments/terrain/h_te_interp"
       dtype: "float32"
-      valid_range: "-1000.0 to 25000.0"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Interpolated terrain surface height above the WGS84 Ellipsoid at the midpoint of the segment."
+      long_name: "interpolated terrain surface height"
+      source: "Land ATBD section 4.9"
+      units: "meters"
 
-    num_detectedmodes:
-      SDS_Name: "num_detectedmodes"
-      description: "Number of detected modes in rxwaveform"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0 to 20"
-      product_level: 'L2A'
-
-    quality_flag:
-      SDS_Name: "quality_flag"
-      description: "Flag simplifying selection of most useful data"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0, 1"
-      product_level: 'L2A'
-
-    rh:
-      SDS_Name: "rh"
-      is_profile: True
-      profile_length: 101
-      description: "Relative height metrics at 1% interval"
-      units: "Meters"
+    h_te_max:
+      SDS_Name: "land_segments/terrain/h_te_max"
       dtype: "float32"
-      valid_range: "-213 to 213"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The maximum of the photon heights above the WGS84 Ellipsoid, classified as terrain within the segment."
+      long_name: "maximum terrain height"
+      source: "Land ATBD section 4.11"
+      units: "meters"
 
-    selected_algorithm:
-      SDS_Name: "selected_algorithm"
-      description: "Identifier of algorithm selected as identifying the lowest non-noise mode"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "1 to 6"
-      product_level: 'L2A'
-
-    surface_flag:
-      SDS_Name: "surface_flag"
-      description: "Identifier of algorithm selected as identifying the lowest non-noise mode"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0 to 1"
-      product_level: 'L2A'
-
-    elev_highestreturn_a1:
-      SDS_Name: "geolocation/elev_highestreturn_a1"
-      description: "Elevation of the highest return detected using algorithm 1, relative to reference ellipsoid"
-      units: "Meters"
+    h_te_mean:
+      SDS_Name: "land_segments/terrain/h_te_mean"
       dtype: "float32"
-      valid_range: "-1000 to 25000"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The mean of the photon heights above the WGS84 Ellipsoid, classified as terrain within the segment."
+      long_name: "mean terrain height"
+      source: "Land ATBD section 4.11"
+      units: "meters"
 
-    elev_highestreturn_a2:
-      SDS_Name: "geolocation/elev_highestreturn_a2"
-      description: "Elevation of the highest return detected using algorithm 2, relative to reference ellipsoid"
-      units: "Meters"
+    h_te_median:
+      SDS_Name: "land_segments/terrain/h_te_median"
       dtype: "float32"
-      valid_range: "-1000 to 25000"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The median of the photon heights above the WGS84 Ellipsoid, classified as terrain within the segment."
+      long_name: "median terrain height"
+      source: "Land ATBD section 4.11"
+      units: "meters"
 
-    stale_return_flag:
-      SDS_Name: "geolocation/stale_return_flag"
-      description: "Flag indicating return signal above detection threshold was not detected"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0 to 1"
-      product_level: 'L2A'
-
-    landsat_water_persistence:
-      SDS_Name: "land_cover_data/landsat_water_persistence"
-      description: "Percent UMD GLAD Landsat observations with classified surface water"
-      units: "Percent"
-      dtype: "uint8"
-      valid_range: "0 to 100"
-      product_level: 'L2A'
-
-    urban_proportion:
-      SDS_Name: "land_cover_data/urban_proportion"
-      description: "The percentage proportion of land area within a focal area surrounding each shot that is urban land cover."
-      units: "Percent"
-      dtype: "uint8"
-      valid_range: "0 to 100"
-      product_level: 'L2A'
-
-    pft_class:
-      SDS_Name: "land_cover_data/pft_class"
-      description: "GEDI 1 km EASE 2.0 grid Plant Functional Type (PFT)"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0 to 11"
-      product_level: 'L2A'
-
-    region_class:
-      SDS_Name: "land_cover_data/region_class"
-      description: "GEDI 1 km EASE 2.0 grid world continental regions "
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0 to 7"
-      product_level: 'L2A'
-
-    rx_maxamp:
-      SDS_Name: "rx_assess/rx_maxamp"
-      description: "Maximum amplitude of rxwaveform relative to mean noise level"
-      units: "adimensional"
+    h_te_min:
+      SDS_Name: "land_segments/terrain/h_te_min"
       dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The minimum of the photon heights above the WGS84 Ellipsoid, classified as terrain within the segment."
+      long_name: "minimum terrain height"
+      source: "Land ATBD section 4.11"
+      units: "meters"
 
-    sd_corrected:
-      SDS_Name: "rx_assess/sd_corrected"
-      description: "Noise standard deviation, corrected for odd/even digitizer bin errors based on pre-launch calibrations"
-      units: "adimensional"
+    h_te_mode:
+      SDS_Name: "land_segments/terrain/h_te_mode"
       dtype: "float32"
-      valid_range: "0 to 20"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The mode of the photon heights above the WGS84 Ellipsoid, classified as terrain within the segment."
+      long_name: "mode of terrain heights"
+      source: "Land ATBD section 4.11"
+      units: "meters"
 
-    rx_algrunflag:
-      SDS_Name: "rx_processing_a2/rx_algrunflag"
-      description: "Flag indicating signal was detected and algorithm ran successfully"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0 to 1"
-      product_level: 'L2A'
-
-    zcross:
-      SDS_Name: "rx_processing_a2/zcross"
-      description: "Sample number of center of lowest mode above noise level"
-      units: "Nanoseconds"
+    h_te_rh25:
+      SDS_Name: "land_segments/terrain/h_te_rh25"
       dtype: "float32"
-      valid_range: "0 to 1420"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The terrain elevation from the 25% height. The classified ground photons are sorted into a cumulative distribution and the height associated with the 25% height for that segment is reported."
+      long_name: "Terrain height 25% percentile"
+      source: "Land/veg ATBD, September 2020"
+      units: "meters"
 
-    toploc:
-      SDS_Name: "rx_processing_a2/toploc"
-      description: "Sample number of highest detected return"
-      units: "adimensional"
+    h_te_skew:
+      SDS_Name: "land_segments/terrain/h_te_skew"
       dtype: "float32"
-      valid_range: "0 to 1420"
-      product_level: 'L2A'
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The skewness of the photon heights above the WGS84 Ellipsoid, classified as terrain within the segment."
+      long_name: "skew of terrain heights"
+      source: "Land ATBD section 4.11"
+      units: "meters"
 
-level_2b:
-  variables:
+    h_te_std:
+      SDS_Name: "land_segments/terrain/h_te_std"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The standard deviation of the photon heights above the WGS84 Ellipsoid, classified as terrain within the segment."
+      long_name: "segment terrain roughness"
+      source: "Land ATBD section 4.11"
+      units: "meters"
+
+    h_te_uncertainty:
+      SDS_Name: "land_segments/terrain/h_te_uncertainty"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Uncertainty of the mean terrain height for the segment. This uncertainty incorporates all systematic uncertainties(e.g. timing orbits, geolocation,etc.) as well as uncertainty from errors of identified photons.  This parameter is described in section 1, equation 1.4"
+      long_name: "uncertainty of h_te_mean"
+      source: "Land ATBD section 4.11"
+      units: "meters"
+
+    n_te_photons:
+      SDS_Name: "land_segments/terrain/n_te_photons"
+      dtype: "int32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The number of the photons classified as terrain within the segment."
+      long_name: "number of ground photons"
+      source: "Land ATBD section 4.11"
+      units: "1"
+
+    photon_rate_te:
+      SDS_Name: "land_segments/terrain/photon_rate_te"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Calculated photon rate of terrain photons within each 100m segment"
+      long_name: "Terrain photon rate"
+      source: "July 2020 Land/Veg ATBD"
+      units: "s^-1"
+      valid_min: "0.0"
+
+    subset_te_flag:
+      SDS_Name: "land_segments/terrain/subset_te_flag"
+      dtype: "int8"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)
+ array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "127"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "Quality flag indicating the terrain photons populating the 100 m segment statistics are derived from less than 100 m worth of photons and/or less than 5 20m ATL03 segments."
+      flag_meanings: "no_photon_data_within_geosegment no_terrain_photons_within_geosegment terrain_photons_present_within_geosegment"
+      flag_values: "[-1  0  1]"
+      long_name: "subset terrain flag"
+      source: "Land/Veg ATBD 15 Novemebr 2019, Section 2.1.15"
+      units: "1"
+      valid_max: "1"
+      valid_min: "-1"
+      is_subsegment: True # change this to subsegment
+      subsegment_length: 5 # vertical length
+
+    terrain_slope:
+      SDS_Name: "land_segments/terrain/terrain_slope"
+      dtype: "float32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "3.4028234663852886e+38"
+      contentType: "modelResult"
+      coordinates: "../delta_time ../latitude ../longitude"
+      description: "The along-track slope of terrain, within each segment;computed by a linear fit of terrain classified photons. Slope is in units of delta height over delta along track distance."
+      long_name: "segment terrain slope"
+      source: "Land ATBD section 4.11"
+      units: "1"
+
+    terrain_flg:
+      SDS_Name: "land_segments/terrain_flg"
+      dtype: "int32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "2147483647"
+      contentType: "auxiliaryInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "Terrain flag quality check to indicate a deviation above a threshold from the reference DEM height reported on the product."
+      flag_meanings: "below_threshold above_threshold"
+      flag_values: "[0 1]"
+      long_name: "terrain flag"
+      source: "Land ATBD section 2.4.8"
+      units: "1"
+
+    urban_flag:
+      SDS_Name: "land_segments/urban_flag"
+      dtype: "int32"
+      DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+      _FillValue: "2147483647"
+      contentType: "qualityInformation"
+      coordinates: "delta_time latitude longitude"
+      description: "The urban flag indicates that a segment is likely located over an urban area."
+      flag_meanings: "not_urban urban undeterminable_urban"
+      flag_values: "[ 0  1 -1]"
+      long_name: "segment urban flag"
+      source: "Land ATBD section 2.4.17"
+      units: "1"
+
+    # additional parameter shot_number, constructed from the delta_time, latitude and longitude. This will be added as a reference information parameter.
     shot_number:
       SDS_Name: "shot_number"
-      description: "Unique shot identifier"
-      units: "adimensional"
-      dtype: "float64"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    algorithmrun_flag:
-      SDS_Name: "algorithmrun_flag"
-      description: "The L2B algorithm run flag"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0, 1"
-      product_level: 'L2B'
-
-    l2a_quality_flag:
-      SDS_Name: "l2a_quality_flag"
-      description: "L2A quality flag"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0, 1"
-      product_level: 'L2B'
-
-    l2b_quality_flag:
-      SDS_Name: "l2b_quality_flag"
-      description: "L2B quality flag"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0, 1"
-      product_level: 'L2B'
-
-    stale_return_flag:
-      SDS_Name: "stale_return_flag"
-      description: "Flag indicating return signal above detection threshold was not detected"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "0, 1"
-      product_level: 'L2B'
-
-    cover:
-      SDS_Name: "cover"
-      description: "Total canopy cover"
-      units: "Percent"
-      dtype: "float32"
-      valid_range: "0 to 1"
-      product_level: 'L2B'
-
-    cover_z:
-      SDS_Name: "cover_z"
-      is_profile: true
-      profile_length: 30
-      description: "Cumulative canopy cover vertical profile"
-      units: "Percent"
-      dtype: "float32"
-      valid_range: "0 to 1"
-      product_level: 'L2B'
-
-    fhd_normal:
-      SDS_Name: "fhd_normal"
-      description: "Foliage Height Diversity"
-      units: "adimensional"
-      dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    omega:
-      SDS_Name: "omega"
-      description: "Foliage Clumping Index"
-      units: "adimensional"
-      dtype: "float32"
-      valid_range: "0, 1"
-      product_level: 'L2B'
-
-    pai:
-      SDS_Name: "pai"
-      description: "Total Plant Area Index"
-      units: "m²/m²"
-      dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    pai_z:
-      SDS_Name: "pai_z"
-      is_profile: true
-      profile_length: 30
-      description: "Plant Area Index profile"
-      units: "m²/m²"
-      dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    pavd_z:
-      SDS_Name: "pavd_z"
-      is_profile: true
-      profile_length: 30
-      description: "Plant Area Volume Density profile"
-      units: "m²/m³"
-      dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    pgap_theta:
-      SDS_Name: "pgap_theta"
-      description: "Total Gap Probability (theta)"
-      units: "adimensional"
-      dtype: "float32"
-      valid_range: "0, 1"
-      product_level: 'L2B'
-
-    pgap_theta_error:
-      SDS_Name: "pgap_theta_error"
-      description: "Total Pgap (theta) error"
-      units: "adimensional"
-      dtype: "float32"
-      valid_range: "0, 1"
-      product_level: 'L2B'
-
-    rg:
-      SDS_Name: "rg"
-      description: "Integral of the ground component in the RX waveform"
-      units: "adimensional"
-      dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    rh100:
-      SDS_Name: "rh100"
-      description: "Height above ground of the received waveform signal start"
-      units: "cm"
-      dtype: "int16"
-      valid_range: "-21300 to 21300"
-      product_level: 'L2B'
-
-    rhog:
-      SDS_Name: "rhog"
-      description: "Volumetric scattering coefficient (rho) of the ground"
-      units: "adimensional"
-      dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    rhog_error:
-      SDS_Name: "rhog_error"
-      description: "Rho (ground) error"
-      units: "adimensional"
-      dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    rhov:
-      SDS_Name: "rhov"
-      description: "Volumetric scattering coefficient (rho) of the canopy"
-      units: "adimensional"
-      dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    rhov_error:
-      SDS_Name: "rhov_error"
-      description: "Rho (canopy) error"
-      units: "adimensional"
-      dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    rossg:
-      SDS_Name: "rossg"
-      description: "Ross-G function"
-      units: "adimensional"
-      dtype: "float32"
-      valid_range: "0, 1"
-      product_level: 'L2B'
-
-    rv:
-      SDS_Name: "rv"
-      description: "Integral of the vegetation component in the RX waveform"
-      units: "adimensional"
-      dtype: "float32"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    rx_range_highestreturn:
-      SDS_Name: "rx_range_highestreturn"
-      description: "Range to signal start"
-      units: "Meters"
-      dtype: "float64"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    selected_l2a_algorithm:
-      SDS_Name: "selected_l2a_algorithm"
-      description: "Selected L2A algorithm setting"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "1 to 6"
-      product_level: 'L2B'
-
-    selected_rg_algorithm:
-      SDS_Name: "selected_rg_algorithm"
-      description: "Selected R (ground) algorithm"
-      units: "adimensional"
-      dtype: "uint8"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-    dz:
-      SDS_Name: "ancillary/dz"
-      description: "Vertical step size of foliage profile"
-      units: "Meters"
-      dtype: "float64"
-      valid_range: "N/A"
-      product_level: 'L2B'
-
-level_4a:
-  variables:
-    shot_number:
-      SDS_Name: "shot_number"
-      description: "Unique identifier for each shot"
-      units: "adimensional"
-      dtype: "float64"
-      product_level: 'L4A'
-
-    l2_quality_flag:
-      SDS_Name: "l2_quality_flag"
-      description: "Flag identifying the most useful L2 data for biomass predictions"
-      units: "adimensional"
-      dtype: "uint8"
-      product_level: 'L4A'
-
-    l4_quality_flag:
-      SDS_Name: "l4_quality_flag"
-      description: "Flag simplifying selection of most useful biomass predictions"
-      units: "adimensional"
-      dtype: "uint8"
-      product_level: 'L4A'
-
-    predictor_limit_flag:
-      SDS_Name: "predictor_limit_flag"
-      description: "Prediction stratum identifier (0=in bounds, 1=lower bound, 2=upper bound)"
-      units: "adimensional"
-      dtype: "uint8"
-      product_level: 'L4A'
-
-    response_limit_flag:
-      SDS_Name: "response_limit_flag"
-      description: "Prediction value outside bounds of training data (0=in bounds, 1=lower bound, 2=upper bound)"
-      units: "adimensional"
-      dtype: "uint8"
-      product_level: 'L4A'
-
-    agbd:
-      SDS_Name: "agbd"
-      description: "Aboveground biomass density"
-      units: "Mg/ha"
-      dtype: "float32"
-      product_level: 'L4A'
-
-    agbd_pi_lower:
-      SDS_Name: "agbd_pi_lower"
-      description: "Lower prediction interval for aboveground biomass density"
-      units: "Mg/ha"
-      dtype: "float32"
-      product_level: 'L4A'
-
-    agbd_pi_upper:
-      SDS_Name: "agbd_pi_upper"
-      description: "Upper prediction interval for aboveground biomass density"
-      units: "Mg/ha"
-      dtype: "float32"
-      product_level: 'L4A'
-
-    agbd_se:
-      SDS_Name: "agbd_se"
-      description: "Standard error of aboveground biomass density"
-      units: "Mg/ha"
-      dtype: "float32"
-      product_level: 'L4A'
-
-    agbd_t:
-      SDS_Name: "agbd_t"
-      description: "Model prediction in fit units"
-      units: "adimensional"
-      dtype: "float32"
-      product_level: 'L4A'
-
-    agbd_t_se:
-      SDS_Name: "agbd_t_se"
-      description: "Model prediction standard error in fit units"
-      units: "adimensional"
-      dtype: "float32"
-      product_level: 'L4A'
-
-    predict_stratum:
-      SDS_Name: "predict_stratum"
-      description: "Prediction stratum name for the 1 km cell"
-      units: "adimensional"
-      dtype: "U20"
-      product_level: 'L4A'
-
-level_4c:
-  variables:
-    shot_number:
-      SDS_Name: "shot_number"
-      description: "Unique identifier for each shot"
-      units: "adimensional"
-      dtype: "uint64"
-      product_level: 'L4C'
-
-    wsci:
-      SDS_Name: "wsci"
-      description: "Waveform Structural Complexity Index"
-      units: "adimensional"
-      dtype: "float32"
-      product_level: 'L4C'
-
-    wsci_pi_lower:
-      SDS_Name: "wsci_pi_lower"
-      description: "Waveform Structural Complexity Index lower prediction interval"
-      units: "adimensional"
-      dtype: "float32"
-      product_level: 'L4C'
-
-    wsci_pi_upper:
-      SDS_Name: "wsci_pi_upper"
-      description: "Waveform Structural Complexity Index upper prediction interval"
-      units: "adimensional"
-      dtype: "float32"
-      product_level: 'L4C'
-
-    wsci_quality_flag:
-      SDS_Name: "wsci_quality_flag"
-      description: "Waveform Structural Complexity Index quality flag"
-      units: "adimensional"
-      dtype: "uint8"
-      product_level: 'L4C'
-
-    wsci_xy:
-      SDS_Name: "wsci_xy"
-      description: "Horizontal Structural Complexity"
-      units: "adimensional"
-      dtype: "float32"
-      product_level: 'L4C'
-
-    wsci_xy_pi_lower:
-      SDS_Name: "wsci_xy_pi_lower"
-      description: "Horizontal Structural Complexity lower prediction interval"
-      units: "adimensional"
-      dtype: "float32"
-      product_level: 'L4C'
-
-    wsci_xy_pi_upper:
-      SDS_Name: "wsci_xy_pi_upper"
-      description: "Horizontal Structural Complexity upper prediction interval"
-      units: "adimensional"
-      dtype: "float32"
-      product_level: 'L4C'
-
-    wsci_z:
-      SDS_Name: "wsci_z"
-      description: "Vertical Structural Complexity"
-      units: "adimensional"
-      dtype: "float32"
-      product_level: 'L4C'
-
-    wsci_z_pi_lower:
-      SDS_Name: "wsci_z_pi_lower"
-      description: "Vertical Structural Complexity lower prediction interval"
-      units: "adimensional"
-      dtype: "float32"
-      product_level: 'L4C'
-
-    wsci_z_pi_upper:
-      SDS_Name: "wsci_z_pi_upper"
-      description: "Vertical Structural Complexity upper prediction interval"
-      units: "adimensional"
-      dtype: "float32"
-      product_level: 'L4C'
+      description: "Unique shot number"
+      dtype: "U30"

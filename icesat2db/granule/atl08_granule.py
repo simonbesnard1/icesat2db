@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
-# SPDX-FileCopyrightText: 2025 Amelia Holcomb
-# SPDX-FileCopyrightText: 2025 Felix Dombrowski
-# SPDX-FileCopyrightText: 2025 Simon Besnard
-# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-#
+# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
+# SPDX-FileCopyrightText: 2026 Felix Dombrowski
+# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
+# SPDX-FileCopyrightText: 2026 Simon Besnard
+# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+
 
 from typing import Dict
 
@@ -15,7 +15,7 @@ from icesat2db.granule.Granule import granule_handler
 
 class ATL08Granule(granule_handler):
     """
-    Represents a IceSat-2 ATL08 granule, providing access to its beams and related data.
+    Represents a IceSat2 ATL08 granule, providing access to its beams and related data.
 
     This class extends the base Granule class and initializes with a specific file path and
     a field mapping that maps product variables to the corresponding data fields in the granule.

@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
-# SPDX-FileCopyrightText: 2025 Amelia Holcomb
-# SPDX-FileCopyrightText: 2025 Felix Dombrowski
-# SPDX-FileCopyrightText: 2025 Simon Besnard
-# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-#
+# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
+# SPDX-FileCopyrightText: 2026 Felix Dombrowski
+# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
+# SPDX-FileCopyrightText: 2026 Simon Besnard
+# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+
 
 import logging
 from typing import Callable, Dict, Optional
@@ -77,7 +77,7 @@ class beam_handler(h5py.Group):
         Returns:
             int: The number of shots in the beam.
         """
-        return len(self["signal_photons/delta_time"])
+        return len(self["shot_number"])
 
     @property
     def beam_type(self) -> str:

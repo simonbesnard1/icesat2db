@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
-# SPDX-FileCopyrightText: 2025 Amelia Holcomb
-# SPDX-FileCopyrightText: 2025 Felix Dombrowski
-# SPDX-FileCopyrightText: 2025 Simon Besnard
-# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-#
+# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
+# SPDX-FileCopyrightText: 2026 Felix Dombrowski
+# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
+# SPDX-FileCopyrightText: 2026 Simon Besnard
+# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+
 
 import concurrent.futures
 import logging
@@ -490,10 +490,10 @@ class IceSat2Database:
 
         Overview
         --------
-        Each variable from the IceSat product configuration (`self.variables_config`)
+        Each variable from the IceSat2 product configuration (`self.variables_config`)
         becomes a TileDB attribute in the output array schema. This includes both
-        scalar attributes (e.g., `lat_lowestmode`, `agbd`, `sensitivity`) and profile-type
-        variables (e.g., `rh_1`...`rh_101`) that represent vertical profiles or
+        subsegment attributes (e.g., `h_canopy_20m`) and profile-type
+        variables (e.g., `canopy_h_metrics`) that represent vertical profiles or
         multi-level values per shot.
 
         The function delegates compression and filter selection to the
@@ -508,14 +508,12 @@ class IceSat2Database:
 
         .. code-block:: yaml
 
-            agbd:
-              dtype: float32
+            h_canopy:
               is_profile: false
 
-            rh:
-              dtype: float32
-              is_profile: true
-              profile_length: 101
+            h_canopy_20m:
+              is_subsegment: true
+              subsegment_length: 5
 
         Supported keys per variable:
             - ``dtype`` : str or numpy dtype
@@ -524,6 +522,10 @@ class IceSat2Database:
                 Whether the variable represents a profile-type attribute.
             - ``profile_length`` : int, optional
                 Number of vertical levels (required if `is_profile` is True).
+            - ``is_subsegment`` : bool, optional
+                Whether the variable represents a subsegment-type attribute.
+            - ``subsegment_length`` : int, optional
+                Number of horizontal levels (required if `is_subsegment` is True).
 
         Compression Strategy
         --------------------
@@ -538,7 +540,7 @@ class IceSat2Database:
             | string (U)        | Zstd(level from config)                     |
 
         Profile attributes are expanded into multiple attributes with numeric suffixes,
-        e.g. `rh_1`, `rh_2`, … `rh_N`.
+        e.g. `canopy_h_metrics_1`, `canopy_h_metrics_2`, … `canopy_h_metrics_N`.
 
         An additional attribute `timestamp_ns` (int64) is optionally included to support
         deduplication and versioning of records, compressed using BitWidthReduction +
@@ -561,20 +563,11 @@ class IceSat2Database:
         -----
         **Design rationale:**
         - Filter assignment is entirely dtype-based for maintainability and scalability
-          (critical when handling >1000 IceSat variables).
+          (critical when handling >1000 IceSat2 variables).
         - Profile variables are flattened into multiple attributes to support direct
           columnar reads from TileDB, avoiding the need for nested array structures.
         - The optional `timestamp_ns` field allows time-based filtering and ensures
           deterministic merges of overlapping data writes.
-
-        Examples
-        --------
-        >>> attrs = self._create_attributes()
-        >>> attrs[:3]
-        [Attr(name='agbd', dtype='float32', filters=ByteShuffle+Zstd(5)),
-         Attr(name='degrade_flag', dtype='uint8', filters=RLE+Zstd(3)),
-         Attr(name='rh_1', dtype='float32', filters=ByteShuffle+Zstd(5))]
-
         """
         if not self.variables_config:
             raise ValueError(
@@ -602,7 +595,7 @@ class IceSat2Database:
                 )
             )
 
-        # --- Profile attributes (e.g. rh_1, rh_2, ..., rh_N)
+        # --- Profile attributes
         for var_name, var_info in self.variables_config.items():
             if not var_info.get("is_profile", False):
                 continue
@@ -623,7 +616,7 @@ class IceSat2Database:
                     )
                 )
 
-        # --- Profile attributes (e.g. rh_1, rh_2, ..., rh_N)
+        # --- Subsegment attributes
         for var_name, var_info in self.variables_config.items():
             if not var_info.get("is_subsegment", False):
                 continue
@@ -690,11 +683,11 @@ class IceSat2Database:
                             "profile_length", 0
                         )
 
-                        # Add profile-specific metadata
-                        if var_info.get("is_subsegment", False):
-                            array.meta[f"{var_name}.subsegment_length"] = var_info.get(
-                                "subsegment_length", 0
-                            )
+                    # Add profile-specific metadata
+                    if var_info.get("is_subsegment", False):
+                        array.meta[f"{var_name}.subsegment_length"] = var_info.get(
+                            "subsegment_length", 0
+                        )
 
         except tiledb.TileDBError as e:
             logger.error(f"Error adding metadata to TileDB array: {e}")

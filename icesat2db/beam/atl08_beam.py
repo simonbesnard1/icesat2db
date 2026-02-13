@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
-# SPDX-FileCopyrightText: 2025 Amelia Holcomb
-# SPDX-FileCopyrightText: 2025 Felix Dombrowski
-# SPDX-FileCopyrightText: 2025 Simon Besnard
-# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-#
+# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
+# SPDX-FileCopyrightText: 2026 Felix Dombrowski
+# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
+# SPDX-FileCopyrightText: 2026 Simon Besnard
+# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+
 import hashlib
 from typing import Dict, Optional
 
@@ -17,7 +17,7 @@ from icesat2db.granule.Granule import granule_handler
 
 class ATL08Beam(beam_handler):
     """
-    Represents a Level 2A (L2A) GEDI beam and processes the beam data.
+    Represents a Level ATL08 IceSat2 beam and processes the beam data.
     This class extracts geolocation and elevation data, applies quality filters,
     and returns the filtered beam data as a DataFrame.
     """
@@ -26,7 +26,7 @@ class ATL08Beam(beam_handler):
         self, granule: granule_handler, beam: str, field_mapping: Dict[str, str]
     ):
         """
-        Initialize the L2ABeam class.
+        Initialize the ATL08Beam class.
 
         Args:
             granule (Granule): The parent granule object.
@@ -72,13 +72,22 @@ class ATL08Beam(beam_handler):
         lat = np.round(self["land_segments/latitude"], 9)
         lon = np.round(self["land_segments/longitude"], 9)
 
-        shot_str = (
-                dt.astype(str) + "_" +
-                lat.astype(str) + "_" +
-                lon.astype(str)
-        )
+        # shot_str = (
+        #         dt.astype(str) + "_" +
+        #         lat.astype(str) + "_" +
+        #         lon.astype(str)
+        # )
+        #
+        # return shot_str
 
-        return shot_str
+        data = np.stack([dt, lat, lon], axis=1).astype(np.float64)
+
+        shot_hash = np.array([
+            hashlib.sha256(row.tobytes()).hexdigest()
+            for row in data
+        ])
+
+        return shot_hash
 
     def _get_main_data(self) -> Optional[Dict[str, np.ndarray]]:
         """
