@@ -70,7 +70,7 @@ end_date = "2023-12-31"
 earth_data_dir = "/path/to/EarthData_credentials"
 
 # Initialize and run the GEDIProcessor
-with gdb.GEDIProcessor(
+with gdb.IceSat2Processor(
     config_file=new_config_file,
     geometry=geojson_path,
     start_date=start_date,

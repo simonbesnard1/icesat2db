@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
-# SPDX-FileCopyrightText: 2025 Amelia Holcomb
-# SPDX-FileCopyrightText: 2025 Felix Dombrowski
-# SPDX-FileCopyrightText: 2025 Simon Besnard
-# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
+# SPDX-FileCopyrightText: 2026 Felix Dombrowski
+# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
+# SPDX-FileCopyrightText: 2026 Simon Besnard
+# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
 
 import logging
 import os
@@ -16,7 +16,7 @@ import geopandas as gpd
 from shapely import contains_xy
 import tiledb
 
-from gedidb.utils.geo_processing import (
+from icesat2db.utils.geo_processing import (
     _datetime_to_timestamp_days,
 )
 
@@ -27,7 +27,7 @@ DEFAULT_DIMS = ["shot_number"]
 
 class TileDBProvider:
     """
-    A base provider class for managing low-level interactions with TileDB arrays for GEDI data.
+    A base provider class for managing low-level interactions with TileDB arrays for IceSat2 data.
     """
 
     def __init__(
@@ -187,7 +187,8 @@ class TileDBProvider:
 
         for var in variables:
             profile_key = f"{var}.profile_length"
-            if profile_key in array_meta:
+            subsegment_key = f"{var}.subsegment_length"
+            if profile_key in array_meta or subsegment_key in array_meta:
                 profile_length = array_meta[profile_key]
                 # Pre-allocate list with list comprehension (faster than append)
                 profile_attrs = [f"{var}_{i}" for i in range(1, profile_length + 1)]

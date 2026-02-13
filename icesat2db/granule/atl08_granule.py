@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
-# SPDX-FileCopyrightText: 2025 Amelia Holcomb
-# SPDX-FileCopyrightText: 2025 Felix Dombrowski
-# SPDX-FileCopyrightText: 2025 Simon Besnard
-# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-#
+# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
+# SPDX-FileCopyrightText: 2026 Felix Dombrowski
+# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
+# SPDX-FileCopyrightText: 2026 Simon Besnard
+# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+
 
 from typing import Dict
 
@@ -15,7 +15,7 @@ from icesat2db.granule.Granule import granule_handler
 
 class ATL08Granule(granule_handler):
     """
-    Represents a GEDI Level 2A granule, providing access to its beams and related data.
+    Represents a IceSat2 ATL08 granule, providing access to its beams and related data.
 
     This class extends the base Granule class and initializes with a specific file path and
     a field mapping that maps product variables to the corresponding data fields in the granule.
@@ -26,10 +26,10 @@ class ATL08Granule(granule_handler):
 
     def __init__(self, file_path: str, field_mapping: Dict[str, str]):
         """
-        Initialize an L2AGranule object.
+        Initialize an ATL08Granule object.
 
         Parameters:
-            file_path (str): Path to the GEDI Level 2A granule file (HDF5 format).
+            file_path (str): Path to the IceSat-2 ATL08 granule file (HDF5 format).
             field_mapping (Dict[str, str]): Dictionary containing the mapping of product variables to data fields.
         """
         self.field_mapping = (
@@ -40,10 +40,10 @@ class ATL08Granule(granule_handler):
             super().__init__(file_path)  # Call parent constructor
             if not self._is_open:
                 raise RuntimeError(
-                    f"Failed to initialize L4CGranule: {file_path} could not be opened."
+                    f"Failed to initialize ATL08Granule: {file_path} could not be opened."
                 )
         except Exception as e:
-            print(f"Error initializing L4CGranule for {file_path}: {e}")
+            print(f"Error initializing ATL08Granule for {file_path}: {e}")
             self.file_path = (
                 file_path  # Ensure this is always set to avoid AttributeError
             )
@@ -75,10 +75,10 @@ class ATL08Granule(granule_handler):
         Retrieve a specific beam from the granule by name.
 
         Parameters:
-            beam (str): The name of the beam to retrieve (e.g., "BEAM0000").
+            beam (str): The name of the beam to retrieve (e.g., "gt1l").
 
         Returns:
-            L2ABeam: The corresponding L2ABeam object for the given beam name.
+            ATL08Beam: The corresponding ATL08Beam object for the given beam name.
         """
         self.validate_beam_name(beam)
         return ATL08Beam(self, beam, self.field_mapping)

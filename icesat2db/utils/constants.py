@@ -14,14 +14,11 @@ class IceSat2Product(Enum):
     Enum representing different GEDI data products.
 
     Attributes:
-        L2A (str): Level 2A GEDI product (land and canopy structure).
-        L2B (str): Level 2B GEDI product (biomass and carbon).
-        L4A (str): Level 4A GEDI product (terrain elevation and canopy height).
-        L4C (str): Level 4C GEDI product (ecosystem carbon and dynamics).
+        ATL08 (str): Represents the ATL08 product.
     """
 
     ATL08 = "atl08"
-    ATL03 = "atl03"
+    # ATL03 = "atl03"
     
     @classmethod
     def list_products(cls):

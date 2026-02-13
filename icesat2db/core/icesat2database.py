@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
-# SPDX-FileCopyrightText: 2025 Amelia Holcomb
-# SPDX-FileCopyrightText: 2025 Felix Dombrowski
-# SPDX-FileCopyrightText: 2025 Simon Besnard
-# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-#
+# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
+# SPDX-FileCopyrightText: 2026 Felix Dombrowski
+# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
+# SPDX-FileCopyrightText: 2026 Simon Besnard
+# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+
 
 import concurrent.futures
 import logging
@@ -19,23 +19,23 @@ from retry import retry
 from pandas.api.types import is_datetime64_any_dtype
 from pandas.core.dtypes.dtypes import DatetimeTZDtype  # new-style tz dtype check
 
-from gedidb.utils.tiledb_consolidation import SpatialConsolidationPlanner
-from gedidb.utils.filters import TileDBFilterPolicy
+from icesat2db.utils.tiledb_consolidation import SpatialConsolidationPlanner
+from icesat2db.utils.filters import TileDBFilterPolicy
 
 
 # Configure the logger
 logger = logging.getLogger(__name__)
 
 
-class GEDIDatabase:
+class IceSat2Database:
     """
-    A class to manage the creation and operation of global TileDB arrays for GEDI data storage.
+    A class to manage the creation and operation of global TileDB arrays for IceSat2 data storage.
     This class is configured via an external configuration, allowing flexible schema definitions and metadata handling.
     """
 
     def __init__(self, config: Dict[str, Any], credentials: Optional[dict] = None):
         """
-        Initialize GEDIDatabase with configuration, supporting both S3 and local storage.
+        Initialize IceSat2Database with configuration, supporting both S3 and local storage.
 
         Parameters:
         -----------
@@ -347,12 +347,12 @@ class GEDIDatabase:
 
     def _create_domain(self) -> tiledb.Domain:
         """
-        Create the TileDB domain for storing GEDI data, including spatial (latitude,
+        Create the TileDB domain for storing IceSat data, including spatial (latitude,
         longitude) and temporal (time) dimensions with appropriate compression filters.
 
         Overview
         --------
-        The GEDI data are georeferenced point observations with time stamps. To enable
+        The IceSat data are georeferenced point observations with time stamps. To enable
         efficient spatial–temporal indexing and compression, this function defines:
 
         • Latitude and longitude as float64 dimensions, internally stored as scaled
@@ -485,15 +485,15 @@ class GEDIDatabase:
 
     def _create_attributes(self) -> list[tiledb.Attr]:
         """
-        Create TileDB attributes for all configured GEDI variables, assigning appropriate
+        Create TileDB attributes for all configured IceSat variables, assigning appropriate
         compression filters based on their data type.
 
         Overview
         --------
-        Each variable from the GEDI product configuration (`self.variables_config`)
+        Each variable from the IceSat2 product configuration (`self.variables_config`)
         becomes a TileDB attribute in the output array schema. This includes both
-        scalar attributes (e.g., `lat_lowestmode`, `agbd`, `sensitivity`) and profile-type
-        variables (e.g., `rh_1`...`rh_101`) that represent vertical profiles or
+        subsegment attributes (e.g., `h_canopy_20m`) and profile-type
+        variables (e.g., `canopy_h_metrics`) that represent vertical profiles or
         multi-level values per shot.
 
         The function delegates compression and filter selection to the
@@ -508,14 +508,12 @@ class GEDIDatabase:
 
         .. code-block:: yaml
 
-            agbd:
-              dtype: float32
+            h_canopy:
               is_profile: false
 
-            rh:
-              dtype: float32
-              is_profile: true
-              profile_length: 101
+            h_canopy_20m:
+              is_subsegment: true
+              subsegment_length: 5
 
         Supported keys per variable:
             - ``dtype`` : str or numpy dtype
@@ -524,6 +522,10 @@ class GEDIDatabase:
                 Whether the variable represents a profile-type attribute.
             - ``profile_length`` : int, optional
                 Number of vertical levels (required if `is_profile` is True).
+            - ``is_subsegment`` : bool, optional
+                Whether the variable represents a subsegment-type attribute.
+            - ``subsegment_length`` : int, optional
+                Number of horizontal levels (required if `is_subsegment` is True).
 
         Compression Strategy
         --------------------
@@ -538,7 +540,7 @@ class GEDIDatabase:
             | string (U)        | Zstd(level from config)                     |
 
         Profile attributes are expanded into multiple attributes with numeric suffixes,
-        e.g. `rh_1`, `rh_2`, … `rh_N`.
+        e.g. `canopy_h_metrics_1`, `canopy_h_metrics_2`, … `canopy_h_metrics_N`.
 
         An additional attribute `timestamp_ns` (int64) is optionally included to support
         deduplication and versioning of records, compressed using BitWidthReduction +
@@ -561,20 +563,11 @@ class GEDIDatabase:
         -----
         **Design rationale:**
         - Filter assignment is entirely dtype-based for maintainability and scalability
-          (critical when handling >1000 GEDI variables).
+          (critical when handling >1000 IceSat2 variables).
         - Profile variables are flattened into multiple attributes to support direct
           columnar reads from TileDB, avoiding the need for nested array structures.
         - The optional `timestamp_ns` field allows time-based filtering and ensures
           deterministic merges of overlapping data writes.
-
-        Examples
-        --------
-        >>> attrs = self._create_attributes()
-        >>> attrs[:3]
-        [Attr(name='agbd', dtype='float32', filters=ByteShuffle+Zstd(5)),
-         Attr(name='degrade_flag', dtype='uint8', filters=RLE+Zstd(3)),
-         Attr(name='rh_1', dtype='float32', filters=ByteShuffle+Zstd(5))]
-
         """
         if not self.variables_config:
             raise ValueError(
@@ -585,7 +578,10 @@ class GEDIDatabase:
 
         # --- Scalar attributes (non-profile variables)
         for var_name, var_info in self.variables_config.items():
+
             if var_info.get("is_profile", False):
+                continue
+            if var_info.get("is_subsegment", False):
                 continue
 
             dtype = np.dtype(var_info["dtype"])
@@ -599,7 +595,7 @@ class GEDIDatabase:
                 )
             )
 
-        # --- Profile attributes (e.g. rh_1, rh_2, ..., rh_N)
+        # --- Profile attributes
         for var_name, var_info in self.variables_config.items():
             if not var_info.get("is_profile", False):
                 continue
@@ -612,6 +608,27 @@ class GEDIDatabase:
             filters = self.filter_policy.filters_for_dtype(dtype)
 
             for i in range(profile_length):
+                attrs.append(
+                    tiledb.Attr(
+                        name=f"{var_name}_{i + 1}",
+                        dtype=dtype,
+                        filters=filters,
+                    )
+                )
+
+        # --- Subsegment attributes
+        for var_name, var_info in self.variables_config.items():
+            if not var_info.get("is_subsegment", False):
+                continue
+
+            subsegment_length = int(var_info.get("subsegment_length", 1))
+            if subsegment_length <= 0:
+                raise ValueError(f"{var_name}: subsegment_length must be >= 1")
+
+            dtype = np.dtype(var_info["dtype"])
+            filters = self.filter_policy.filters_for_dtype(dtype)
+
+            for i in range(subsegment_length):
                 attrs.append(
                     tiledb.Attr(
                         name=f"{var_name}_{i + 1}",
@@ -666,6 +683,12 @@ class GEDIDatabase:
                             "profile_length", 0
                         )
 
+                    # Add profile-specific metadata
+                    if var_info.get("is_subsegment", False):
+                        array.meta[f"{var_name}.subsegment_length"] = var_info.get(
+                            "subsegment_length", 0
+                        )
+
         except tiledb.TileDBError as e:
             logger.error(f"Error adding metadata to TileDB array: {e}")
             raise
@@ -688,7 +711,10 @@ class GEDIDatabase:
         data : dict
             Variable data to write to the TileDB array.
         """
+
         with tiledb.open(self.array_uri, mode="w", ctx=self.ctx) as array:
+
+
             dim_names = [dim.name for dim in array.schema.domain]
             dims = tuple(coords[dim_name] for dim_name in dim_names)
             array[dims] = data
@@ -710,6 +736,7 @@ class GEDIDatabase:
 
             # --- Deduplicate rows on key dimensions
             subset_cols = ["latitude", "longitude", "time"]
+
             granule_data = granule_data.drop_duplicates(
                 subset=subset_cols, keep="first"
             )
@@ -736,6 +763,7 @@ class GEDIDatabase:
 
             available_cols = set(view.columns)
             attrs_to_write = [name for name in schema_attrs if name in available_cols]
+
             write_timestamp = "timestamp_ns" in schema_attrs
 
             # --- Precompute coordinate arrays
@@ -978,7 +1006,7 @@ class GEDIDatabase:
         """
         # Consolidate all variables from different levels
         variables_config = {}
-        for level in ["level_2a", "level_2b", "level_4a", "level_4c"]:
+        for level in ["level_atl08"]:
             level_vars = config.get(level, {}).get("variables", {})
             for var_name, var_info in level_vars.items():
                 variables_config[var_name] = var_info

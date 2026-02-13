@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
-# SPDX-FileCopyrightText: 2025 Amelia Holcomb
-# SPDX-FileCopyrightText: 2025 Felix Dombrowski
-# SPDX-FileCopyrightText: 2025 Simon Besnard
-# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-#
+# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
+# SPDX-FileCopyrightText: 2026 Felix Dombrowski
+# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
+# SPDX-FileCopyrightText: 2026 Simon Besnard
+# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+
 
 import logging
 import os
@@ -21,13 +21,13 @@ from dask.distributed import Client
 import concurrent.futures
 from concurrent.futures import as_completed
 
-from gedidb.core.gedidatabase import GEDIDatabase
-from gedidb.core.gedigranule import GEDIGranule
-from gedidb.downloader.authentication import EarthDataAuthenticator
-from gedidb.downloader.data_downloader import CMRDataDownloader, H5FileDownloader
-from gedidb.utils.constants import GediProduct
-from gedidb.utils.geo_processing import _temporal_tiling, check_and_format_shape
-from gedidb.utils.progress_ledger import ProgressLedger, Row
+from icesat2db.core.icesat2database import IceSat2Database
+from icesat2db.core.icesat2granule import IceSat2Granule
+from icesat2db.downloader.authentication import EarthDataAuthenticator
+from icesat2db.downloader.data_downloader import CMRDataDownloader, H5FileDownloader
+from icesat2db.utils.constants import IceSat2Product
+from icesat2db.utils.geo_processing import _temporal_tiling, check_and_format_shape
+from icesat2db.utils.progress_ledger import ProgressLedger, Row
 
 
 # Configure logging
@@ -39,9 +39,9 @@ logging.getLogger("tornado").setLevel(logging.WARNING)
 logger = logging.getLogger()
 
 
-class GEDIProcessor:
+class IceSat2Processor:
     """
-    GEDIProcessor class is responsible for processing GEDI granules, handling metadata,
+    IceSat2Processor class is responsible for processing IceSat2 granules, handling metadata,
     and writing data into the database.
     """
 
@@ -57,7 +57,7 @@ class GEDIProcessor:
         log_dir: Optional[str] = None,
     ):
         """
-        Initializes the GEDIProcessor.
+        Initializes the IceSat2Processor.
 
         Parameters:
         -----------
@@ -133,7 +133,7 @@ class GEDIProcessor:
             os.makedirs(log_dir, exist_ok=True)
             log_file = os.path.join(
                 log_dir,
-                f"gediprocessor_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log",
+                f"IceSat2Processor_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log",
             )
 
             # Create a FileHandler and set its level and format
@@ -237,9 +237,9 @@ class GEDIProcessor:
 
     def _initialize_database_writer(self, credentials: Optional[dict]):
         """
-        Initialize and return the GEDIDatabase instance.
+        Initialize and return the IceSat2Database instance.
         """
-        return GEDIDatabase(config=self.data_info, credentials=credentials)
+        return IceSat2Database(config=self.data_info, credentials=credentials)
 
     def _initialize_parallel_engine(self, parallel_engine: Optional[object]):
         """
@@ -278,7 +278,7 @@ class GEDIProcessor:
 
     def compute(self, consolidate: bool = True, consolidation_type: str = "spatial"):
         """
-        Main method to download and process GEDI granules.
+        Main method to download and process IceSat2 granules.
 
         Parameters:
         ----------
@@ -303,7 +303,7 @@ class GEDIProcessor:
                 return
 
             # Process unprocessed granules
-            logger.info("Starting GEDI granules processing...")
+            logger.info("Starting IceSat2 granules processing...")
             self._process_granules(unprocessed_cmr_data)
 
             # Consolidate fragments if required
@@ -311,7 +311,7 @@ class GEDIProcessor:
                 self.database_writer.consolidate_fragments(
                     consolidation_type=consolidation_type, parallel_engine=None
                 )
-            logger.info("GEDI granule processing completed successfully.")
+            logger.info("IceSat2 granule processing completed successfully.")
         except Exception as e:
             # Log the exception with traceback
             logger.error("An error occurred: %s", e)
@@ -377,7 +377,7 @@ class GEDIProcessor:
                     for gid, pinf in granules.items():
                         ledger.note_submit(gid)
                         fut = executor.submit(
-                            GEDIProcessor.process_single_granule,
+                            IceSat2Processor.process_single_granule,
                             gid,
                             pinf,
                             self.data_info,
@@ -465,7 +465,7 @@ class GEDIProcessor:
                 for gid, pinf in granules.items():
                     ledger.note_submit(gid)
                     fut = self.parallel_engine.submit(
-                        GEDIProcessor.process_single_granule,
+                        IceSat2Processor.process_single_granule,
                         gid,
                         pinf,
                         self.data_info,
@@ -574,14 +574,14 @@ class GEDIProcessor:
         prods = []
         download_results = []
         for url, product, extra in product_info:
-            res = downloader.download(granule_id, url, GediProduct(product))
+            res = downloader.download(granule_id, url, IceSat2Product(product))
             # If your downloader can expose sizes, insert here:
             if isinstance(res, tuple) and len(res) >= 2 and isinstance(res[1], int):
                 bytes_dl += int(res[1])
             prods.append(str(product))
             download_results.append(res)
 
-        granule_processor = GEDIGranule(download_path, data_info)
+        granule_processor = IceSat2Granule(download_path, data_info)
         ids_, gdf = granule_processor.process_granule(download_results)
         n_records = int(gdf.shape[0]) if gdf is not None else None
 

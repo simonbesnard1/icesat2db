@@ -17,7 +17,7 @@ start_time_ = time.time()
 
 
 # %% Instantiate the GEDIProvider
-provider = gdb.GEDIProvider(
+provider = gdb.IceSat2Provider(
     storage_type='s3',
     s3_bucket="dog.gedidb.gedi-l2-l4-v002",
     url="https://s3.gfz-potsdam.de"

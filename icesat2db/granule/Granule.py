@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
-# SPDX-FileCopyrightText: 2025 Amelia Holcomb
-# SPDX-FileCopyrightText: 2025 Felix Dombrowski
-# SPDX-FileCopyrightText: 2025 Simon Besnard
-# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-#
+# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
+# SPDX-FileCopyrightText: 2026 Felix Dombrowski
+# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
+# SPDX-FileCopyrightText: 2026 Simon Besnard
+# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+
 
 import pathlib
 from typing import Iterable, List, Union
@@ -13,12 +13,12 @@ import h5py
 import pandas as pd
 
 from icesat2db.beam.Beam import beam_handler
-from icesat2db.granule.granule_name import GediNameMetadata, parse_granule_filename
+from icesat2db.granule.granule_name import IceSat2NameMetadata, parse_granule_filename
 
 
 class granule_handler(h5py.File):
     """
-    Represents a GEDI Granule HDF5 file, providing access to metadata and beams.
+    Represents a IceSat2 Granule HDF5 file, providing access to metadata and beams.
 
     Attributes:
         file_path (pathlib.Path): The path to the granule file.
@@ -38,7 +38,8 @@ class granule_handler(h5py.File):
 
         try:
             super().__init__(file_path, "r")  # Open HDF5 file
-            self.beam_names = [name for name in self.keys() if name.startswith("BEAM")]
+            beams = {'gt1l', 'gt1r', 'gt2l', 'gt2r', 'gt3l', 'gt3r'}
+            self.beam_names = [name for name in self.keys() if name in beams]
             self._is_open = True  # Mark as successfully opened
         except Exception as e:
             print(f"Error opening granule {file_path}: {e}")
@@ -70,12 +71,12 @@ class granule_handler(h5py.File):
         self.close()
 
     @property
-    def filename_metadata(self) -> GediNameMetadata:
+    def filename_metadata(self) -> IceSat2NameMetadata:
         """
         Lazily load and cache the parsed metadata from the granule's filename.
 
         Returns:
-            GediNameMetadata: Parsed metadata from the granule filename.
+            IceSat2NameMetadata: Parsed metadata from the granule filename.
         """
         if self._parsed_filename_metadata is None:
             self._parsed_filename_metadata = parse_granule_filename(self.filename)
@@ -111,8 +112,7 @@ class granule_handler(h5py.File):
         """Get the start datetime from the parsed filename metadata."""
         metadata = self.filename_metadata
         return pd.Timestamp(
-            f"{metadata.year}-{metadata.julian_day} {metadata.hour}:{metadata.minute}:{metadata.second}",
-            format="%Y-%j %H:%M:%S",
+            f"{metadata.year}-{metadata.month}-{metadata.day} {metadata.hour}:{metadata.minute}:{metadata.second}"
         )
 
     @property
@@ -207,16 +207,14 @@ class granule_handler(h5py.File):
         try:
             metadata = self.filename_metadata
             description = (
-                f"GEDI Granule:\n"
+                f"IceSat2 Granule:\n"
                 f" Granule name: {self.filename}\n"
-                f" Sub-granule:  {metadata.sub_orbit_granule}\n"
                 f" Product:      {self.product}\n"
-                f" Release:      {metadata.release_number}\n"
                 f" No. beams:    {self.n_beams}\n"
                 f" Start date:   {self.start_datetime.date()}\n"
                 f" Start time:   {self.start_datetime.time()}\n"
                 f" HDF object:   {super().__repr__()}"
             )
         except AttributeError as e:
-            description = f"GEDI Granule (Error in metadata: {e})"
+            description = f"IceSat-2 Granule (Error in metadata: {e})"
         return description

@@ -1,34 +1,34 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
-# SPDX-FileCopyrightText: 2025 Amelia Holcomb
-# SPDX-FileCopyrightText: 2025 Felix Dombrowski
-# SPDX-FileCopyrightText: 2025 Simon Besnard
-# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-#
+# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
+# SPDX-FileCopyrightText: 2026 Felix Dombrowski
+# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
+# SPDX-FileCopyrightText: 2026 Simon Besnard
+# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+
 
 import re
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class GediNameMetadata:
+class IceSat2NameMetadata:
     """
-    Container for metadata derived from GEDI file name conventions.
+    Container for metadata derived from IceSat2 file name conventions.
 
     Attributes:
-        product (str): The product type (e.g., L1B, L2A).
+        product (str): The product type (e.g. ATL08).
         year (str): The year of data acquisition (4 digits).
-        julian_day (str): The Julian day of the year when data was acquired.
+        month (str): The month of data acquisition (2 digits).
+        day (str): The day of data acquisition (2 digits).
         hour (str): The hour (UTC) when data was acquired.
         minute (str): The minute (UTC) when data was acquired.
         second (str): The second (UTC) when data was acquired.
-        orbit (str): The orbit number associated with the granule.
-        sub_orbit_granule (str): The sub-orbit granule identifier.
-        ground_track (str): The ground track number.
-        positioning (str): The positioning number.
-        release_number (str): The release version of the product.
-        granule_production_version (str): The granule production version.
-        major_version_number (str): The major version of the product.
+        ref_ground_track (str): The RTG number (4 digits) ranging from 0001 to 1387.
+        cycle_number (str): The cycle number (2 digits).
+        region (str): The region number (2 digits) ranging from 01-14.
+        version (str): The version number (3 digits).
+        revision (str): The revision number (2 digits).
+
     """
 
     product: str
@@ -38,62 +38,51 @@ class GediNameMetadata:
     hour: str
     minute: str
     second: str
-    rgt: str
-    cycle : str
-    segment : str
+    ref_ground_track: str
+    cycle_number : str
+    segment_number : str
     version: str
     revision: str
 
 
-# Precompile the GEDI filename pattern for efficient reuse
-GEDI_FILENAME_PATTERN = re.compile(
+# Precompile the IceSat2 filename pattern for efficient reuse
+IceSat2_FILENAME_PATTERN = re.compile(
     (
-        #r"(?P<product>\w+_\w)"  # Product identifier (e.g., GEDI_L2A)
-        #r"_(?P<year>\d{4})"  # Year (4 digits)
-        #r"(?P<julian_day>\d{3})"  # Julian day (3 digits)
-        #r"(?P<hour>\d{2})"  # Hour (2 digits)
-        #r"(?P<minute>\d{2})"  # Minute (2 digits)
-        #r"(?P<second>\d{2})"  # Second (2 digits)
-        #r"_(?P<orbit>O\d+)"  # Orbit (O followed by digits)
-        #r"_(?P<sub_orbit_granule>\d{2})"  # Sub-orbit granule (2 digits)
-        #r"_(?P<ground_track>T\d+)"  # Ground track (T followed by digits)
-        #r"_(?P<positioning>\d{2})"  # Positioning number (2 digits)
-        #r"_(?P<release_number>\d{3})"  # Release number (3 digits)
-        #r"_(?P<granule_production_version>\d{2})"  # Granule production version (2 digits)
-        #r"_(?P<major_version_number>V\d+)"  # Major version number (V followed by digits)
-
-        r"(?P<product>\w+)"           # Product identifier (e.g., ATL08)        
-        r"(?P<year>\d{4})"            # Year (4 digits)
-        r"(?P<month>\d{2})"           # Month (2 digits)
-        r"(?P<day>\d{2})"             # Day (2 digits)
-        r"(?P<hour>\d{2})"            # Hour (2 digits)
-        r"(?P<minute>\d{2})"          # Minute (2 digits)
-        r"(?P<second>\d{2})"          # Second (2 digits)          
-        r"(?P<ref_ground_track>\d{4})"  # Reference Ground Track (4 digits)
-        r"(?P<cycle_number>\d{2})"     # Cycle Number (2 digits)
-        r"(?P<segment_number>\d{2})"   # Segment Number (2 digits)    
-        r"(?P<version>\d{3})"         # Version (3 digits)    
-        r"(?P<revision>\d{2})"        # Revision (2 digits)    
+        r"^"
+        r"(?P<product>[A-Z0-9]+)_"        # Product identifier (e.g. ATL08)
+        r"(?P<year>\d{4})"                # Year of acquisition (YYYY)
+        r"(?P<month>\d{2})"               # Month of acquisition (MM)
+        r"(?P<day>\d{2})"                 # Day of acquisition (DD)
+        r"(?P<hour>\d{2})"                # Hour of acquisition (UTC)
+        r"(?P<minute>\d{2})"              # Minute of acquisition (UTC)
+        r"(?P<second>\d{2})_"             # Second of acquisition (UTC)
+        r"(?P<ref_ground_track>\d{4})"    # Reference Ground Track (0001–1387)
+        r"(?P<cycle_number>\d{2})"        # Cycle number (2 digits)
+        r"(?P<segment_number>\d{2})_"     # Segment / region number (01–14)
+        r"(?P<version>\d{3})_"            # Product version number (3 digits)
+        r"(?P<revision>\d{2})"            # Product revision number (2 digits)
+        r"$"
     )
 )
 
 
-def parse_granule_filename(gedi_filename: str) -> GediNameMetadata:
+
+def parse_granule_filename(IceSat2_filename: str) -> IceSat2NameMetadata:
     """
-    Parses the GEDI filename and extracts metadata into a structured format.
+    Parses the IceSat2 filename and extracts metadata into a structured format.
 
     Parameters:
-        gedi_filename (str): The GEDI filename to parse.
+        IceSat2_filename (str): The IceSat2 filename to parse.
 
     Returns:
-        GediNameMetadata: An instance of GediNameMetadata with extracted components.
+        IceSat2NameMetadata: An instance of IceSat2NameMetadata with extracted components.
 
     Raises:
-        ValueError: If the filename does not match the expected GEDI naming pattern.
+        ValueError: If the filename does not match the expected IceSat2 naming pattern.
     """
-    match = GEDI_FILENAME_PATTERN.search(gedi_filename)
+    match = IceSat2_FILENAME_PATTERN.search(IceSat2_filename)
     if match is None:
         raise ValueError(
-            f"Filename '{gedi_filename}' does not match the expected GEDI naming pattern: {GEDI_FILENAME_PATTERN.pattern}"
+            f"Filename '{IceSat2_filename}' does not match the expected IceSat2 naming pattern: {IceSat2_FILENAME_PATTERN.pattern}"
         )
-    return GediNameMetadata(**match.groupdict())
+    return IceSat2NameMetadata(**match.groupdict())
