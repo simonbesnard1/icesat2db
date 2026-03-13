@@ -203,7 +203,7 @@ class CMRDataDownloader(IceSat2Downloader):
             total_size_mb / 1024,
             total_size_mb / 1_048_576,
         )
-
+        
         return filtered_cmr_dict
 
     def _filter_granules_with_all_products(self, granules: dict) -> dict:

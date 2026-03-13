@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
-# SPDX-FileCopyrightText: 2026 Felix Dombrowski
-# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
-# SPDX-FileCopyrightText: 2026 Simon Besnard
-# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
+# SPDX-FileCopyrightText: 2025 Amelia Holcomb
+# SPDX-FileCopyrightText: 2025 Felix Dombrowski
+# SPDX-FileCopyrightText: 2025 Simon Besnard
+# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+#
 
 import logging
 from datetime import datetime
@@ -40,7 +41,8 @@ class CMRQuery:
         """
         Construct query parameters for the CMR request.
         """
-        collection_id = earth_data_info["CMR_PRODUCT_IDS"].get(str(product))
+        # In _construct_query_params:
+        collection_id = earth_data_info["CMR_PRODUCT_IDS"].get(product.name)
         bounding_box = CMRQuery._construct_spatial_params(geom)
         temporal = CMRQuery._construct_temporal_params(start_date, end_date)
 
@@ -91,7 +93,6 @@ class CMRQuery:
 
     @staticmethod
     def _get_name(item: dict) -> str:
-        # TODO: do we still need to support multiple data centers here?
         """
         Extract the name of the granule from the CMR response item.
         Removes the '.h5' extension if present and strips whitespace.
@@ -123,6 +124,7 @@ class CMRQuery:
         # Remove '.h5' extension if present
         if granule_name.endswith(".h5"):
             granule_name = granule_name[:-3]
+
         return granule_name
 
 
@@ -167,7 +169,7 @@ class GranuleQuery(CMRQuery):
         # Configure retry strategy for the HTTP session
         retry_strategy = Retry(
             total=3,
-            backoff_factor=0.3,
+            backoff_factor=0.1,
             status_forcelist=[429, 500, 502, 503, 504],
             allowed_methods=["GET"],
         )
