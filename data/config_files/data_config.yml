@@ -1,8 +1,8 @@
 # database parameters
 tiledb:
   storage_type: 'local'
-  local_path: ''     # TileDB URI for storing data
-  overwrite: false                                  # Whether to overwrite existing arrays
+  local_path: '/home/simon/Documents/science/GFZ/projects/icesat2db/data/'     # TileDB URI for storing data
+  overwrite: true                                  # Whether to overwrite existing arrays
   # temporal_batching:
   time_range:                                      # Global time range for data
     start_time: "2018-01-01"
@@ -21,15 +21,16 @@ tiledb:
   capacity: 100000
 
 # Data directory for downloading GEDI data
-data_dir: ''
-progress_dir: ''
+data_dir: '/home/simon/Documents/science/GFZ/projects/icesat2db/data/tmp'
+
+# Progress directory for monitoring processing
+progress_dir: '/home/simon/Documents/science/GFZ/projects/icesat2db/data/tmp'
 
 # Configuration for accessing NASA's Earthdata Search API to query granule data.
 earth_data_info:
  CMR_URL: "https://cmr.earthdata.nasa.gov/search/granules.json"
  CMR_PRODUCT_IDS:
-   # IceSatProduct.ATL08: 'C2565090645-NSIDC_ECS'
-   IceSat2Product.ATL08: 'C2613553260-NSIDC_CPRD'
+  ATL08: 'C3565574177-NSIDC_CPRD'
 
 # Variables list for each GEDI level product - SDS_Name is science dataset name the native h5 file retrieved from the NASA API
 level_atl08:

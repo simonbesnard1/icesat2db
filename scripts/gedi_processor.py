@@ -16,8 +16,8 @@ concurrent_engine = concurrent.futures.ThreadPoolExecutor(max_workers=6)
 # Initialize the GEDIProcessor and compute
 with idb.IceSat2Processor(
     config_file=config_file,
-    geometry="/home/simon/Documents/science/GFZ/projects/icesat2db/data/geojson/global_geojson.geojson",
-    start_date="2018-01-01",
+    geometry="/home/simon/Downloads/thuringia_bbox.geojson",
+    start_date="2019-01-01",
     end_date="2025-01-31",
     earth_data_dir="/home/simon/",
     parallel_engine=concurrent_engine,
