@@ -8,7 +8,7 @@
 import concurrent.futures
 import logging
 import os
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Any, Dict, Generator, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -261,51 +261,71 @@ class IceSat2Database:
             ),
         )
 
-    def _create_attributes(self) -> List[tiledb.Attr]:
+    def _create_attributes(self) -> list[tiledb.Attr]:
         """
-        Build TileDB attributes for all configured variables.
-
-        Profile variables (e.g. rh) are expanded to rh_1 … rh_N.
-        Compression filters are applied only when use_filters=True;
-        otherwise TileDB's default (Zstd level-1) is used, which is
-        faster to write while still giving reasonable compression.
+        Build TileDB attribute list from ``self.variables_config``.
+    
+        Variables are emitted in three passes:
+          1. Scalar attributes (neither profile nor subsegment).
+          2. Profile attributes expanded to ``<name>_1 … <name>_N``.
+          3. Subsegment attributes expanded to ``<name>_1 … <name>_N``.
+    
+        An optional ``timestamp_ns`` (int64) attribute is appended last,
+        controlled by ``tiledb.write_timestamp_ns`` in config (default: True).
+    
+        Compression filters are selected entirely by dtype via
+        :meth:`TileDBFilterPolicy.filters_for_dtype` — no per-variable rules.
+    
+        Raises
+        ------
+        ValueError
+            If ``variables_config`` is missing or a profile/subsegment variable
+            has an invalid length (< 1).
         """
         if not self.variables_config:
-            raise ValueError("Variable configuration is missing.")
-
-        attrs: List[tiledb.Attr] = []
-
-        def _attr(name: str, dtype: np.dtype) -> tiledb.Attr:
-            return tiledb.Attr(
-                name=name,
-                dtype=dtype,
-                filters=self.filter_policy.filters_for_dtype(dtype),
-            )
-
-        # Scalar variables
+            raise ValueError("Variable configuration is missing. Cannot create attributes.")
+    
+        def _expand(var_name: str, var_info: dict, length_key: str) -> list[tiledb.Attr]:
+            """Expand a profile or subsegment variable into N numbered attributes."""
+            length = int(var_info.get(length_key, 1))
+            if length <= 0:
+                raise ValueError(f"{var_name}: {length_key} must be >= 1")
+            dtype = np.dtype(var_info["dtype"])
+            filters = self.filter_policy.filters_for_dtype(dtype)
+            return [
+                tiledb.Attr(name=f"{var_name}_{i + 1}", dtype=dtype, filters=filters)
+                for i in range(length)
+            ]
+    
+        attrs: list[tiledb.Attr] = []
+    
         for var_name, var_info in self.variables_config.items():
-            if not var_info.get("is_profile", False):
-                attrs.append(_attr(var_name, np.dtype(var_info["dtype"])))
-
-        # Profile variables
-        for var_name, var_info in self.variables_config.items():
-            if var_info.get("is_profile", False):
-                profile_length = int(var_info.get("profile_length", 1))
-                if profile_length <= 0:
-                    raise ValueError(f"{var_name}: profile_length must be >= 1")
+            is_profile = var_info.get("is_profile", False)
+            is_subsegment = var_info.get("is_subsegment", False)
+    
+            if is_profile:
+                attrs.extend(_expand(var_name, var_info, "profile_length"))
+            elif is_subsegment:
+                attrs.extend(_expand(var_name, var_info, "subsegment_length"))
+            else:
                 dtype = np.dtype(var_info["dtype"])
-                for i in range(profile_length):
-                    attrs.append(_attr(f"{var_name}_{i + 1}", dtype))
-
-        # Timestamp (nanoseconds since epoch, int64)
-        attrs.append(
-            tiledb.Attr(
-                name="timestamp_ns",
-                dtype=np.int64,
-                filters=self.filter_policy.timestamp_filters(),
+                attrs.append(
+                    tiledb.Attr(
+                        name=var_name,
+                        dtype=dtype,
+                        filters=self.filter_policy.filters_for_dtype(dtype),
+                    )
+                )
+    
+        if self.config.get("tiledb", {}).get("write_timestamp_ns", True):
+            attrs.append(
+                tiledb.Attr(
+                    name="timestamp_ns",
+                    dtype=np.int64,
+                    filters=self.filter_policy.timestamp_filters(),
+                )
             )
-        )
-
+    
         return attrs
 
     def _add_variable_metadata(self) -> None:
@@ -321,6 +341,10 @@ class IceSat2Database:
                     if var_info.get("is_profile", False):
                         array.meta[f"{var_name}.profile_length"] = var_info.get(
                             "profile_length", 0
+                        )
+                    if var_info.get("is_subsegment", False):
+                        array.meta[f"{var_name}.subsegment_length"] = var_info.get(
+                            "subsegment_length", 0
                         )
         except tiledb.TileDBError as e:
             logger.error(f"Error adding metadata: {e}")
