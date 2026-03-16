@@ -1,9 +1,10 @@
 # database parameters
 tiledb:
-  storage_type: 'local'
-  local_path: '/home/simon/Documents/science/GFZ/projects/icesat2db/data/'     # TileDB URI for storing data
+  storage_type: 's3'
+  s3_bucket: "dog.icesat2db.icesat2-atl008-v007"      # TileDB URI for storing data
+  url: "https://s3.gfz-potsdam.de"
   overwrite: true                                  # Whether to overwrite existing arrays
-  # temporal_batching:
+  #temporal_batching: "weekly"
   time_range:                                      # Global time range for data
     start_time: "2018-01-01"
     end_time: "2030-12-31"
