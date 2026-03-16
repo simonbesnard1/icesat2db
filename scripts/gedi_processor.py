@@ -7,6 +7,15 @@ Created on Sun Jan 19 19:57:34 2025
 """
 import concurrent.futures
 import icesat2db as idb
+import boto3
+
+# Get credentials
+session = boto3.Session()
+creds = session.get_credentials()
+credentials = {
+    "AccessKeyId": creds.access_key,
+    "SecretAccessKey": creds.secret_key
+}
 
 # Paths to configuration files
 config_file = "/home/simon/Documents/science/GFZ/projects/icesat2db/data/config_files/data_config.yml"
@@ -21,5 +30,10 @@ with idb.IceSat2Processor(
     end_date="2025-01-31",
     earth_data_dir="/home/simon/",
     parallel_engine=concurrent_engine,
+    credentials= credentials
 ) as processor:
     processor.compute(consolidate=True)
+
+
+
+
