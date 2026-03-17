@@ -1,5 +1,5 @@
 <p align="center">
-<a href="https://github.com/simonbesnard1/gedidb.git">
+<a href="https://github.com/simonbesnard1/icesat2db">
         <img src="https://raw.githubusercontent.com/simonbesnard1/icesat2db/main/doc/_static/logos/icesat2db_logo.svg"
          alt="icesat2db Logo" height="200px" hspace="0px" vspace="30px" align="left">
 </a>
@@ -60,7 +60,7 @@ For any questions or inquiries, please contact:
 - Amelia Holcomb (ah2174@cam.ac.uk)
 
 ## Acknowledgments
-We acknowledge funding support by the European Union through the [FORWARDS](https://forwards-project.eu/) and [OpenEarthMonitor](https://earthmonitor.org/) projects. We would also like to thank the R2D2 Workshop (March 2024, GFZ Potsdam) for providing the opportunity to meet and discuss IceSat2 data processing.
+The development of gediDB was supported by the European Union through the [FORWARDS](https://forwards-project.eu/) and [NextGenCarbon](https://www.nextgencarbon-project.eu/) projects, and by the Helmholtz Association via the Helmholtz Foundation Model Initiative ([3D-ABC project](https://www.3d-abc.ai/)). Amelia Holcomb acknowledges funding from the Harding Distinguished Postgraduate Scholarship.
 
 ## License
 This project is licensed under the EUROPEAN UNION PUBLIC LICENCE v.1.2 License - see the LICENSE file for details.
