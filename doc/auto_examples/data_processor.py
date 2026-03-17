@@ -1,8 +1,8 @@
 """
-GEDIProcessor example with different parallel engines
+IceSat2Processor example with different parallel engines
 =======================================================
 
-This example demonstrates how to use the `gedidb` library to process GEDI granules
+This example demonstrates how to use the `icesat2db` library to process IceSat2 granules
 with different parallel engines, such as `concurrent.futures.ThreadPoolExecutor` and `dask.distributed.Client`.
 
 A default data configuration file (`data_config.yml`) can be downloaded here:
@@ -18,7 +18,7 @@ We will:
 
 1. Set up configuration paths.
 2. Initialize different parallel engines (Dask and concurrent futures).
-3. Run the GEDIProcessor to process granules and consolidate fragments.
+3. Run the IceSat2Processor to process granules and consolidate fragments.
 
 """
 
@@ -27,7 +27,7 @@ import concurrent.futures
 from dask.distributed import Client, LocalCluster
 
 # Import required libraries
-import gedidb as gdb
+import icesat2db as isdb
 
 # Configuration file path
 config_file = "/path/to/data_config.yml"
@@ -61,11 +61,11 @@ cluster = LocalCluster(
 )
 dask_client = Client(cluster)
 
-# Initialize the GEDIProcessor with the chosen parallel engine
+# Initialize the IceSat2Processor with the chosen parallel engine
 # ------------------------------------------------------------
 # Here, we demonstrate usage with `concurrent.futures.ThreadPoolExecutor`.
 # You can replace `parallel_engine=concurrent_engine` with `parallel_engine=dask_client` to use Dask instead.
-with gdb.IceSat2Processor(
+with isdb.IceSat2Processor(
     config_file=config_file,
     geometry=geojson_path,
     start_date=start_date,
@@ -73,5 +73,5 @@ with gdb.IceSat2Processor(
     earth_data_dir=earth_data_dir,
     parallel_engine=concurrent_engine,  # Change to `parallel_engine=dask_client` for Dask
 ) as processor:
-    # Run the GEDIProcessor to process granules and consolidate fragments
+    # Run the IceSat2Processor to process granules and consolidate fragments
     processor.compute(consolidate=True)

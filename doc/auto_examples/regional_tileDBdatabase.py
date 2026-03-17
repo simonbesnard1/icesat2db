@@ -17,8 +17,8 @@ A default GeoJSON file for the Amazon region (`amazon.geojson`) can be downloade
 We will:
 
 1. Modify the configuration file (`data_config.yml`) to define the Amazon spatial extent.
-2. Initialize the `GEDIProcessor` with the modified configuration.
-3. Process GEDI granules and store them in a **regional TileDB array**.
+2. Initialize the `IceSat2Processor` with the modified configuration.
+3. Process IceSat2 granules and store them in a **regional TileDB array**.
 
 """
 
@@ -27,7 +27,7 @@ import json
 import yaml
 
 # Import required libraries
-import gedidb as gdb
+import icesat2db as isdb
 
 # Define paths for configuration and spatial data
 config_file = "/path/to/data_config.yml"
@@ -62,15 +62,15 @@ with open(new_config_file, "w") as file:
 
 print(f"Updated configuration saved as '{new_config_file}'.")
 
-# Step 2: Run the GEDI Processor
+# Step 2: Run the IceSat2 Processor
 # ------------------------------
 # Define additional parameters
 start_date = "2020-01-01"
 end_date = "2023-12-31"
 earth_data_dir = "/path/to/EarthData_credentials"
 
-# Initialize and run the GEDIProcessor
-with gdb.IceSat2Processor(
+# Initialize and run the IceSat2Processor
+with isdb.IceSat2Processor(
     config_file=new_config_file,
     geometry=geojson_path,
     start_date=start_date,

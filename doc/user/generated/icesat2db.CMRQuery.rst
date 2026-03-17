@@ -1,7 +1,7 @@
-﻿gedidb.CMRQuery
-===============
+﻿icesat2db.CMRQuery
+==================
 
-.. currentmodule:: gedidb
+.. currentmodule:: icesat2db
 
 .. autoclass:: CMRQuery
 

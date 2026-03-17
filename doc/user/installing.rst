@@ -6,7 +6,7 @@ Installation
 Dependencies
 ------------
 
-gediDB requires Python >= 3.10 and the following dependencies. These are resolved automatically when installing via **pip**:
+icesat2db requires Python >= 3.10 and the following dependencies. These are resolved automatically when installing via **pip**:
 
 +------------+-----------------+--------------------------------------------+
 | Dependency | Minimum Version | Link                                       |
@@ -50,7 +50,7 @@ For additional functionality, the following optional dependencies are available:
 | seaborn     | Statistical data visualization                            |
 +-------------+-----------------------------------------------------------+
 
-To install optional dependencies, use **pip** with the extras syntax (e.g., `pip install gedidb[full]`).
+To install optional dependencies, use **pip** with the extras syntax (e.g., `pip install icesat2db[full]`).
 
 Installation Instructions
 -------------------------
@@ -59,13 +59,13 @@ Install via **pip**:
 
 .. code-block:: bash
 
-    $ pip install gedidb
+    $ pip install icesat2db
 
 To include optional dependencies:
 
 .. code-block:: bash
 
-    $ pip install gedidb[full]
+    $ pip install icesat2db[full]
 
 Development Versions
 --------------------
@@ -74,18 +74,18 @@ To install the latest development version from GitLab:
 
 .. code-block:: bash
 
-    $ pip install git+https://github.com/simonbesnard1/gedidb.git
+    $ pip install git+https://github.com/simonbesnard1/icesat2db.git
 
 Testing
 -------
 
-To run tests after installing gediDB, first install **pytest**:
+To run tests after installing icesat2db, first install **pytest**:
 
 .. code-block:: bash
 
     $ pip install pytest
 
-Navigate to the root directory of the gediDB repository, then run:
+Navigate to the root directory of the icesat2db repository, then run:
 
 .. code-block:: bash
 

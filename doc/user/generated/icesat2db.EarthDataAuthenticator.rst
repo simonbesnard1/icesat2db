@@ -1,7 +1,7 @@
-﻿gedidb.EarthDataAuthenticator
-=============================
+﻿icesat2db.EarthDataAuthenticator
+================================
 
-.. currentmodule:: gedidb
+.. currentmodule:: icesat2db
 
 .. autoclass:: EarthDataAuthenticator
 

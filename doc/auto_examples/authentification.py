@@ -13,7 +13,7 @@ Before running this example:
 
 from pathlib import Path
 
-from gedidb.downloader.authentication import EarthDataAuthenticator
+from icesat2db.downloader.authentication import EarthDataAuthenticator
 
 # Specify the directory where `.netrc` and cookies will be stored
 earth_data_dir = Path.home()

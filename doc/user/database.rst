@@ -4,7 +4,7 @@
 Personalising tileDB Settings
 #############################
 
-This section provides an overview of customizing the tileDB settings in the `data_config.yml` to manage and query GEDI data using your own personalized settings.
+This section provides an overview of customizing the tileDB settings in the `data_config.yml` to manage and query IceSat2 data using your own personalized settings.
 
 Overview
 --------

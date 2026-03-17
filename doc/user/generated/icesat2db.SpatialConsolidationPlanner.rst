@@ -1,7 +1,7 @@
-﻿gedidb.SpatialConsolidationPlanner
-==================================
+﻿icesat2db.SpatialConsolidationPlanner
+=====================================
 
-.. currentmodule:: gedidb
+.. currentmodule:: icesat2db
 
 .. autoclass:: SpatialConsolidationPlanner
 

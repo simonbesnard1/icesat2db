@@ -1,7 +1,7 @@
 .. _devindex:
 
 **********************
-Contributing to gediDB
+Contributing to icesat2db
 **********************
 
 .. highlight:: shell
@@ -9,13 +9,13 @@ Contributing to gediDB
 Overview
 ========
 
-We welcome your skills and enthusiasm at the gediDB project!. There are numerous opportunities to
+We welcome your skills and enthusiasm at the icesat2db project!. There are numerous opportunities to
 contribute beyond just writing code.
 All contributions, including bug reports, bug fixes, documentation improvements, enhancement suggestions,
 and other ideas are welcome.
 
 This project is a community effort, and everyone is welcome to contribute. Everyone within the community
-is expected to abide by our `code of conduct <https://github.com/simonbesnard1/gedidb/blob/main/CODE_OF_CONDUCT.md>`_.
+is expected to abide by our `code of conduct <https://github.com/simonbesnard1/icesat2db/blob/main/CODE_OF_CONDUCT.md>`_.
 
 You can contribute in many ways:
 
@@ -25,7 +25,7 @@ Types of Contributions
 Report Bugs
 ~~~~~~~~~~~
 
-Report bugs at https://github.com/simonbesnard1/gedidb/issues.
+Report bugs at https://github.com/simonbesnard1/icesat2db/issues.
 
 If you are reporting a bug, please include:
 
@@ -48,8 +48,8 @@ and "help wanted" is open to whoever wants to implement it.
 Write Documentation
 ~~~~~~~~~~~~~~~~~~~
 
-gediDB could always use more documentation, whether as part of the
-official gediDB docs, in docstrings, or even on the web in blog posts,
+icesat2db could always use more documentation, whether as part of the
+official icesat2db docs, in docstrings, or even on the web in blog posts,
 articles, and such.  If something in the docs doesn't make sense to you, 
 updating the relevant section after you figure it out is a great way to 
 ensure it will help the next person.
@@ -57,7 +57,7 @@ ensure it will help the next person.
 Submit Feedback
 ~~~~~~~~~~~~~~~
 
-The best way to send feedback is to file an `issue <https://github.com/simonbesnard1/gedidb/issues>`_.
+The best way to send feedback is to file an `issue <https://github.com/simonbesnard1/icesat2db/issues>`_.
 
 If you are proposing a feature:
 
@@ -72,15 +72,15 @@ Commit Changes
 How to
 ~~~~~~
 
-1. Fork the `gedidb` repo on GitLab.
+1. Fork the `icesat2db` repo on GitLab.
 2. Clone your fork locally::
 
-    $ git clone git@github.com:simonbesnard1/gedidb.git
+    $ git clone git@github.com:simonbesnard1/icesat2db.git
 
 3. Install your local copy into a virtualenv. Assuming you have virtualenvwrapper installed, this is how you set up your fork for local development::
 
-    $ mkvirtualenv gedidb
-    $ cd gedidb/
+    $ mkvirtualenv icesat2db
+    $ cd icesat2db/
     $ python setup.py develop
 
 4. Create a branch for local development::
@@ -127,6 +127,6 @@ Before you submit a pull request, check that it meets these guidelines:
    your new functionality into a function with a docstring, and add the
    feature to the list in README.rst.
 3. The pull request should work for Python 3.6, 3.7, 3.8 and 3.9. Check
-   https://github.com/simonbesnard1/gedidb/pulls
+   https://github.com/simonbesnard1/icesat2db/pulls
    and make sure that the tests pass for all supported Python versions.
 

@@ -4,27 +4,27 @@
 NASA authentication
 #####################
 
-To interact with NASA's Common Metadata Repository (CMR) and download the required `.h5` files, gediDB requires NASA Earthdata credentials for authentication. This guide will help you set up and securely store your credentials to enable seamless access.
+To interact with NASA's Common Metadata Repository (CMR) and download the required `.h5` files, icesat2db requires NASA Earthdata credentials for authentication. This guide will help you set up and securely store your credentials to enable seamless access.
 
 Creating CMR login credentials
 ------------------------------
 
-To access GEDI data hosted on NASA’s servers, you need an **Earthdata** account. If you don't have one, create an account at the following link:
+To access IceSat2 data hosted on NASA’s servers, you need an **Earthdata** account. If you don't have one, create an account at the following link:
 
 `Create an Earthdata Account <https://urs.earthdata.nasa.gov/>`_
 
 Storing credentials for authentication
 --------------------------------------
 
-To avoid re-entering your credentials each time, gediDB includes a function that securely saves your login information in a `.netrc` file, enabling automatic authentication for future requests to NASA’s servers.
+To avoid re-entering your credentials each time, icesat2db includes a function that securely saves your login information in a `.netrc` file, enabling automatic authentication for future requests to NASA’s servers.
 
 Use the following code snippet to authenticate and store your credentials in the `.netrc` file:
 
 .. code-block:: python
 
-    import gedidb as gdb
+    import icesat2db as isdb
 
-    authentificator = gdb.EarthDataAuthenticator()
+    authentificator = isdb.EarthDataAuthenticator()
     authentificator.authenticate()
 
     # Example Output:
@@ -35,7 +35,7 @@ Use the following code snippet to authenticate and store your credentials in the
 
 Explanation:
 
-- :py:class:`gedidb.EarthDataAuthenticator` asks for your credentials in the prompt and verifies them.
+- :py:class:`icesat2db.EarthDataAuthenticator` asks for your credentials in the prompt and verifies them.
 - Once authenticated, the credentials are saved in the `.netrc` file for future use, avoiding repeated login prompts.
 - By default credentials files are stores in your home directory.
 - Authentication cookies are fetched and stored in a .cookies file for efficient reuse.
@@ -46,7 +46,7 @@ Credential validation process
 
 As part of the authentication workflow:
 
-- gediDB checks for the existence of a .netrc file in the specified or default directory (typically the user’s home directory).
+- icesat2db checks for the existence of a .netrc file in the specified or default directory (typically the user’s home directory).
 - If the file is missing, the user is prompted to input their credentials, which are then securely stored in the .netrc file.
 - Authentication cookies are retrieved from NASA servers and stored in the .cookies file, reducing the need for repeated credential validation during subsequent requests.
 
@@ -54,7 +54,7 @@ As part of the authentication workflow:
 Successful authentication confirmation
 --------------------------------------
 
-Upon successful authentication, gediDB logs messages to confirm that your credentials were correctly stored and verified. Here’s an example of the log output:
+Upon successful authentication, icesat2db logs messages to confirm that your credentials were correctly stored and verified. Here’s an example of the log output:
 
 .. code-block:: none
 
@@ -79,7 +79,7 @@ Testing authentication
 
 To verify that your credentials are correct and valid:
 
-- Run the authentication process using :py:class:`gedidb.EarthDataAuthenticator`.
+- Run the authentication process using :py:class:`icesat2db.EarthDataAuthenticator`.
 - Check the log messages for successful credential verification and cookie fetching.
 
 Troubleshooting tips:
@@ -89,4 +89,4 @@ Troubleshooting tips:
 - If authentication fails, check the permissions and format of your `.netrc` file.
 - Contact NASA Earthdata support if issues persist: `Earthdata Support <https://www.earthdata.nasa.gov/contact>`_
   
-With authentication configured, you are now ready to download and process GEDI data using gediDB.
+With authentication configured, you are now ready to download and process IceSat2 data using icesat2db.

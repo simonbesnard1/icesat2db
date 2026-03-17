@@ -16,7 +16,9 @@ from importlib.metadata import version as version_
 from docutils import nodes
 from docutils.parsers.rst import Directive
 
-import gedidb
+import icesat2db
+
+
 
 # Minimum version, enforced by sphinx
 needs_sphinx = "4.3"
@@ -28,7 +30,7 @@ needs_sphinx = "4.3"
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 
-sys.path.insert(0, os.path.abspath("../sphinxext"))
+# sys.path.insert(0, os.path.abspath("../sphinxext"))
 
 extensions = [
     "sphinxcontrib.mermaid",
@@ -42,7 +44,7 @@ extensions = [
     "IPython.sphinxext.ipython_console_highlighting",
     "sphinx_autosummary_accessors",
     "sphinx.ext.linkcode",
-    "sphinxext.opengraph",
+    # "sphinxext.opengraph",
     "sphinx_copybutton",
     "sphinx_design",
     "sphinx_inline_tabs",
@@ -74,12 +76,12 @@ templates_path = ["_templates"]
 source_suffix = ".rst"
 
 # General substitutions.
-project = "gediDB"
+project = "icesat2DB"
 year = datetime.now().year
-copyright = f"2024-{year}, gediDB Developers"
+copyright = f"2025-{year}, icesat2DB Developers"
 
 # The full version, including alpha/beta/rc tags.
-version = version_("gedidb")
+version = version_("icesat2db")
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
@@ -135,7 +137,7 @@ class LegacyDirective(Directive):
         text = (
             f"This {obj} is considered legacy and will no longer receive "
             "updates. This could also mean it will be removed in future "
-            "gediDB versions."
+            "icesat2DB versions."
         )
 
         try:
@@ -171,7 +173,7 @@ def setup(app):
 # so we make the alias look like a "real" module for it.
 # If we deemed it desirable, we could in future make these real modules, which
 # would make `from numpy.char import split` work.
-# sys.modules['gedidb.char'] = gedidb.char
+# sys.modules['icesat2db.char'] = icesat2db.char
 
 # -----------------------------------------------------------------------------
 # HTML output
@@ -187,7 +189,7 @@ html_theme_options = {
         "image_light": "_static/logos/gediDB_logo.svg",
         "image_dark": "_static/logos/gediDB_logo.svg",
     },
-    "gitlab_url": "https://github.com/simonbesnard1/gedidb",
+    "gitlab_url": "https://github.com/simonbesnard1/icesat2db",
     "collapse_navigation": True,
     "header_links_before_dropdown": 6,
     "navbar_end": ["search-button", "theme-switcher", "navbar-icon-links"],
@@ -199,14 +201,14 @@ html_theme_options = {
 html_title = "%s v%s Manual" % (project, version)
 html_static_path = ["_static"]
 html_last_updated_fmt = "%b %d, %Y"
-html_css_files = ["gedidb.css"]
+html_css_files = ["icesat2db.css"]
 html_context = {"default_mode": "dark"}
 html_use_modindex = True
 html_copy_source = False
 html_domain_indices = False
 html_file_suffix = ".html"
 
-htmlhelp_basename = "gedidbdoc"
+htmlhelp_basename = "icesat2dbdoc"
 
 if "sphinx.ext.pngmath" in extensions:
     pngmath_use_preview = True
@@ -235,19 +237,19 @@ latex_engine = "xelatex"
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, document class [howto/manual]).
-_stdauthor = "Written by the gediDB members"
+_stdauthor = "Written by the icesat2db members"
 latex_documents = [
     (
         "reference/index",
-        "gedidb-ref.tex",
-        "gediDB Reference",
+        "icesat2db-ref.tex",
+        "icesat2db Reference",
         _stdauthor,
         "manual",
     ),
     (
         "user/index",
-        "gedidb-user.tex",
-        "gediDB User Guide",
+        "icesat2db-user.tex",
+        "icesat2db User Guide",
         _stdauthor,
         "manual",
     ),
@@ -336,11 +338,11 @@ latex_use_modindex = False
 texinfo_documents = [
     (
         "index",
-        "gedidb",
-        "gediDB Documentation",
+        "icesat2db",
+        "icesat2db Documentation",
         _stdauthor,
-        "gediDB",
-        "gediDB: A toolbox for processing and providing Global Ecosystem Dynamics Investigation (GEDI) L2A-B and L4A-C data",
+        "icesat2db",
+        "icesat2db: A toolbox for processing and providing Ice, Cloud, and land Elevation Satellite 2 (IceSat2) ATL08 data",
         "Programming",
         1,
     ),
@@ -367,7 +369,7 @@ intersphinx_mapping = {
 
 
 # -----------------------------------------------------------------------------
-# gediDB extensions
+# icesat2db extensions
 # -----------------------------------------------------------------------------
 
 # If we want to do a phantom import from an XML file for all autodocs
@@ -403,7 +405,7 @@ coverage_ignore_c_items = {}
 # -----------------------------------------------------------------------------
 
 
-for name in ["sphinx.ext.linkcode", "gedidbdoc.linkcode"]:
+for name in ["sphinx.ext.linkcode", "icesat2dbdoc.linkcode"]:
     try:
         __import__(name)
         extensions.append(name)
@@ -415,9 +417,9 @@ else:
 
 
 def _get_c_source_file(obj):
-    if issubclass(obj, gedidb.generic):
+    if issubclass(obj, icesat2db.generic):
         return r"_core/src/multiarray/scalartypes.c.src"
-    elif obj is gedidb.ndarray:
+    elif obj is icesat2db.ndarray:
         return r"_core/src/multiarray/arrayobject.c"
     else:
         # todo: come up with a better way to generate these
@@ -463,14 +465,14 @@ def linkcode_resolve(domain, info):
     else:
         linespec = ""
 
-    fn = os.path.relpath(fn, start=os.path.dirname(gedidb.__file__))
+    fn = os.path.relpath(fn, start=os.path.dirname(icesat2db.__file__))
 
-    if "+" in gedidb.__version__:
-        return f"https://github.com/simonbesnard1/gedidb/{fn}{linespec}"
+    if "+" in icesat2db.__version__:
+        return f"https://github.com/simonbesnard1/icesat2db/{fn}{linespec}"
     else:
         return (
-            f"https://github.com/simonbesnard1/gedidb/blob/"
-            f"v{gedidb.__version__}/gedidb/{fn}{linespec}"
+            f"https://github.com/simonbesnard1/icesat2db/blob/"
+            f"v{icesat2db.__version__}/icesat2db/{fn}{linespec}"
         )
 
 
@@ -485,8 +487,8 @@ def html_page_context(app, pagename, templatename, context, doctree):
 # -----------------------------------------------------------------------------
 
 
-breathe_projects = dict(gedidb=os.path.join("..", "build", "doxygen", "xml"))
-breathe_default_project = "gedidb"
+breathe_projects = dict(icesat2db=os.path.join("..", "build", "doxygen", "xml"))
+breathe_default_project = "icesat2db"
 breathe_default_members = ("members", "undoc-members", "protected-members")
 
 # See https://github.com/breathe-doc/breathe/issues/696

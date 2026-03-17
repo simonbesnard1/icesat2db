@@ -1,7 +1,7 @@
-﻿gedidb.beam\_handler
-====================
+﻿icesat2db.beam\_handler
+=======================
 
-.. currentmodule:: gedidb
+.. currentmodule:: icesat2db
 
 .. autoclass:: beam_handler
 

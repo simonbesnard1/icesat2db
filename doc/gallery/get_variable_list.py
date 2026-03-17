@@ -3,30 +3,30 @@ Retrieve List of Variables in TileDB Array
 ==========================================
 
 This example demonstrates how to retrieve the list of variables stored in a TileDB array
-using the `GEDIProvider` class from the `gedidb` package. The output is a `pandas.DataFrame`
+using the `IceSat2Provider` class from the `icesat2db` package. The output is a `pandas.DataFrame`
 containing variable names, descriptions, and metadata.
 
 Prerequisites:
 --------------
-1. GEDI data must be processed and stored in TileDB arrays.
+1. IceSat2 data must be processed and stored in TileDB arrays.
 2. Configure the TileDB storage backend (local or S3).
 
 Steps:
 ------
 1. Configure the TileDB backend (local or S3).
-2. Initialize the `GEDIProvider`.
+2. Initialize the `IceSat2Provider`.
 3. Retrieve and display the list of available variables.
 """
 
-import gedidb as gdb
+import icesat2db as isdb
 
 # Step 1: Configure the TileDB storage backend
 storage_type = "local"  # Options: "local" or "s3"
-local_path = "/path/to/processed/gedi/data"  # Update with your local TileDB path
+local_path = "/path/to/processed/icesat2/data"  # Update with your local TileDB path
 s3_bucket = None  # Set the S3 bucket name if using S3 storage
 
-# Step 2: Initialize the GEDIProvider
-provider = gdb.IceSat2Provider(
+# Step 2: Initialize the IceSat2Provider
+provider = isdb.IceSat2Provider(
     storage_type=storage_type,
     local_path=local_path,
     s3_bucket=s3_bucket,

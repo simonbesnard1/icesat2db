@@ -5,8 +5,8 @@ tiledb:
   overwrite: false                                  # Whether to overwrite existing arrays
   # temporal_batching:
   time_range:                                      # Global time range for data
-    start_time: "2018-01-01"
-    end_time: "2030-12-31"
+    start_time: "2020-01-01"
+    end_time: "2020-01-02"
   spatial_range:                                   # Global spatial range (bounding box)
     lat_min: -90.0
     lat_max: 90.0
@@ -28,10 +28,9 @@ progress_dir: ''
 earth_data_info:
  CMR_URL: "https://cmr.earthdata.nasa.gov/search/granules.json"
  CMR_PRODUCT_IDS:
-   # IceSatProduct.ATL08: 'C2565090645-NSIDC_ECS'
-   IceSat2Product.ATL08: 'C2613553260-NSIDC_CPRD'
+   ATL08: C3565574177-NSIDC_CPRD
 
-# Variables list for each GEDI level product - SDS_Name is science dataset name the native h5 file retrieved from the NASA API
+# Variables list for each IceSat2 level product - SDS_Name is science dataset name the native h5 file retrieved from the NASA API
 level_atl08:
   variables:
     asr:

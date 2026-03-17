@@ -1,11 +1,11 @@
 {
- "gdb.GEDIProvider": [
+ "isdb.IceSat2Provider": [
   {
    "is_class": false,
    "is_explicit": false,
-   "module": "gedidb",
-   "module_short": "gedidb",
-   "name": "GEDIProvider"
+   "module": "icesat2db",
+   "module_short": "icesat2db",
+   "name": "IceSat2Provider"
   }
  ]
 }

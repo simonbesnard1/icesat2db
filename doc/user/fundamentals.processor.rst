@@ -4,35 +4,35 @@
 Data Processing
 ###############
 
-The :py:class:`gedidb.GEDIProcessor` class in gediDB manages the entire workflow of downloading, processing, and storing GEDI data in either a local or s3-based tileDB. This section outlines the key functions of :py:class:`gedidb.GEDIProcessor`, example usage, core functions, and customization options for efficient GEDI data handling.
+The :py:class:`icesat2db.IceSat2Processor` class in icesat2db manages the entire workflow of downloading, processing, and storing IceSat2 data in either a local or s3-based tileDB. This section outlines the key functions of :py:class:`icesat2db.IceSat2Processor`, example usage, core functions, and customization options for efficient IceSat2 data handling.
 
-Overview of GEDIProcessor workflow
+Overview of IceSat2Processor workflow
 ----------------------------------
 
-The :py:class:`gedidb.GEDIProcessor` class handles the following tasks:
+The :py:class:`icesat2db.IceSat2Processor` class handles the following tasks:
 
 - **Initialization**: Sets up paths, configurations, and database connections.
-- **Granule downloading**: Automatically downloads `.h5` granule files for multiple GEDI products (L2A, L2B, L4A, and L4C).
+- **Granule downloading**: Automatically downloads `.h5` granule files for multiple IceSat2 products (L2A, L2B, L4A, and L4C).
 - **Data processing**: Applies quality filtering, merges products, and prepares data for storage.
 - **Database writing**: Stores processed data in a tileSB array with proper metadata for easy querying.
 
 Example usage
 -------------
 
-Below is a quick example of using the :py:class:`gedidb.GEDIProcessor` in a workflow:
+Below is a quick example of using the :py:class:`icesat2db.IceSat2Processor` in a workflow:
 
 .. code-block:: python
 
-   import gedidb as gdb
+   import icesat2db as isdb
 
    config_file = 'path/to/config_file.yml'
    geometry = 'path/to/test.geojson'
    
-   # Initialize the GEDIProcessor and compute
+   # Initialize the IceSat2Processor and compute
    concurrent_engine= concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
-   # Initialize the GEDIProcessor and compute
-   with gdb.GEDIProcessor(
+   # Initialize the IceSat2Processor and compute
+   with isdb.IceSat2Processor(
        config_file=config_file,
        geometry=geometry,
        start_date='2020-01-01',
@@ -46,11 +46,11 @@ Below is a quick example of using the :py:class:`gedidb.GEDIProcessor` in a work
 Processing workflow
 -------------------
 
-The :py:class:`compute()` method of :py:class:`gedidb.GEDIProcessor` initiates the following workflow, using configuration settings defined in `data_config.yml`:
+The :py:class:`compute()` method of :py:class:`icesat2db.IceSat2Processor` initiates the following workflow, using configuration settings defined in `data_config.yml`:
 
 1. **Setup and initialization**:
 
-   - The :py:class:`gedidb.GEDIProcessor` is initialized with the `data_config.yml` file for parameters like spatial and temporal boundaries, product details, and filtering criteria.
+   - The :py:class:`icesat2db.IceSat2Processor` is initialized with the `data_config.yml` file for parameters like spatial and temporal boundaries, product details, and filtering criteria.
    - Database tables are created based on the parameters in `data_config.yml`, ensuring that the tileDB required for granule storage is in place and properly configured.
    - Paths are set up for storing granules.
 
@@ -58,14 +58,14 @@ The :py:class:`compute()` method of :py:class:`gedidb.GEDIProcessor` initiates t
 
    The granule downloading process consists of two main components:
 
-   - **CMR Data Querying**: The :py:class:`gedidb.CMRDataDownloader` class queries NASA's CMR service for GEDI granules within the specified spatial and temporal bounds. It retrieves granule metadata and ensures that all required products (L2A, L2B, L4A, L4C) are consistently available for each granule ID. A retry mechanism is implemented to handle inconsistencies across products.
-   - **Granule File Downloading**: The :py:class:`gedidb.H5FileDownloader` class downloads `.h5` granule files using a robust, resumable process. It supports partial downloads with a temporary `.part` file and only renames files to `.h5` upon successful completion. The class also handles network failures and retries failed downloads to ensure reliability.
+   - **CMR Data Querying**: The :py:class:`icesat2db.CMRDataDownloader` class queries NASA's CMR service for IceSat2 granules within the specified spatial and temporal bounds. It retrieves granule metadata and ensures that all required products (L2A, L2B, L4A, L4C) are consistently available for each granule ID. A retry mechanism is implemented to handle inconsistencies across products.
+   - **Granule File Downloading**: The :py:class:`icesat2db.H5FileDownloader` class downloads `.h5` granule files using a robust, resumable process. It supports partial downloads with a temporary `.part` file and only renames files to `.h5` upon successful completion. The class also handles network failures and retries failed downloads to ensure reliability.
 
-   Granules are stored in structured directories, with each granule ID having separate subdirectories containing its corresponding GEDI product files.
+   Granules are stored in structured directories, with each granule ID having separate subdirectories containing its corresponding IceSat2 product files.
 
 3. **Data processing**:
 
-   The processing pipeline efficiently handles GEDI granules by downloading, parsing, filtering, and merging data in parallel.
+   The processing pipeline efficiently handles IceSat2 granules by downloading, parsing, filtering, and merging data in parallel.
 
    - **Parallel Processing**:
 
@@ -75,20 +75,15 @@ The :py:class:`compute()` method of :py:class:`gedidb.GEDIProcessor` initiates t
 
    - **Granule Parsing & Quality Filtering**:
 
-     - Each granule is parsed and processed by the :py:class:`gedidb.GEDIGranule` class.
+     - Each granule is parsed and processed by the :py:class:`icesat2db.IceSat2Granule` class.
      - Quality filtering is applied using flags such as **sensitivity** and **degrade status**.
      - For more details on filtering criteria, refer to :ref:`fundamentals-filters`.
-
-   - **Data Merging & Structuring**:
-
-     - GEDI products (L2A, L2B, L4A, L4C) are merged using **shot numbers** as the primary key.
-     - The merging process ensures that only granules containing all required products are retained.
      - The resulting unified dataset is prepared for writing to **TileDB**.
 
 
 4. **Database writing**:
 
-   The processed GEDI data is written to a **TileDB database**, ensuring efficient storage and retrieval.
+   The processed IceSat2 data is written to a **TileDB database**, ensuring efficient storage and retrieval.
 
    - **Data Storage**: Processed data is stored in either a local or S3-based TileDB database, distributed across different fragments.
    - **Spatial Chunking**: The data is partitioned into spatial chunks as defined in `data_config.yml`, with each chunk stored in a separate fragment.
@@ -108,16 +103,16 @@ The :py:class:`compute()` method of :py:class:`gedidb.GEDIProcessor` initiates t
 Advanced customization options
 ------------------------------
 
-The :py:class:`gedidb.GEDIProcessor` class is highly configurable, allowing you to tailor data processing to your specific needs:
+The :py:class:`icesat2db.IceSat2Processor` class is highly configurable, allowing you to tailor data processing to your specific needs:
 
 - **`data_config.yml`**: Modify this file to specify:
 
   - Database configuration details
-  - Variables list for each GEDI product (L2A, L2B, L4A, L4C)
+  - Variables list for each IceSat2 product (L2A, L2B, L4A, L4C)
   
   For details on configuration files, refer to the :ref:`fundamentals-setup` page.
 
 Performance considerations
 --------------------------
 
-Using parallel engines (e.g., Dask) for parallel processing enables gediDB to scale efficiently, particularly when working with large datasets. However, ensure that your system has sufficient memory for handling multiple workers and large `.h5` files. 
+Using parallel engines (e.g., Dask) for parallel processing enables icesat2db to scale efficiently, particularly when working with large datasets. However, ensure that your system has sufficient memory for handling multiple workers and large `.h5` files. 

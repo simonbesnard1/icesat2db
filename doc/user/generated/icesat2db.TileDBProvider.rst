@@ -1,7 +1,7 @@
-﻿gedidb.TileDBProvider
-=====================
+﻿icesat2db.TileDBProvider
+========================
 
-.. currentmodule:: gedidb
+.. currentmodule:: icesat2db
 
 .. autoclass:: TileDBProvider
 
@@ -14,7 +14,9 @@
    .. autosummary::
    
       ~TileDBProvider.__init__
+      ~TileDBProvider.close
       ~TileDBProvider.get_available_variables
+      ~TileDBProvider.query_dataframe
    
    
 

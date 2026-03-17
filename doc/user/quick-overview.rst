@@ -1,24 +1,24 @@
 .. _overview:
 
-################
+##############
 Quick Overview
-################
+##############
 
-This section provides brief examples of using :py:class:`gedidb.GEDIProcessor` and :py:class:`gedidb.GEDIProvider` to process and query **GEDI** data. For advanced features and detailed use cases, refer to the :ref:`fundamentals`.
+This section provides brief examples of using :py:class:`icesat2db.IceSat2Processor` and :py:class:`icesat2db.IceSat2Provider` to process and query **IceSat2** data. For advanced features and detailed use cases, refer to the :ref:`fundamentals`.
 
-Start by importing the **gedidb** package:
+Start by importing the **icesat2db** package:
 
 .. code-block:: python
 
-    import gedidb as gdb
+    import icesat2db as isdb
     import concurrent.futures
 
-Processing GEDI Data
---------------------
+Processing IceSat2 Data
+-----------------------
 
-To process GEDI data, specify paths to a ``YAML`` configuration file (`config_file`). See :ref:`fundamentals-setup` for more information on the data configuration files.
+To process IceSat2 data, specify paths to a ``YAML`` configuration file (`config_file`). See :ref:`fundamentals-setup` for more information on the data configuration files.
 
-This setup initiates the download, processing, and storage of GEDI data in your database.
+This setup initiates the download, processing, and storage of IceSat2 data in your database.
 
 .. code-block:: python
 
@@ -29,8 +29,8 @@ This setup initiates the download, processing, and storage of GEDI data in your 
     # Initialize a parallel engine
     concurrent_engine= concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
-    # Initialize the GEDIProcessor and compute
-    with gdb.GEDIProcessor(
+    # Initialize the IceSat2Processor and compute
+    with isdb.IceSat2Processor(
         config_file=config_file,
         geometry=geometry,
         start_date='2020-01-01',
@@ -41,36 +41,36 @@ This setup initiates the download, processing, and storage of GEDI data in your 
         processor.compute(consolidate=True)
 
 
-In this example, the :py:class:`gedidb.GEDIProcessor` performs:
+In this example, the :py:class:`icesat2db.IceSat2Processor` performs:
 
-- **Downloading** GEDI L2A-B and L4A-C products.
+- **Downloading** IceSat2 ATL08 product.
 - **Filtering** data by quality.
 - **Storing** the processed data in the tileDB database.
 
-Querying GEDI Data
-------------------
+Querying IceSat2 Data
+---------------------
 
-Once the data is processed and stored, use :py:class:`gedidb.GEDIProvider` to query it. The results can be returned in either **Xarray** or **Pandas** format, providing flexibility for various workflows.
+Once the data is processed and stored, use :py:class:`icesat2db.IceSat2Provider` to query it. The results can be returned in either **Xarray** or **Pandas** format, providing flexibility for various workflows.
 
-Example query using :py:class:`gedidb.GEDIProvider`:
+Example query using :py:class:`icesat2db.IceSat2Provider`:
 
 .. code-block:: python
     
     import geopandas as gpd
-    import gedidb as gdb
+    import icesat2db as gdb
 
-    # Create GEDIProvider instance
-    provider = gdb.GEDIProvider(storage_type='local', 
+    # Create IceSat2Provider instance
+    provider = gdb.IceSat2Provider(storage_type='local', 
                                 local_path= "path/to/your/database/")
 
     # Load region of interest
     region_of_interest = gpd.read_file('./data/geojson/BR-Sa1.geojson')
 
     # Define the columns to query and additional parameters
-    vars_selected = ["agbd", 'rh']
+    vars_selected = ["brightness_flag"]
     
     # Profile the provider's `get_data` function
-    gedi_data = provider.get_data(
+    icesat2_data = provider.get_data(
         variables=vars_selected,
         query_type="bounding_box",
         geometry=region_of_interest,
@@ -81,11 +81,11 @@ Example query using :py:class:`gedidb.GEDIProvider`:
 
 This :py:class:`provider.get_data()` function allows you to:
 
-- **Select specific columns** (e.g., `wsci_z_pi_lower`, `wsci_z_pi_upper`).
+- **Select specific columns** (e.g., `brightness_flag`).
 - **Apply spatial and temporal filters** using `geometry`, `start_time`, and `end_time`.
 - **Return data** in either `xarray` or `pandas` format based on `return_type`.
 
-This functionality offers a flexible, scalable approach to querying GEDI data, streamlining its integration into your data workflows.
+This functionality offers a flexible, scalable approach to querying IceSat2 data, streamlining its integration into your data workflows.
 
 ---
 

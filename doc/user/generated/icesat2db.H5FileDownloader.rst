@@ -1,7 +1,7 @@
-﻿gedidb.H5FileDownloader
-=======================
+﻿icesat2db.H5FileDownloader
+==========================
 
-.. currentmodule:: gedidb
+.. currentmodule:: icesat2db
 
 .. autoclass:: H5FileDownloader
 
