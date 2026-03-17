@@ -85,6 +85,7 @@ class IceSat2Granule:
                 return granule_key, None
 
             gdf = self._join_dfs(gdf_dict, granule_key)
+      
             if gdf is None:
                 return granule_key, None
 
@@ -129,55 +130,28 @@ class IceSat2Granule:
             logger.error(f"Granule {granule_key}: Error while parsing: {e}")
             return {}
 
-        return {k: v for k, v in data_dict.items() if "shot_number" in v}
+        return {k: v for k, v in data_dict.items() if "segment_id" in v}
 
     @staticmethod
     def _join_dfs(
         df_dict: Dict[str, pd.DataFrame], granule_key: str
     ) -> Optional[pd.DataFrame]:
         """
-        Join IceSat2 product DataFrames on 'shot_number' with this policy:
-          - Required products: ATL08 must exist and be non-empty.
-
-        Additional behavior:
-          - Enforces consistent 'string' dtype for 'shot_number'.
-          - Drops duplicates per product on 'shot_number' (keeps first).
-          - Handles column collisions with suffixes.
-          - Returns None if any required product missing/empty or if base ends empty.
-
+        Validate and return the ATL08 DataFrame.
         """
-        key = "shot_number"
-        req = [IceSat2Product.ATL08]
-
-        missing = []
-        for p in req:
-            code = p.value
-            if code not in df_dict or df_dict[code] is None or df_dict[code].empty:
-                missing.append(code)
-
-        if missing:
+        atl08_key = IceSat2Product.ATL08.value
+        df = df_dict.get(atl08_key)
+        
+    
+        if df is None or df.empty:
+            logger.warning(f"[{granule_key}] ATL08 data missing or empty.")
             return None
-
-        def _prep(df: pd.DataFrame, product_name: str) -> pd.DataFrame:
-            """Prepare DataFrame with validation and deduplication."""
-            if key not in df.columns:
-                raise KeyError(
-                    f"[{granule_key}] Product {product_name} missing join key '{key}'"
-                )
-
-            # Single copy, then modify
-            out = df.copy()
-            out[key] = out[key].astype("string")
-
-            out = out.drop_duplicates(subset=[key], keep="first")
-
-            return out
-
-        # Prepare all DataFrames
-        try:
-            base = _prep(df_dict[IceSat2Product.ATL08.value], "atl08")
-        except Exception as e:
-            logger.error(f"[{granule_key}] Preparation failed: {e}")
+    
+        if "segment_id" not in df.columns:
+            logger.error(f"[{granule_key}] ATL08 DataFrame missing 'segment_id' column.")
             return None
-
-        return base if not base.empty else None
+    
+        assert not df.duplicated(subset=["segment_id"]).any(), \
+            f"[{granule_key}] Duplicate segment_ids detected in ATL08 — upstream bug."
+    
+        return df

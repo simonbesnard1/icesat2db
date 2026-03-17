@@ -5,7 +5,6 @@
 # SPDX-FileCopyrightText: 2026 Simon Besnard
 # SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
 
-import hashlib
 from typing import Dict, Optional
 
 import numpy as np
@@ -60,34 +59,29 @@ class ATL08Beam(beam_handler):
 
         }
 
-    def construct_shot_number(self) -> np.ndarray:
+    def construct_segment_id(self) -> np.ndarray:
         """
-        Construct shot numbers for the beam based on the number of shots.
-
-        Returns:
-            np.ndarray: An array of shot numbers.
+        Construct a globally unique segment ID for ATL08 land segments.
+        Encodes: RGT (14 bits) | cycle (8 bits) | beam (3 bits) | segment_id_beg (32 bits)
+        
+        Bit layout (int64):
+          [63..43] RGT (1–1387)
+          [42..35] cycle
+          [34..32] beam (0–5)
+          [31..0]  segment_id_beg
         """
-
-        dt = np.round(self["land_segments/delta_time"], 9)
-        lat = np.round(self["land_segments/latitude"], 9)
-        lon = np.round(self["land_segments/longitude"], 9)
-
-        # shot_str = (
-        #         dt.astype(str) + "_" +
-        #         lat.astype(str) + "_" +
-        #         lon.astype(str)
-        # )
-        #
-        # return shot_str
-
-        data = np.stack([dt, lat, lon], axis=1).astype(np.float64)
-
-        shot_hash = np.array([
-            hashlib.sha256(row.tobytes()).hexdigest()
-            for row in data
-        ])
-
-        return shot_hash
+        rgt   = int(self.parent_granule["orbit_info/rgt"][0])
+        cycle = int(self.parent_granule["orbit_info/cycle_number"][0])
+        beam_map = {"gt1l": 0, "gt1r": 1, "gt2l": 2, "gt2r": 3, "gt3l": 4, "gt3r": 5}
+        beam_id = beam_map[self.beam_name]
+        seg_ids = self["land_segments/segment_id_beg"][()].astype(np.int64)  # int32 → int64 before shifting
+    
+        return (
+            (np.int64(rgt)     << 43) |
+            (np.int64(cycle)   << 35) |
+            (np.int64(beam_id) << 32) |
+            seg_ids
+        )
 
     def _get_main_data(self) -> Optional[Dict[str, np.ndarray]]:
         """
@@ -102,13 +96,12 @@ class ATL08Beam(beam_handler):
         delta_time = self["land_segments/delta_time"][()]
         # instead of delta_time we can use start_delta_time and end_delta_time for segments as mid point
 
-
         # Initialize the data dictionary with calculated fields
         land_data = {
             "time": icesat2_count_start + pd.to_timedelta(delta_time, unit="seconds"),
             "longitude": self["land_segments/longitude"][()],
             "latitude": self["land_segments/latitude"][()],
-            "shot_number": self.construct_shot_number()
+            "segment_id": self.construct_segment_id()
         }
 
         # Populate data dictionary with fields from field mapping
