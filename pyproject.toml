@@ -38,7 +38,8 @@ dependencies = [
     "retry",
     "scipy",
     "tiledb",
-    "xarray"
+    "xarray",
+    "boto3>=1.40.60"
 ]
 
 [project.urls]

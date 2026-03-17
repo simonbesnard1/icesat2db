@@ -1,4 +1,4 @@
-name: gedidb-docs
+name: icesat2db-docs
 channels:
   - conda-forge
   - nodefaults

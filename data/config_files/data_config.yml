@@ -1,12 +1,13 @@
 # database parameters
 tiledb:
-  storage_type: 'local'
-  local_path: ''     # TileDB URI for storing data
-  overwrite: false                                  # Whether to overwrite existing arrays
-  # temporal_batching:
+  storage_type: 's3'
+  s3_bucket: "dog.icesat2db.icesat2-atl008-v007"      # TileDB URI for storing data
+  url: "https://s3.gfz-potsdam.de"
+  overwrite: true                                  # Whether to overwrite existing arrays
+  #temporal_batching: "weekly"
   time_range:                                      # Global time range for data
-    start_time: "2020-01-01"
-    end_time: "2020-01-02"
+    start_time: "2018-01-01"
+    end_time: "2030-12-31"
   spatial_range:                                   # Global spatial range (bounding box)
     lat_min: -90.0
     lat_max: 90.0
@@ -28,7 +29,7 @@ progress_dir: ''
 earth_data_info:
  CMR_URL: "https://cmr.earthdata.nasa.gov/search/granules.json"
  CMR_PRODUCT_IDS:
-   ATL08: C3565574177-NSIDC_CPRD
+  ATL08: 'C3565574177-NSIDC_CPRD'
 
 # Variables list for each IceSat2 level product - SDS_Name is science dataset name the native h5 file retrieved from the NASA API
 level_atl08:

@@ -1,18 +1,23 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
-# SPDX-FileCopyrightText: 2026 Felix Dombrowski
-# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
-# SPDX-FileCopyrightText: 2026 Simon Besnard
-# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-
+# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
+# SPDX-FileCopyrightText: 2025 Amelia Holcomb
+# SPDX-FileCopyrightText: 2025 Felix Dombrowski
+# SPDX-FileCopyrightText: 2025 Simon Besnard
+# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+#
 
 import logging
-import os
 import pathlib
-import time
 from collections import defaultdict
 from datetime import datetime
 from typing import Optional, Tuple
+import threading
+from retry import retry
+
+logger = logging.getLogger(__name__)
+
+# Thread-local storage for safe Sessions
+_thread_local = threading.local()
 
 import geopandas as gpd
 import requests
@@ -20,11 +25,9 @@ from requests.exceptions import (
     ChunkedEncodingError,
     ConnectionError,
     HTTPError,
-    ReadTimeout,
     RequestException,
     Timeout,
 )
-from retry import retry
 from urllib3.exceptions import NewConnectionError
 import h5py
 
@@ -43,6 +46,32 @@ class WarningFilter(logging.Filter):
 
 # Apply the filter
 logger.addFilter(WarningFilter())
+
+
+def _normalize_entry(t):
+    """Accept (url, product, start_time) or (url, product, start_time, size_mb)."""
+    if len(t) == 4:
+        url, product, start_time, size_mb = t
+        return (
+            url,
+            product,
+            start_time,
+            float(size_mb) if size_mb is not None else 0.0,
+        )
+    elif len(t) == 3:
+        url, product, start_time = t
+        return (url, product, start_time, 0.0)
+    else:
+        raise ValueError(f"Unexpected granule tuple shape: {t!r}")
+
+
+def _get_session() -> requests.Session:
+    """Return a per-thread requests.Session (thread-safe)."""
+    if not hasattr(_thread_local, "session"):
+        s = requests.Session()
+        s.headers.update({"User-Agent": "icesat2db/1.0"})
+        _thread_local.session = s
+    return _thread_local.session
 
 
 class IceSat2Downloader:
@@ -85,25 +114,21 @@ class CMRDataDownloader(IceSat2Downloader):
             RequestException,
             NewConnectionError,
         ),
-        tries=10,
-        delay=5,
-        backoff=3,
+        tries=4,
+        delay=2,
+        backoff=2,
         logger=logger,
     )
     def download(self) -> dict:
         """
         Download granules across all IceSat2 products and ensure ID consistency.
-        Returns a dictionary organized by granule ID with a list of (url, product) tuples.
-        Retry mechanism is applied if the IDs across products are inconsistent.
-
-        :return: A dictionary containing granule data organized by granule ID.
-        :raises: ValueError if no granules with all required products are found.
+        Returns: {granule_id: [(url, product, start_time, size_mb), ...]}
         """
         cmr_dict = defaultdict(list)
-        total_granules = 0
-        total_size_mb = 0.0
+        per_product_counts = {}
+        per_product_sizes_mb = {}
 
-        # Iterate over each required product and collect granule information
+        # 1) Query per product and stage everything (include size for post-intersection sum)
         for product in IceSat2Product:
             try:
                 granule_query = GranuleQuery(
@@ -115,78 +140,106 @@ class CMRDataDownloader(IceSat2Downloader):
                 )
                 granules = granule_query.query_granules()
 
-                if not granules.empty:
-                    total_granules += len(granules)
-                    total_size_mb += (
-                        granules["size"].astype(float).sum()
-                    )  # Summing the size column
-
-                    # Organize granules by ID and append (url, product) tuples
-                    for _, row in granules.iterrows():
-
-                        cmr_dict[row["id"]].append(
-                            (
-                                row["url"],
-                                product.value,
-                                row["start_time"],
-                            )
-                        )
-                else:
+                if granules.empty:
                     logger.warning(f"No granules found for product {product.value}.")
+                    per_product_counts[product.value] = 0
+                    per_product_sizes_mb[product.value] = 0.0
+                    continue
+
+                per_product_counts[product.value] = len(granules)
+                per_product_sizes_mb[product.value] = float(
+                    granules["size"].astype(float).sum()
+                )
+
+                for _, row in granules.iterrows():
+                    cmr_dict[row["id"]].append(
+                        (
+                            row["url"],
+                            product.value,
+                            row["start_time"],
+                            float(row["size"]),
+                        )
+                    )
 
             except Exception as e:
                 logger.error(f"Failed to download granules for {product.name}: {e}")
+                per_product_counts.setdefault(product.value, 0)
+                per_product_sizes_mb.setdefault(product.value, 0.0)
                 continue
 
         if not cmr_dict:
-            raise ValueError("No granules found after retry attempts.")
+            raise ValueError(
+                "No IceSat2 granules found for the provided spatio-temporal request. "
+                f"Geometry bounds={self.geom.total_bounds.tolist()}, "
+                f"start_date={self.start_date}, end_date={self.end_date}"
+            )
 
-        # Filter granules to only include those with all required products
+        # 2) Intersect to keep only granules that have all required products.
         filtered_cmr_dict = self._filter_granules_with_all_products(cmr_dict)
-
         if not filtered_cmr_dict:
             raise ValueError("No granules with all required products found.")
 
-        # Log the total number of granules and total size of the data
-        logger.info(
-            f"NASA's CMR service found {int(total_granules / len(IceSat2Product))} granules for a total size of {total_size_mb / 1024:.2f} GB ({total_size_mb / 1_048_576:.2f} TB)."
+        # 3) True counts/sizes AFTER intersection.
+        n_intersection = len(filtered_cmr_dict)
+        total_size_mb = sum(
+            sz for entries in filtered_cmr_dict.values() for _, _, _, sz in entries
         )
+
+        # 4) Clear logging (and a sanity note)
+        if per_product_counts:
+            min_per_prod = min(per_product_counts.values())
+            if n_intersection > min_per_prod:
+                logger.warning(
+                    "Intersection (%d) > min per-product count (%d) — check product set / inputs.",
+                    n_intersection,
+                    min_per_prod,
+                )
+
+        logger.info(
+            "Intersection has %d granule IDs across %d products. "
+            "Estimated download: %.2f GB (%.2f TB). ",
+            n_intersection,
+            len(IceSat2Product),
+            total_size_mb / 1024,
+            total_size_mb / 1_048_576,
+        )
+        
         return filtered_cmr_dict
 
     def _filter_granules_with_all_products(self, granules: dict) -> dict:
         """
-        Filter the granules dictionary to only include granules that have all required products.
-
-        :param granules: Dictionary where keys are granule IDs and values are lists of (url, product) tuples.
-        :return: Filtered dictionary containing only granules with all required products.
+        Keep only granule IDs that have all required products.
+        Deduplicates multiple entries for the same (granule_id, product).
+        Accepts tuples of len 3 or 4 and normalizes to len 4.
         """
-        # TODO: Make required products configurable
-        required_products = {"atl08"}
+        required_products = {p.value for p in IceSat2Product}
         filtered_granules = {}
 
         for granule_id, product_info in granules.items():
-            # Extract the set of products for the current granule
-            products_found = {product[1] for product in product_info}
+            # Normalize shapes & dedupe per product
+            by_product = {}
+            for t in product_info:
+                url, product, start_time, size_mb = _normalize_entry(t)
+                # keep first seen per product; change policy if you prefer newest/largest
+                by_product.setdefault(product, (url, product, start_time, size_mb))
 
-            # Check for missing products
-            missing_products = required_products - products_found
-            if missing_products:
-                # Skip this granule as it's missing required products
+            # Check intersection condition
+            if not required_products.issubset(by_product.keys()):
                 continue
-            else:
-                # Include this granule as it has all required products
-                filtered_granules[granule_id] = product_info
+
+            # Keep only required products (ignore extras)
+            filtered_granules[granule_id] = [by_product[p] for p in required_products]
 
         return filtered_granules
 
 
 class H5FileDownloader:
     """
-    Downloader for HDF5 files from URLs, with resume and retry support,
-    plus a temporary ".part" approach to ensure data integrity.
+    Safe downloader for HDF5 files using thread-local Sessions
+    and non-streaming chunked reads to avoid SSL segfaults in threaded mode.
     """
 
-    def __init__(self, download_path: str = "."):
+    def __init__(self, download_path: str = ".") -> None:
         self.download_path = pathlib.Path(download_path)
 
     @retry(
@@ -206,130 +259,89 @@ class H5FileDownloader:
         logger=logger,
     )
     def download(
-        self, granule_key: str, url: str, product: str
+        self, granule_key: str, url: str, product
     ) -> Tuple[str, Tuple[str, Optional[str]]]:
-        """
-        Download an HDF5 file for a specific granule and product with resume support
-        using a temporary ".part" file. Renames to ".h5" only upon successful download.
-        """
-        # Paths
+
+        session = _get_session()
+
         granule_dir = self.download_path / granule_key
-        final_path = granule_dir / f"{product.name}.h5"
-        temp_path = granule_dir / f"{product.name}.h5.part"
-        os.makedirs(granule_dir, exist_ok=True)
+        granule_dir.mkdir(parents=True, exist_ok=True)
 
-        # Check if file already exists and is valid
-        if final_path.exists():
-            if self._is_hdf5_valid(final_path):
-                return granule_key, (product.value, str(final_path))
-            else:
-                logger.warning(
-                    f"Corrupt HDF5 file detected: {final_path}. Deleting and retrying."
-                )
-                final_path.unlink()
+        product_name = getattr(product, "name", str(product))
+        product_value = getattr(product, "value", str(product))
 
-        # Get the size of partially downloaded file
+        final_path = granule_dir / f"{product_name}.h5"
+        temp_path = granule_dir / f"{product_name}.h5.part"
+
+        # -----------------------------
+        # Fast path: valid existing file
+        # -----------------------------
+        if final_path.exists() and self._is_hdf5_valid(final_path):
+            return granule_key, (product_value, str(final_path))
+
+        # ensure stale files are removed
+        final_path.unlink(missing_ok=True)
+
+        # -----------------------------
+        # Determine total size via HEAD-range
+        # -----------------------------
         downloaded_size = temp_path.stat().st_size if temp_path.exists() else 0
-
-        # Attempt to retrieve total file size with a small GET request (Range=0-1)
-        headers = {"Range": "bytes=0-1"}
         total_size: Optional[int] = None
 
-        try:
-            partial_response = requests.get(
-                url, headers=headers, stream=True, timeout=30
-            )
-            partial_response.raise_for_status()  # Ensure HTTP errors are caught
-            if "Content-Range" in partial_response.headers:
-                total_size = int(
-                    partial_response.headers["Content-Range"].split("/")[-1]
-                )
-                if downloaded_size == total_size:
-                    temp_path.rename(final_path)
-                    if self._is_hdf5_valid(final_path):
-                        return granule_key, (product.value, str(final_path))
-                    else:
-                        logger.warning(
-                            f"Downloaded file {final_path} is corrupt. Deleting and retrying."
-                        )
-                        final_path.unlink()
-                        raise ValueError("Invalid HDF5 file after download.")
-                headers["Range"] = f"bytes={downloaded_size}-"
-            else:
-                headers = {}  # Server doesn't support Range requests
-        except requests.RequestException as e:
-            raise ValueError(f"Failed to get Content-Range: {e}.")
+        r = session.get(url, headers={"Range": "bytes=0-1"}, timeout=30)
+        r.raise_for_status()
 
-        # Download (or resume) the file to the .part path
-        try:
-            with requests.get(url, headers=headers, stream=True, timeout=30) as r:
-                if r.status_code == 416:  # Handle "Requested Range Not Satisfiable"
-                    if temp_path.exists():
-                        temp_path.unlink()
-                    raise ValueError("Invalid byte range.")
+        cr = r.headers.get("Content-Range")
+        if cr:
+            try:
+                total_size = int(cr.split("/")[-1])
+            except Exception:
+                total_size = None
 
-                r.raise_for_status()
+        # -----------------------------
+        # Prepare resume header
+        # -----------------------------
+        headers = {}
+        if downloaded_size > 0:
+            headers["Range"] = f"bytes={downloaded_size}-"
 
-                mode = "ab" if headers.get("Range") else "wb"
-                with open(temp_path, mode) as f:
-                    for chunk in r.iter_content(
-                        chunk_size=8 * 1024 * 1024
-                    ):  # 8 MB chunks
-                        if chunk:
-                            f.write(chunk)
+        # -----------------------------
+        # Main download — no streaming
+        # -----------------------------
+        r = session.get(url, headers=headers, timeout=45, stream=False)
+        r.raise_for_status()
 
-            # Validate final size
-            final_downloaded_size = temp_path.stat().st_size
-            if total_size is not None and final_downloaded_size != total_size:
-                temp_path.unlink(missing_ok=True)
-                raise ValueError("Downloaded final size mismatch with expected size.")
+        mode = "ab" if downloaded_size else "wb"
+        with open(temp_path, mode) as f:
+            data = r.content
+            f.write(data)
 
-            # Rename to final name upon successful download
-            temp_path.rename(final_path)
+        # -----------------------------
+        # Validate size for complete files
+        # -----------------------------
+        final_size = temp_path.stat().st_size
 
-            # Validate the HDF5 file
-            if not self._is_hdf5_valid(final_path):
-                logger.warning(
-                    f"Downloaded file {final_path} is corrupt. Deleting and retrying."
-                )
-                final_path.unlink()
-                raise ValueError("Invalid HDF5 file after download.")
+        if total_size is not None and final_size != total_size:
+            temp_path.unlink(missing_ok=True)
+            raise ValueError(f"Size mismatch: expected {total_size}, got {final_size}")
 
-            return granule_key, (product.value, str(final_path))
+        # -----------------------------
+        # Promote part → final
+        # -----------------------------
+        temp_path.rename(final_path)
 
-        except (
-            HTTPError,
-            ConnectionError,
-            ChunkedEncodingError,
-            ReadTimeout,
-            OSError,
-            ValueError,
-        ) as e:
-            if isinstance(e, OSError) and e.errno == 24:
-                logger.error(
-                    f"Too many open files for {product.name} of the granule {granule_key}: {e}. Retrying..."
-                )
-                time.sleep(5)
+        # -----------------------------
+        # Validate HDF5 integrity
+        # -----------------------------
+        if not self._is_hdf5_valid(final_path):
+            final_path.unlink(missing_ok=True)
+            raise ValueError("Invalid HDF5 file after download.")
 
-            logger.error(
-                f"Error encountered for {product.name} of the granule {granule_key}: {e}. Retrying..."
-            )
-            raise  # This is what triggers the retry
-
-        except Exception as e:
-            logger.error(
-                f"Download failed after all retries for {product.name} of the granule {granule_key}: {e}"
-            )
-            if temp_path.exists():
-                temp_path.unlink()
-            return granule_key, (product.value, None)
+        return granule_key, (product_value, str(final_path))
 
     def _is_hdf5_valid(self, file_path: pathlib.Path) -> bool:
-        """
-        Check if an HDF5 file is valid and can be opened.
-        """
+        """Lightweight HDF5 validation."""
         try:
-            with h5py.File(file_path, "r") as f:
-                return True  # File is valid
-        except OSError:
-            return False  # File is corrupt or not a valid HDF5
+            return h5py.is_hdf5(file_path)
+        except Exception:
+            return False

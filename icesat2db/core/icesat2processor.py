@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: EUPL-1.2
-# Contact: besnard@gfz.de, felixd@gfz.de and urbazaev@gfz.de
-# SPDX-FileCopyrightText: 2026 Felix Dombrowski
-# SPDX-FileCopyrightText: 2026 Mikhail Urbazaev
-# SPDX-FileCopyrightText: 2026 Simon Besnard
-# SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-
+# Contact: besnard@gfz.de, felix.dombrowski@uni-potsdam.de and ah2174@cam.ac.uk
+# SPDX-FileCopyrightText: 2025 Amelia Holcomb
+# SPDX-FileCopyrightText: 2025 Felix Dombrowski
+# SPDX-FileCopyrightText: 2025 Simon Besnard
+# SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+#
 
 import logging
 import os
@@ -12,6 +12,7 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Union
+from collections import defaultdict
 import time
 
 import geopandas as gpd
@@ -28,7 +29,6 @@ from icesat2db.downloader.data_downloader import CMRDataDownloader, H5FileDownlo
 from icesat2db.utils.constants import IceSat2Product
 from icesat2db.utils.geo_processing import _temporal_tiling, check_and_format_shape
 from icesat2db.utils.progress_ledger import ProgressLedger, Row
-
 
 # Configure logging
 logging.basicConfig(
@@ -133,7 +133,7 @@ class IceSat2Processor:
             os.makedirs(log_dir, exist_ok=True)
             log_file = os.path.join(
                 log_dir,
-                f"IceSat2Processor_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log",
+                f"icesat2processor_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log",
             )
 
             # Create a FileHandler and set its level and format
@@ -292,7 +292,7 @@ class IceSat2Processor:
             # Download and filter CMR data
             cmr_data = self._download_cmr_data()
             unprocessed_cmr_data = self._filter_unprocessed_granules(cmr_data)
-
+            
             if not unprocessed_cmr_data:
                 logger.info("All requested granules are already processed.")
                 if consolidate:
@@ -356,7 +356,8 @@ class IceSat2Processor:
 
     def _process_granules(self, unprocessed_cmr_data: dict):
         """
-        Process unprocessed granules in parallel using the selected parallelization engine.
+        Process unprocessed granules in parallel, then write to TileDB in a
+        fragment-friendly way: accumulate per spatial window and write once per window.
         """
         temporal_batching = self.data_info["tiledb"].get("temporal_batching", None)
         if temporal_batching in ("daily", "weekly"):
@@ -365,14 +366,82 @@ class IceSat2Processor:
             batches = {"all": unprocessed_cmr_data}
         else:
             raise ValueError("Invalid temporal batching option.")
+            
+        def _append_ledger_row(
+            ledger,
+            gid,
+            timeframe,
+            started_ts,
+            finished_ts,
+            status,
+            metrics=None,
+            error_msg=None,
+        ):
+            metrics = metrics or {}
+            row = Row(
+                granule_id=gid,
+                timeframe=timeframe,
+                submitted_ts=ledger._submits.get(gid, finished_ts),
+                started_ts=metrics.get("started_ts", started_ts),
+                finished_ts=finished_ts,
+                duration_s=finished_ts - metrics.get("started_ts", started_ts),
+                status=status,
+                n_records=metrics.get("n_records"),
+                bytes_downloaded=metrics.get("bytes_downloaded"),
+                products=(
+                    ",".join(metrics.get("products", []))
+                    if metrics.get("products")
+                    else None
+                ),
+                error_msg=error_msg,
+            )
+            ledger.append(row)
 
+        def _buffer_by_window(buffers, df: pd.DataFrame):
+            """
+            Split one DF into spatial windows and append each sub-DF to buffers.
+            buffers key is (i_lat, i_lon) or bounds tuple; we use bounds as key for simplicity.
+            """
+            for bounds, sub in self.database_writer.spatial_chunking(df):
+                if sub is None or sub.empty:
+                    continue
+                buffers[bounds].append(sub)
+
+        def _flush_buffers(buffers, processed_ids, timeframe):
+            """
+            Concatenate per-window buffers and write once per window (or a small capped number).
+            Only mark processed after successful write.
+            """
+            if not buffers:
+                return
+
+            try:
+                for bounds, parts in buffers.items():
+                    if not parts:
+                        continue
+                    window_df = pd.concat(parts, ignore_index=True)
+                    
+                    self.database_writer.write_granule(window_df)
+
+                # mark processed only after all window writes succeed
+                for ids_ in processed_ids:
+                    self.database_writer.mark_granule_as_processed(ids_)
+
+            except Exception as e:
+                logger.error(
+                    f"Write phase failed for timeframe {timeframe}: {e}", exc_info=True
+                )
+                raise
+
+        # ---- Executor path ----
         if isinstance(self.parallel_engine, concurrent.futures.Executor):
             with self.parallel_engine as executor:
                 for timeframe, granules in batches.items():
                     ledger = ProgressLedger(
                         os.path.join(self.progress_dir, timeframe), timeframe
                     )
-                    # submit all
+
+                    # Submit tasks
                     future_map = {}
                     for gid, pinf in granules.items():
                         ledger.note_submit(gid)
@@ -385,82 +454,78 @@ class IceSat2Processor:
                         )
                         future_map[fut] = gid
 
-                    valid_dataframes = []
+                    # Per-window buffers (bounds -> list[df])
+                    buffers = defaultdict(list)
                     processed_ids = []
                     counter = 0
+
+                    # Collect + buffer streaming (no global concat)
                     for fut in as_completed(future_map):
                         gid = future_map[fut]
                         started_ts = time.time()
                         try:
-                            (ids_, gdf, metrics) = fut.result()
+                            ids_, gdf, metrics = fut.result()
                             finished_ts = time.time()
                             ok = ids_ is not None
-                            if gdf is not None:
-                                valid_dataframes.append(gdf)
+
                             if ok:
                                 processed_ids.append(ids_)
-                            row = Row(
-                                granule_id=gid,
-                                timeframe=timeframe,
-                                submitted_ts=ledger._submits.get(gid, finished_ts),
-                                started_ts=metrics.get("started_ts", started_ts),
-                                finished_ts=finished_ts,
-                                duration_s=finished_ts
-                                - metrics.get("started_ts", started_ts),
+
+                            if gdf is not None and not gdf.empty:
+                                _buffer_by_window(buffers, gdf)
+
+                            _append_ledger_row(
+                                ledger,
+                                gid,
+                                timeframe,
+                                started_ts,
+                                finished_ts,
                                 status="ok" if ok else "fail",
-                                n_records=metrics.get("n_records"),
-                                bytes_downloaded=metrics.get("bytes_downloaded"),
-                                products=",".join(metrics.get("products", [])),
+                                metrics=metrics,
                                 error_msg=None,
                             )
-                            ledger.append(row)
+
                         except Exception as e:
                             finished_ts = time.time()
                             tb = traceback.format_exc()
                             ledger.write_error(gid, tb)
-                            row = Row(
-                                granule_id=gid,
-                                timeframe=timeframe,
-                                submitted_ts=ledger._submits.get(gid, finished_ts),
-                                started_ts=started_ts,
-                                finished_ts=finished_ts,
-                                duration_s=finished_ts - started_ts,
+                            _append_ledger_row(
+                                ledger,
+                                gid,
+                                timeframe,
+                                started_ts,
+                                finished_ts,
                                 status="fail",
+                                metrics={},
                                 error_msg=str(e),
                             )
-                            ledger.append(row)
                             logger.error(f"Granule {gid} failed: {e}")
+
                         finally:
                             counter += 1
                             if counter % self.report_every == 0:
                                 ledger.write_status_md()
                                 ledger.write_html()
 
-                    # write data then finalize report
-                    if valid_dataframes:
-                        concatenated_df = pd.concat(valid_dataframes, ignore_index=True)
+                    # Flush to TileDB once per window
+                    if buffers:
                         try:
-                            for _, data in self.database_writer.spatial_chunking(
-                                concatenated_df
-                            ):
-                                self.database_writer.write_granule(data)
-
-                            # only now mark them as processed
-                            for ids_ in processed_ids:
-                                self.database_writer.mark_granule_as_processed(ids_)
-                        except Exception as e:
-                            logger.error(
-                                f"Write phase failed for timeframe {timeframe}: {e}"
-                            )
+                            _flush_buffers(buffers, processed_ids, timeframe)
+                        except Exception:
+                            # already logged; keep ledger finalization
+                            pass
 
                     ledger.write_status_md()
                     ledger.write_html()
+            return
 
-        elif isinstance(self.parallel_engine, Client):
+        # ---- Dask path ----
+        if isinstance(self.parallel_engine, Client):
             for timeframe, granules in batches.items():
                 ledger = ProgressLedger(
                     os.path.join(self.progress_dir, timeframe), timeframe
                 )
+
                 futures = []
                 for gid, pinf in granules.items():
                     ledger.note_submit(gid)
@@ -473,77 +538,67 @@ class IceSat2Processor:
                     )
                     futures.append((gid, fut))
 
-                valid_dataframes = []
+                buffers = defaultdict(list)
                 processed_ids = []
                 counter = 0
+
                 for gid, fut in futures:
                     started_ts = time.time()
                     try:
                         ids_, gdf, metrics = self.parallel_engine.gather(fut)
                         finished_ts = time.time()
                         ok = ids_ is not None
-                        if gdf is not None:
-                            valid_dataframes.append(gdf)
+
                         if ok:
                             processed_ids.append(ids_)
-                        row = Row(
-                            granule_id=gid,
-                            timeframe=timeframe,
-                            submitted_ts=ledger._submits.get(gid, finished_ts),
-                            started_ts=metrics.get("started_ts", started_ts),
-                            finished_ts=finished_ts,
-                            duration_s=finished_ts
-                            - metrics.get("started_ts", started_ts),
+
+                        if gdf is not None and not gdf.empty:
+                            _buffer_by_window(buffers, gdf)
+
+                        _append_ledger_row(
+                            ledger,
+                            gid,
+                            timeframe,
+                            started_ts,
+                            finished_ts,
                             status="ok" if ok else "fail",
-                            n_records=metrics.get("n_records"),
-                            bytes_downloaded=metrics.get("bytes_downloaded"),
-                            products=",".join(metrics.get("products", [])),
+                            metrics=metrics,
                             error_msg=None,
                         )
-                        ledger.append(row)
+
                     except Exception as e:
                         finished_ts = time.time()
                         tb = traceback.format_exc()
                         ledger.write_error(gid, tb)
-                        row = Row(
-                            granule_id=gid,
-                            timeframe=timeframe,
-                            submitted_ts=ledger._submits.get(gid, finished_ts),
-                            started_ts=started_ts,
-                            finished_ts=finished_ts,
-                            duration_s=finished_ts - started_ts,
+                        _append_ledger_row(
+                            ledger,
+                            gid,
+                            timeframe,
+                            started_ts,
+                            finished_ts,
                             status="fail",
+                            metrics={},
                             error_msg=str(e),
                         )
-                        ledger.append(row)
                         logger.error(f"Dask task for {gid} failed: {e}")
+
                     finally:
                         counter += 1
                         if counter % self.report_every == 0:
                             ledger.write_status_md()
                             ledger.write_html()
 
-                # write data then finalize report
-                if valid_dataframes:
-                    concatenated_df = pd.concat(valid_dataframes, ignore_index=True)
+                if buffers:
                     try:
-                        for _, data in self.database_writer.spatial_chunking(
-                            concatenated_df
-                        ):
-                            self.database_writer.write_granule(data)
-
-                        # only now mark them as processed
-                        for ids_ in processed_ids:
-                            self.database_writer.mark_granule_as_processed(ids_)
-                    except Exception as e:
-                        logger.error(
-                            f"Write phase failed for timeframe {timeframe}: {e}"
-                        )
+                        _flush_buffers(buffers, processed_ids, timeframe)
+                    except Exception:
+                        pass
 
                 ledger.write_status_md()
                 ledger.write_html()
-        else:
-            raise ValueError("Unsupported parallel engine.")
+            return
+
+        raise ValueError("Unsupported parallel engine.")
 
     @staticmethod
     def process_single_granule(granule_id, product_info, data_info, download_path):
@@ -569,11 +624,12 @@ class IceSat2Processor:
 
         started_ts = time.time()
         downloader = H5FileDownloader(download_path)
-
+                
         bytes_dl = 0
         prods = []
         download_results = []
-        for url, product, extra in product_info:
+        for url, product, _, _ in product_info:
+            
             res = downloader.download(granule_id, url, IceSat2Product(product))
             # If your downloader can expose sizes, insert here:
             if isinstance(res, tuple) and len(res) >= 2 and isinstance(res[1], int):
