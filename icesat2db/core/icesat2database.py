@@ -260,18 +260,18 @@ class IceSat2Database:
     def _create_attributes(self) -> list[tiledb.Attr]:
         """
         Build TileDB attribute list from ``self.variables_config``.
-    
+
         Variables are emitted in three passes:
           1. Scalar attributes (neither profile nor subsegment).
           2. Profile attributes expanded to ``<name>_1 … <name>_N``.
           3. Subsegment attributes expanded to ``<name>_1 … <name>_N``.
-    
+
         An optional ``timestamp_ns`` (int64) attribute is appended last,
         controlled by ``tiledb.write_timestamp_ns`` in config (default: True).
-    
+
         Compression filters are selected entirely by dtype via
         :meth:`TileDBFilterPolicy.filters_for_dtype` — no per-variable rules.
-    
+
         Raises
         ------
         ValueError
@@ -279,9 +279,13 @@ class IceSat2Database:
             has an invalid length (< 1).
         """
         if not self.variables_config:
-            raise ValueError("Variable configuration is missing. Cannot create attributes.")
-    
-        def _expand(var_name: str, var_info: dict, length_key: str) -> list[tiledb.Attr]:
+            raise ValueError(
+                "Variable configuration is missing. Cannot create attributes."
+            )
+
+        def _expand(
+            var_name: str, var_info: dict, length_key: str
+        ) -> list[tiledb.Attr]:
             """Expand a profile or subsegment variable into N numbered attributes."""
             length = int(var_info.get(length_key, 1))
             if length <= 0:
@@ -292,13 +296,13 @@ class IceSat2Database:
                 tiledb.Attr(name=f"{var_name}_{i + 1}", dtype=dtype, filters=filters)
                 for i in range(length)
             ]
-    
+
         attrs: list[tiledb.Attr] = []
-    
+
         for var_name, var_info in self.variables_config.items():
             is_profile = var_info.get("is_profile", False)
             is_subsegment = var_info.get("is_subsegment", False)
-    
+
             if is_profile:
                 attrs.extend(_expand(var_name, var_info, "profile_length"))
             elif is_subsegment:
@@ -312,7 +316,7 @@ class IceSat2Database:
                         filters=self.filter_policy.filters_for_dtype(dtype),
                     )
                 )
-    
+
         if self.config.get("tiledb", {}).get("write_timestamp_ns", True):
             attrs.append(
                 tiledb.Attr(
@@ -321,7 +325,7 @@ class IceSat2Database:
                     filters=self.filter_policy.timestamp_filters(),
                 )
             )
-    
+
         return attrs
 
     def _add_variable_metadata(self) -> None:

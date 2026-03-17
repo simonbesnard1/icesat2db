@@ -19,7 +19,7 @@ class IceSat2Product(Enum):
 
     ATL08 = "atl08"
     # ATL03 = "atl03"
-    
+
     @classmethod
     def list_products(cls):
         """

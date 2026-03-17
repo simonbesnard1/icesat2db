@@ -292,7 +292,7 @@ class IceSat2Processor:
             # Download and filter CMR data
             cmr_data = self._download_cmr_data()
             unprocessed_cmr_data = self._filter_unprocessed_granules(cmr_data)
-            
+
             if not unprocessed_cmr_data:
                 logger.info("All requested granules are already processed.")
                 if consolidate:
@@ -366,7 +366,7 @@ class IceSat2Processor:
             batches = {"all": unprocessed_cmr_data}
         else:
             raise ValueError("Invalid temporal batching option.")
-            
+
         def _append_ledger_row(
             ledger,
             gid,
@@ -420,7 +420,7 @@ class IceSat2Processor:
                     if not parts:
                         continue
                     window_df = pd.concat(parts, ignore_index=True)
-                    
+
                     self.database_writer.write_granule(window_df)
 
                 # mark processed only after all window writes succeed
@@ -624,12 +624,12 @@ class IceSat2Processor:
 
         started_ts = time.time()
         downloader = H5FileDownloader(download_path)
-                
+
         bytes_dl = 0
         prods = []
         download_results = []
         for url, product, _, _ in product_info:
-            
+
             res = downloader.download(granule_id, url, IceSat2Product(product))
             # If your downloader can expose sizes, insert here:
             if isinstance(res, tuple) and len(res) >= 2 and isinstance(res[1], int):

@@ -36,51 +36,52 @@ class ATL08Beam(beam_handler):
 
         self._filtered_index: Optional[np.ndarray] = None  # Cache for filtered indices
         self.DEFAULT_QUALITY_FILTERS = {
-
             "h_te_uncertainty": lambda: (
-                (self["land_segments/terrain/h_te_uncertainty"][()] < 3.402823e+23) &
-                (self["land_segments/terrain/h_te_uncertainty"][()] > -999)
+                (self["land_segments/terrain/h_te_uncertainty"][()] < 3.402823e23)
+                & (self["land_segments/terrain/h_te_uncertainty"][()] > -999)
             ),
-
             "h_te_best_fit": lambda: (
-                (self["land_segments/terrain/h_te_best_fit"][()] < 3.402823e+23) &
-                (self["land_segments/terrain/h_te_best_fit"][()] > -999)
+                (self["land_segments/terrain/h_te_best_fit"][()] < 3.402823e23)
+                & (self["land_segments/terrain/h_te_best_fit"][()] > -999)
             ),
-
             "h_te_median": lambda: (
-                    (self["land_segments/terrain/h_te_median"][()] < 3.402823e+23) |
-                    (self["land_segments/terrain/h_te_median"][()] > -999)
+                (self["land_segments/terrain/h_te_median"][()] < 3.402823e23)
+                | (self["land_segments/terrain/h_te_median"][()] > -999)
             ),
-
-            "h_canopy": lambda: self["land_segments/canopy/h_canopy"][()] < 3.402823e+23,
-            "h_canopy_uncertainty": lambda: self["land_segments/canopy/h_canopy_uncertainty"][()] < 3.402823e+23,
+            "h_canopy": lambda: self["land_segments/canopy/h_canopy"][()] < 3.402823e23,
+            "h_canopy_uncertainty": lambda: self[
+                "land_segments/canopy/h_canopy_uncertainty"
+            ][()]
+            < 3.402823e23,
             "urban_flag": lambda: self["land_segments/urban_flag"][()] == 0,
-            "segment_watermask": lambda: self["land_segments/segment_watermask"][()] == 0,
-
+            "segment_watermask": lambda: self["land_segments/segment_watermask"][()]
+            == 0,
         }
 
     def construct_segment_id(self) -> np.ndarray:
         """
         Construct a globally unique segment ID for ATL08 land segments.
         Encodes: RGT (14 bits) | cycle (8 bits) | beam (3 bits) | segment_id_beg (32 bits)
-        
+
         Bit layout (int64):
           [63..43] RGT (1–1387)
           [42..35] cycle
           [34..32] beam (0–5)
           [31..0]  segment_id_beg
         """
-        rgt   = int(self.parent_granule["orbit_info/rgt"][0])
+        rgt = int(self.parent_granule["orbit_info/rgt"][0])
         cycle = int(self.parent_granule["orbit_info/cycle_number"][0])
         beam_map = {"gt1l": 0, "gt1r": 1, "gt2l": 2, "gt2r": 3, "gt3l": 4, "gt3r": 5}
         beam_id = beam_map[self.beam_name]
-        seg_ids = self["land_segments/segment_id_beg"][()].astype(np.int64)  # int32 → int64 before shifting
-    
+        seg_ids = self["land_segments/segment_id_beg"][()].astype(
+            np.int64
+        )  # int32 → int64 before shifting
+
         return (
-            (np.int64(rgt)     << 43) |
-            (np.int64(cycle)   << 35) |
-            (np.int64(beam_id) << 32) |
-            seg_ids
+            (np.int64(rgt) << 43)
+            | (np.int64(cycle) << 35)
+            | (np.int64(beam_id) << 32)
+            | seg_ids
         )
 
     def _get_main_data(self) -> Optional[Dict[str, np.ndarray]]:
@@ -101,7 +102,7 @@ class ATL08Beam(beam_handler):
             "time": icesat2_count_start + pd.to_timedelta(delta_time, unit="seconds"),
             "longitude": self["land_segments/longitude"][()],
             "latitude": self["land_segments/latitude"][()],
-            "segment_id": self.construct_segment_id()
+            "segment_id": self.construct_segment_id(),
         }
 
         # Populate data dictionary with fields from field mapping

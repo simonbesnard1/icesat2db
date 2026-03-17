@@ -85,7 +85,7 @@ class IceSat2Granule:
                 return granule_key, None
 
             gdf = self._join_dfs(gdf_dict, granule_key)
-      
+
             if gdf is None:
                 return granule_key, None
 
@@ -141,17 +141,21 @@ class IceSat2Granule:
         """
         atl08_key = IceSat2Product.ATL08.value
         df = df_dict.get(atl08_key)
-        
-    
+
         if df is None or df.empty:
             logger.warning(f"[{granule_key}] ATL08 data missing or empty.")
             return None
-    
+
         if "segment_id" not in df.columns:
-            logger.error(f"[{granule_key}] ATL08 DataFrame missing 'segment_id' column.")
+            logger.error(
+                f"[{granule_key}] ATL08 DataFrame missing 'segment_id' column."
+            )
             return None
-    
-        assert not df.duplicated(subset=["segment_id"]).any(), \
+
+        assert not df.duplicated(
+            subset=["segment_id"]
+        ).any(), (
             f"[{granule_key}] Duplicate segment_ids detected in ATL08 — upstream bug."
-    
+        )
+
         return df

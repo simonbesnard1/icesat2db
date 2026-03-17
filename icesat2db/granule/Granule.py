@@ -38,7 +38,7 @@ class granule_handler(h5py.File):
 
         try:
             super().__init__(file_path, "r")  # Open HDF5 file
-            beams = {'gt1l', 'gt1r', 'gt2l', 'gt2r', 'gt3l', 'gt3r'}
+            beams = {"gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"}
             self.beam_names = [name for name in self.keys() if name in beams]
             self._is_open = True  # Mark as successfully opened
         except Exception as e:

@@ -54,7 +54,6 @@ class GranuleParser:
             if main_data is not None:
                 granule_data.append(main_data)
 
-
         if granule_data:
             try:
                 df = pd.concat(granule_data, ignore_index=True)
@@ -84,6 +83,7 @@ class ATL08GranuleParser(GranuleParser):
     def parse(self) -> pd.DataFrame:
         with ATL08Granule(self.file, self.variables) as granule:
             return self.parse_granule(granule)
+
 
 def parse_h5_file(
     file: str, product: IceSat2Product, data_info: Optional[Dict] = None

@@ -39,8 +39,8 @@ class IceSat2NameMetadata:
     minute: str
     second: str
     ref_ground_track: str
-    cycle_number : str
-    segment_number : str
+    cycle_number: str
+    segment_number: str
     version: str
     revision: str
 
@@ -49,22 +49,21 @@ class IceSat2NameMetadata:
 IceSat2_FILENAME_PATTERN = re.compile(
     (
         r"^"
-        r"(?P<product>[A-Z0-9]+)_"        # Product identifier (e.g. ATL08)
-        r"(?P<year>\d{4})"                # Year of acquisition (YYYY)
-        r"(?P<month>\d{2})"               # Month of acquisition (MM)
-        r"(?P<day>\d{2})"                 # Day of acquisition (DD)
-        r"(?P<hour>\d{2})"                # Hour of acquisition (UTC)
-        r"(?P<minute>\d{2})"              # Minute of acquisition (UTC)
-        r"(?P<second>\d{2})_"             # Second of acquisition (UTC)
-        r"(?P<ref_ground_track>\d{4})"    # Reference Ground Track (0001–1387)
-        r"(?P<cycle_number>\d{2})"        # Cycle number (2 digits)
-        r"(?P<segment_number>\d{2})_"     # Segment / region number (01–14)
-        r"(?P<version>\d{3})_"            # Product version number (3 digits)
-        r"(?P<revision>\d{2})"            # Product revision number (2 digits)
+        r"(?P<product>[A-Z0-9]+)_"  # Product identifier (e.g. ATL08)
+        r"(?P<year>\d{4})"  # Year of acquisition (YYYY)
+        r"(?P<month>\d{2})"  # Month of acquisition (MM)
+        r"(?P<day>\d{2})"  # Day of acquisition (DD)
+        r"(?P<hour>\d{2})"  # Hour of acquisition (UTC)
+        r"(?P<minute>\d{2})"  # Minute of acquisition (UTC)
+        r"(?P<second>\d{2})_"  # Second of acquisition (UTC)
+        r"(?P<ref_ground_track>\d{4})"  # Reference Ground Track (0001–1387)
+        r"(?P<cycle_number>\d{2})"  # Cycle number (2 digits)
+        r"(?P<segment_number>\d{2})_"  # Segment / region number (01–14)
+        r"(?P<version>\d{3})_"  # Product version number (3 digits)
+        r"(?P<revision>\d{2})"  # Product revision number (2 digits)
         r"$"
     )
 )
-
 
 
 def parse_granule_filename(IceSat2_filename: str) -> IceSat2NameMetadata:
