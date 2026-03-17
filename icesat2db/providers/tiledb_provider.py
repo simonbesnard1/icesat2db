@@ -173,26 +173,50 @@ class TileDBProvider:
             raise
 
     def _build_profile_attrs(
-        self, variables: List[str], array_meta
-    ) -> Tuple[List[str], Dict[str, List[str]]]:
+        self,
+        variables: List[str],
+        array_meta,
+    ) -> Tuple[List[str], Dict[str, List[str]], Dict[str, List[str]]]:
         """
-        Build attribute list and profile variable mapping efficiently.
+        Build attribute list and per-variable column mappings for profile and
+        sub-segment variables.
+    
+        Profile variables are stored as ``{var}_1 … {var}_N`` where N comes from
+        ``{var}.profile_length`` in the array metadata.  Sub-segment variables
+        follow the same layout but use ``{var}.subsegment_length`` instead.
+    
+        Returns
+        -------
+        attr_list : List[str]
+            Flat list of TileDB attribute names to request.
+        profile_vars : Dict[str, List[str]]
+            Mapping of original variable name → expanded column names for
+            profile variables.
+        subsegment_vars : Dict[str, List[str]]
+            Same mapping for sub-segment variables.
         """
-        attr_list = []
-        profile_vars = {}
-
+        attr_list: List[str] = []
+        profile_vars: Dict[str, List[str]] = {}
+        subsegment_vars: Dict[str, List[str]] = {}
+    
         for var in variables:
             profile_key = f"{var}.profile_length"
+            subsegment_key = f"{var}.subsegment_length"
+    
             if profile_key in array_meta:
-                profile_length = array_meta[profile_key]
-                # Pre-allocate list with list comprehension (faster than append)
-                profile_attrs = [f"{var}_{i}" for i in range(1, profile_length + 1)]
-                attr_list.extend(profile_attrs)
-                profile_vars[var] = profile_attrs
+                expanded = [f"{var}_{i}" for i in range(1, array_meta[profile_key] + 1)]
+                attr_list.extend(expanded)
+                profile_vars[var] = expanded
+    
+            elif subsegment_key in array_meta:
+                expanded = [f"{var}_{i}" for i in range(1, array_meta[subsegment_key] + 1)]
+                attr_list.extend(expanded)
+                subsegment_vars[var] = expanded
+    
             else:
                 attr_list.append(var)
-
-        return attr_list, profile_vars
+    
+        return attr_list, profile_vars, subsegment_vars
 
     def _build_condition_string(self, filters: Dict[str, str]) -> Optional[str]:
         """
@@ -301,9 +325,9 @@ class TileDBProvider:
         try:
             with tiledb.open(self.scalar_array_uri, mode="r", ctx=self.ctx) as array:
                 # Build attribute list and profile variables (cached metadata)
-                attr_list, profile_vars = self._build_profile_attrs(
-                    variables, array.meta
-                )
+                attr_list, profile_vars, subsegment_vars = self._build_profile_attrs(
+                        variables, array.meta
+                    )
 
                 # Build condition string
                 cond_string = self._build_condition_string(filters)
@@ -333,7 +357,7 @@ class TileDBProvider:
                     if len(data.get("segment_id", [])) == 0:
                         return None, profile_vars
 
-                return data, profile_vars
+                return data, profile_vars, subsegment_vars
 
         except Exception as e:
             logger.error(f"Error querying TileDB array '{self.scalar_array_uri}': {e}")
@@ -396,31 +420,25 @@ class TileDBProvider:
         Optional[pd.DataFrame]
             Query results or None if no data found
         """
-        data, profile_vars = self._query_array(
-            variables,
-            lat_min,
-            lat_max,
-            lon_min,
-            lon_max,
-            start_time,
-            end_time,
+        data, profile_vars, subsegment_vars = self._query_array(
+            variables, lat_min, lat_max, lon_min, lon_max,
+            start_time, end_time,
             geometry=geometry,
             use_polygon_filter=use_polygon_filter,
             **filters,
         )
-
+    
         if data is None:
             return None
-
-        # Convert to DataFrame
+    
         df = pd.DataFrame(data)
-
-        # Reconstruct profile variables if needed
-        for var_name, profile_cols in profile_vars.items():
-            if all(col in df.columns for col in profile_cols):
-                df[var_name] = df[profile_cols].values.tolist()
-                df = df.drop(columns=profile_cols)
-
+    
+        # Collapse expanded columns back into list-typed columns for both kinds
+        for var_name, expanded_cols in {**profile_vars, **subsegment_vars}.items():
+            if all(col in df.columns for col in expanded_cols):
+                df[var_name] = df[expanded_cols].values.tolist()
+                df = df.drop(columns=expanded_cols)
+    
         return df
 
     def close(self):
