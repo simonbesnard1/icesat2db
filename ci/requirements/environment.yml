@@ -18,6 +18,7 @@ dependencies:
   - hypothesis
   - lxml # Optional dep of pydap
   - netcdf4
+  - numba
   - numpy>=2
   - packaging
   - pandas
@@ -33,6 +34,7 @@ dependencies:
   - pytest-timeout
   - requests
   - retry
+  - setuptools<82
   - scipy
   - xarray
   - pip:
