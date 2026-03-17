@@ -37,7 +37,7 @@ dependencies = [
     "requests",
     "retry",
     "scipy",
-    "tiledb",
+    "tiledb==0.35.2",
     "xarray",
     "boto3>=1.40.60"
 ]
