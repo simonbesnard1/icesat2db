@@ -1,7 +1,7 @@
 <p align="center">
   <a href="https://github.com/simonbesnard1/icesat2db">
     <img src="https://raw.githubusercontent.com/simonbesnard1/icesat2db/main/doc/_static/logos/icesat2db_logo.svg"
-         alt="icesat2db Logo" width="400">
+         alt="icesat2db Logo" width="400" style="margin: 30px 0;">
   </a>
 </p>
 
