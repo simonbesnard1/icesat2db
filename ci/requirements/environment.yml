@@ -1,4 +1,4 @@
-name: gedidb-tests
+name: icesat2db-tests
 channels:
   - conda-forge
   - nodefaults
