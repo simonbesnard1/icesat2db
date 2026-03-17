@@ -62,7 +62,7 @@ cluster = LocalCluster(
 dask_client = Client(cluster)
 
 # Initialize the IceSat2Processor with the chosen parallel engine
-# ------------------------------------------------------------
+# ---------------------------------------------------------------
 # Here, we demonstrate usage with `concurrent.futures.ThreadPoolExecutor`.
 # You can replace `parallel_engine=concurrent_engine` with `parallel_engine=dask_client` to use Dask instead.
 with isdb.IceSat2Processor(
