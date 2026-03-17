@@ -1,16 +1,16 @@
 .. _user:
 
-#################
-gediDB User Guide
-#################
+####################
+icesat2db User Guide
+####################
 
-Welcome to the **gediDB User Guide**! This guide provides an overview of the core features of gediDB and walks you through getting started, fundamental concepts, and advanced usage.
+Welcome to the **icesat2db User Guide**! This guide provides an overview of the core features of icesat2db and walks you through getting started, fundamental concepts, and advanced usage.
 
 .. toctree::
    :caption: Getting Started
    :maxdepth: 1
 
-   why-gedidb
+   why-icesat2db
    installing
    quick-overview
    api
@@ -21,21 +21,19 @@ Welcome to the **gediDB User Guide**! This guide provides an overview of the cor
    :maxdepth: 1
 
    fundamentals
-   tiledb_database   
 
 .. toctree::
    :caption: Advanced Usage
    :maxdepth: 1
 
    database
-   tuning-config
    contributing
 
 .. toctree::
    :caption: Community
    :maxdepth: 1
 
-   GitHub discussions <https://github.com/simonbesnard1/gedidb/discussions>
+   GitHub discussions <https://github.com/simonbesnard1/icesat2db/discussions>
 
 .. tip::
-   Make sure to check the :ref:`faq` section if you encounter any issues while using gediDB!
+   Make sure to check the :ref:`faq` section if you encounter any issues while using icesat2db!

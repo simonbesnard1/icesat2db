@@ -22,10 +22,8 @@ tiledb:
   capacity: 100000
 
 # Data directory for downloading GEDI data
-data_dir: '/home/simon/Documents/science/GFZ/projects/icesat2db/data/tmp'
-
-# Progress directory for monitoring processing
-progress_dir: '/home/simon/Documents/science/GFZ/projects/icesat2db/data/tmp'
+data_dir: ''
+progress_dir: ''
 
 # Configuration for accessing NASA's Earthdata Search API to query granule data.
 earth_data_info:
@@ -33,7 +31,7 @@ earth_data_info:
  CMR_PRODUCT_IDS:
   ATL08: 'C3565574177-NSIDC_CPRD'
 
-# Variables list for each GEDI level product - SDS_Name is science dataset name the native h5 file retrieved from the NASA API
+# Variables list for each IceSat2 level product - SDS_Name is science dataset name the native h5 file retrieved from the NASA API
 level_atl08:
   variables:
     asr:

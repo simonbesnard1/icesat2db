@@ -1,7 +1,7 @@
-﻿gedidb.GranuleParser
-====================
+﻿icesat2db.GranuleParser
+=======================
 
-.. currentmodule:: gedidb
+.. currentmodule:: icesat2db
 
 .. autoclass:: GranuleParser
 

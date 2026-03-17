@@ -1,13 +1,4 @@
 {
- "gdb.GEDIProvider": [
-  {
-   "is_class": false,
-   "is_explicit": false,
-   "module": "gedidb",
-   "module_short": "gedidb",
-   "name": "GEDIProvider"
-  }
- ],
  "gpd.read_file": [
   {
    "is_class": false,
@@ -15,6 +6,15 @@
    "module": "geopandas",
    "module_short": "geopandas",
    "name": "read_file"
+  }
+ ],
+ "isdb.IceSat2Provider": [
+  {
+   "is_class": false,
+   "is_explicit": false,
+   "module": "icesat2db",
+   "module_short": "icesat2db",
+   "name": "IceSat2Provider"
   }
  ]
 }

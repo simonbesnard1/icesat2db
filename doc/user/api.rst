@@ -1,11 +1,11 @@
-.. currentmodule:: gedidb
+.. currentmodule:: icesat2db
 
 .. _api:
 
 API Reference
 =============
 
-This page provides an auto-generated summary of gediDB’s API. For more details and examples, refer to the relevant chapters in the main part of the documentation.
+This page provides an auto-generated summary of icesat2b’s API. For more details and examples, refer to the relevant chapters in the main part of the documentation.
 
 Top-level functions
 ===================
@@ -14,10 +14,10 @@ Top-level functions
    :toctree: generated/
    :recursive:
 
-   GEDIDatabase
-   GEDIGranule
-   GEDIProcessor
-   GEDIProvider
+   IceSat2Database
+   IceSat2Granule
+   IceSat2Processor
+   IceSat2Provider
 
 Downloading functions
 =====================
@@ -26,13 +26,13 @@ Downloading functions
    :toctree: generated/
    :recursive:
 
-   GEDIDownloader
+   IceSat2Downloader
    CMRDataDownloader
    H5FileDownloader
    EarthDataAuthenticator
    CMRQuery
    
-GEDI data processing functions
+IceSat2 data processing functions
 ==============================
 
 .. autosummary::
@@ -41,16 +41,10 @@ GEDI data processing functions
 
    granule_handler
    GranuleParser
-   L2AGranule
-   L2BGranule
-   L4AGranule
-   L4CGranule 
+   ATL08Granule
    beam_handler
-   L2ABeam
-   L2BBeam
-   L4ABeam
-   L4CBeam
-   GediNameMetadata
+   ATL08Beam
+   IceSat2NameMetadata
    
 TileDB functions
 =======================

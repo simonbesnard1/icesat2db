@@ -1,6 +1,6 @@
 
 .. for doctest:
-    >>> import gedidb as gdb
+    >>> import icesat2db as isdb
 
 .. _fundamentals-filters:
 
@@ -8,14 +8,14 @@
 Quality Filtering
 #################
 
-This guide details the quality filtering applied to GEDI Level 2A (L2A) and Level 2B (L2B) data in the gediDB package. Each data product uses specific filters to ensure only high-quality data is processed, enhancing data reliability in analysis.
+This guide details the quality filtering applied to IceSat2 Level ATL08 data in the icesat2db package. Each data product uses specific filters to ensure only high-quality data is processed, enhancing data reliability in analysis.
 
 Overview
 --------
 
-In gediDB, we have implemented a **default quality filtering routine** based on community-recommended practices. These filters are automatically applied during data ingestion, reducing the dataset size by up to **30%** without compromising data quality. This streamlines your analysis pipeline, saving both time and computational resources.
+In icesat2db, we have implemented a **default quality filtering routine** based on community-recommended practices. These filters are automatically applied during data ingestion, reducing the dataset size by up to **30%** without compromising data quality. This streamlines your analysis pipeline, saving both time and computational resources.
 
-The filters rely on quality-related variables present in the raw HDF5 files. While these variables are available, they are **not pre-applied** in the raw data, which can lead to the inclusion of low-quality data if not filtered. gediDB automates this process, applying filters consistently to ensure high data integrity.
+The filters rely on quality-related variables present in the raw HDF5 files. While these variables are available, they are **not pre-applied** in the raw data, which can lead to the inclusion of low-quality data if not filtered. icesat2db automates this process, applying filters consistently to ensure high data integrity.
 
 Filtering and Product Merging
 -----------------------------

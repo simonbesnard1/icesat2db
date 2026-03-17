@@ -12,14 +12,14 @@ Gallery
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to retrieve the list of variables stored in a TileDB array using the GEDIProvider class from the gedidb package. The output is a pandas.DataFrame containing variable names, descriptions, and metadata.">
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to retrieve the list of variables stored in a TileDB array using the IceSat2Provider class from the icesat2db package. The output is a pandas.DataFrame containing variable names, descriptions, and metadata.">
 
 .. only:: html
 
   .. image:: /auto_examples/images/thumb/sphx_glr_get_variable_list_thumb.png
     :alt:
 
-  :ref:`sphx_glr_auto_examples_get_variable_list.py`
+  :doc:`/auto_examples/get_variable_list`
 
 .. raw:: html
 
@@ -36,7 +36,7 @@ Gallery
   .. image:: /auto_examples/images/thumb/sphx_glr_authentification_thumb.png
     :alt:
 
-  :ref:`sphx_glr_auto_examples_authentification.py`
+  :doc:`/auto_examples/authentification`
 
 .. raw:: html
 
@@ -46,18 +46,18 @@ Gallery
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to use the gedidb library to process GEDI granules with different parallel engines, such as concurrent.futures.ThreadPoolExecutor and dask.distributed.Client.">
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to use the icesat2db library to process IceSat2 granules with different parallel engines, such as concurrent.futures.ThreadPoolExecutor and dask.distributed.Client.">
 
 .. only:: html
 
   .. image:: /auto_examples/images/thumb/sphx_glr_data_processor_thumb.png
     :alt:
 
-  :ref:`sphx_glr_auto_examples_data_processor.py`
+  :doc:`/auto_examples/data_processor`
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">GEDIProcessor example with different parallel engines</div>
+      <div class="sphx-glr-thumbnail-title">IceSat2Processor example with different parallel engines</div>
     </div>
 
 
@@ -70,7 +70,7 @@ Gallery
   .. image:: /auto_examples/images/thumb/sphx_glr_regional_tileDBdatabase_thumb.png
     :alt:
 
-  :ref:`sphx_glr_auto_examples_regional_tileDBdatabase.py`
+  :doc:`/auto_examples/regional_tileDBdatabase`
 
 .. raw:: html
 
@@ -80,18 +80,18 @@ Gallery
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to use the GEDIProvider class to query and retrieve GEDI data stored in TileDB arrays. We will:">
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to use the IceSat2Provider class to query and retrieve IceSat2 data stored in TileDB arrays. We will:">
 
 .. only:: html
 
   .. image:: /auto_examples/images/thumb/sphx_glr_data_provider_thumb.png
     :alt:
 
-  :ref:`sphx_glr_auto_examples_data_provider.py`
+  :doc:`/auto_examples/data_provider`
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Querying Processed GEDI Data from TileDB</div>
+      <div class="sphx-glr-thumbnail-title">Querying Processed IceSat2 Data from TileDB</div>
     </div>
 
 

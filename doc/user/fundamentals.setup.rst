@@ -4,14 +4,14 @@
 Configuration files
 *******************
 
-To maximize the functionality of gediDB, it’s essential to configure key settings using the `data_config.yml` file. These files specify important parameters, ensuring efficient data handling, database connection, and alignment with your processing needs.
+To maximize the functionality of icesat2db, it’s essential to configure key settings using the `data_config.yml` file. These files specify important parameters, ensuring efficient data handling, database connection, and alignment with your processing needs.
 
 The `data_config.yml` file is the main configuration file for settings related to data retrieval, database connectivity, and file management. Key configurations include:
 
  - **Database Connection Details**: Define database connection variables like `storage_type`, `dimensions`, `temporal_tiling`, and `consolidation_settings`.
- - **File Paths**: Specify directories for storing downloaded GEDI data, processed files, and metadata.
+ - **File Paths**: Specify directories for storing downloaded IceSat2 data, processed files, and metadata.
  - **Environment Settings**: Configure parameters for parallel processing and resource allocation.
- - **Data Extraction Settings**: Control which variables to extract from GEDI `.h5` files to streamline storage and improve processing efficiency.
+ - **Data Extraction Settings**: Control which variables to extract from IceSat2 `.h5` files to streamline storage and improve processing efficiency.
 
 A default data configuration file (`data_config.yml`) can be downloaded here:
 
@@ -19,40 +19,29 @@ A default data configuration file (`data_config.yml`) can be downloaded here:
 
 **Extracted data from .h5 Files**
 
-GEDI `.h5` files contain extensive data, but gediDB allows you to specify only the essential variables you need. This configuration not only reduces storage requirements but also speeds up data processing.
+IceSat2 `.h5` files contain extensive data, but icesat2db allows you to specify only the essential variables you need. This configuration not only reduces storage requirements but also speeds up data processing.
 
-For instance, each GEDI product, like **Level 2A**, can have a dedicated configuration section, allowing tailored data extraction. Below is an example specifying selected variables for **Level 2A**:
+For instance, each IceSat2 product, like **Level ATL08**, can have a dedicated configuration section, allowing tailored data extraction. Below is an example specifying selected variables for **Level ATL08**:
 
 .. code-block:: yaml
 
-    level_2a:
-      variables:
-        shot_number:
-          SDS_Name: "shot_number"
-          description: "Unique shot number for each beam"
-          units: "adimensional"
-          dtype: "uint64"
-          valid_range: "N/A"
-          product_level: 'L2A'
-        beam_type:
-          SDS_Name: "beam_type"
-          description: "Type of beam used"
-          units: "adimensional"
-          dtype: "U10"
-          valid_range: "0 to 12"
-          product_level: 'L2A'
-        beam_name:
-          SDS_Name: "name"
-          SDS_Name: "name"
-          description: "Name of the beam"
-          units: "adimensional"
-          dtype: "U10"
-          valid_range: "0 to 12"
-          product_level: 'L2A'
+    level_atl08:
+        variables:
+            asr:
+                SDS_Name: "land_segments/asr"
+                dtype: "float32"
+                DIMENSION_LIST: "[array([<HDF5 object reference>], dtype=object)]"
+                _FillValue: "3.4028234663852886e+38"
+                contentType: "auxiliaryInformation"
+                coordinates: "delta_time latitude longitude"
+                description: "Apparent surface reflectance"
+                long_name: "apparent surface reflectance"
+                source: "ATL09"
+                units: "1"
 
 **Spatial and Temporal Parameters**
 
-Define **spatial** and **temporal** parameters to set boundaries for the data queries. These settings specify which GEDI granules to retrieve, based on the region and time range of interest.
+Define **spatial** and **temporal** parameters to set boundaries for the data queries. These settings specify which IceSat2 granules to retrieve, based on the region and time range of interest.
 
 .. code-block:: yaml
 

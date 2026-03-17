@@ -26,13 +26,13 @@
    "name": "ThreadPoolExecutor"
   }
  ],
- "gdb.GEDIProcessor": [
+ "isdb.IceSat2Processor": [
   {
    "is_class": false,
    "is_explicit": false,
-   "module": "gedidb",
-   "module_short": "gedidb",
-   "name": "GEDIProcessor"
+   "module": "icesat2db",
+   "module_short": "icesat2db",
+   "name": "IceSat2Processor"
   }
  ]
 }

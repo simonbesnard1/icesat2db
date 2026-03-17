@@ -1,8 +1,8 @@
-.. _gedidb_docs_mainpage:
+.. _icesat2db_docs_mainpage:
 
-########################
-gediDB Documentation
-########################
+######################
+icesat2db Documentation
+######################
 
 .. toctree::
    :maxdepth: 1
@@ -10,13 +10,12 @@ gediDB Documentation
 
    Installation <user/installing>
    User Guide <user/index>
-   GEDI Global Database <user/tiledb_database>
    API Reference <user/api>
    Examples <auto_examples/index>
-   Discussions <https://github.com/simonbesnard1/gedidb/discussions>
+   Discussions <https://github.com/simonbesnard1/icesat2db/discussions>
    Development <user/contributing>
 
-**gediDB** is an open-source Python package designed to simplify working with GEDI L2A-B and L4A-C datasets, streamlining data analysis for efficient data exploration. It offers intuitive modules for processing, querying, and analyzing GEDI data stored in **tileDB databases**.
+**icesat2db** is an open-source Python package designed to simplify working with IceSat2 ATL08 datasets, streamlining data analysis for efficient data exploration. It offers intuitive modules for processing, querying, and analyzing IceSat2 data stored in **tileDB databases**.
 
 .. grid:: 1 1 2 2
     :gutter: 2 3 4 4
@@ -28,7 +27,7 @@ gediDB Documentation
         **Getting Started**
         ^^^
 
-        New to gediDB? Start here for a quick introduction to gediDB’s core features, with examples to help you jump right in.
+        New to icesat2db? Start here for a quick introduction to icesat2db’s core features, with examples to help you jump right in.
 
         +++
 
@@ -46,7 +45,7 @@ gediDB Documentation
         **User Guide**
         ^^^
 
-        Dive into the User Guide for detailed explanations of key concepts, workflows, and practical applications within gediDB.
+        Dive into the User Guide for detailed explanations of key concepts, workflows, and practical applications within icesat2db.
 
         +++
 
@@ -64,7 +63,7 @@ gediDB Documentation
         **API Reference**
         ^^^
 
-        The reference guide contains a detailed description of the gediDB API.
+        The reference guide contains a detailed description of the icesat2db API.
         The reference describes how the methods work and which parameters can
         be used.
 
@@ -84,7 +83,7 @@ gediDB Documentation
         **Contributor’s Guide**
         ^^^
 
-        Want to contribute to gediDB? From code to documentation improvements, this guide shows you how to get involved.
+        Want to contribute to icesat2db? From code to documentation improvements, this guide shows you how to get involved.
 
         +++
 

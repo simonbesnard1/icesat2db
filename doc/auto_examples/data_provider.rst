@@ -18,20 +18,20 @@
 .. _sphx_glr_auto_examples_data_provider.py:
 
 
-Querying Processed GEDI Data from TileDB
+Querying Processed IceSat2 Data from TileDB
 ========================================
 
-This example demonstrates how to use the `GEDIProvider` class to query and retrieve GEDI data stored in TileDB arrays.
+This example demonstrates how to use the `IceSat2Provider` class to query and retrieve IceSat2 data stored in TileDB arrays.
 We will:
 
-1. Set up the `GEDIProvider` with a TileDB storage backend.
+1. Set up the `IceSat2Provider` with a TileDB storage backend.
 2. Query data using spatial and temporal filters.
 3. Retrieve data in both `xarray.Dataset` and `pandas.DataFrame` formats.
-4. Perform nearest-shot queries to retrieve GEDI data closest to a given point.
+4. Perform nearest-shot queries to retrieve IceSat2 data closest to a given point.
 
 Before running this example:
 
-- Ensure that the GEDI data has been processed and stored in TileDB arrays.
+- Ensure that the IceSat2 data has been processed and stored in TileDB arrays.
 - Configure the TileDB storage settings (local or S3) based on your data location.
 
 .. GENERATED FROM PYTHON SOURCE LINES 19-47
@@ -41,15 +41,15 @@ Before running this example:
 
     import geopandas as gpd
 
-    import gedidb as gdb
+    import icesat2db as isdb
 
     # Configure the TileDB storage backend
     storage_type = "local"  # Options: "local" or "s3"
-    local_path = "/path/to/processed/gedi/data"
+    local_path = "/path/to/processed/icesat2/data"
     s3_bucket = None  # Only required if using "s3"
 
-    # Initialize the GEDIProvider
-    provider = gdb.GEDIProvider(
+    # Initialize the IceSat2Provider
+    provider = isdb.IceSat2Provider(
         storage_type=storage_type,
         local_path=local_path,
         s3_bucket=s3_bucket,
@@ -78,7 +78,7 @@ Section 1: Bounding Box Query
 .. code-block:: Python
 
     print("=== Bounding Box Query ===")
-    print("Querying GEDI data within a specified spatial and temporal range.")
+    print("Querying IceSat2 data within a specified spatial and temporal range.")
 
     # Query data within the bounding box and time range, and retrieve it as an `xarray.Dataset`
     data_xarray = provider.get_data(
@@ -106,13 +106,13 @@ Section 2: Nearest Shot Query
 .. code-block:: Python
 
     print("\n=== Nearest Shot Query ===")
-    print("Querying GEDI data for the nearest shots to a specific point.")
+    print("Querying IceSat2 data for the nearest shots to a specific point.")
 
     # Specify a geographic point (longitude, latitude) and the number of nearest shots
     point = (-55.0, -10.0)  # Example longitude and latitude
     num_shots = 5  # Retrieve the 5 nearest shots
 
-    # Query data for the nearest GEDI shots
+    # Query data for the nearest IceSat2 shots
     nearest_data = provider.get_data(
         variables=variables,
         point=point,
@@ -121,8 +121,8 @@ Section 2: Nearest Shot Query
         return_type="xarray",
     )
 
-    # Print the nearest GEDI shots
-    print("Retrieved nearest GEDI shots as an xarray.Dataset:")
+    # Print the nearest IceSat2 shots
+    print("Retrieved nearest IceSat2 shots as an xarray.Dataset:")
     print(nearest_data)
 
 
@@ -137,7 +137,7 @@ Section 3: Data Format Options
 .. code-block:: Python
 
     print("\n=== Data Format Options ===")
-    print("Retrieving GEDI data as a pandas.DataFrame for easier tabular analysis.")
+    print("Retrieving IceSat2 data as a pandas.DataFrame for easier tabular analysis.")
 
     # Query the data within the bounding box and retrieve it as a `pandas.DataFrame`
     data_dataframe = provider.get_data(

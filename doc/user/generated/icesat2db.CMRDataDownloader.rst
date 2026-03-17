@@ -1,7 +1,7 @@
-﻿gedidb.CMRDataDownloader
-========================
+﻿icesat2db.CMRDataDownloader
+===========================
 
-.. currentmodule:: gedidb
+.. currentmodule:: icesat2db
 
 .. autoclass:: CMRDataDownloader
 

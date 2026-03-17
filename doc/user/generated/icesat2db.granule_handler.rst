@@ -1,7 +1,7 @@
-﻿gedidb.granule\_handler
-=======================
+﻿icesat2db.granule\_handler
+==========================
 
-.. currentmodule:: gedidb
+.. currentmodule:: icesat2db
 
 .. autoclass:: granule_handler
 
