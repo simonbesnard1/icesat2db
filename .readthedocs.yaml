@@ -1,9 +1,7 @@
 version: 2
-
 sphinx:
   configuration: doc/conf.py
   fail_on_warning: true
-
 build:
   os: ubuntu-lts-latest
   tools:
@@ -14,8 +12,7 @@ build:
       - git fetch --unshallow || true
     pre_install:
       - git update-index --assume-unchanged doc/conf.py ci/requirements/doc.yml
-
+      - rm -rf doc/_build doc/auto_examples
 conda:
   environment: ci/requirements/doc.yml
-
 formats: []
