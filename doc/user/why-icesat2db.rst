@@ -79,6 +79,6 @@ With a robust foundation for querying and processing IceSat2 data, icesat2db aim
 A collaborative project
 =======================
 
-icesat2db is an adaption of the Python package `gediDB<https://github.com/simonbesnard1/gedidb>`_ adapted for the IceSat2 product by Felix Dombrowski, Mikhail Urbazaev and Simon Besnard from the `Global Land Monitoring Group <https://www.gfz-potsdam.de/en/section/remote-sensing-and-geoinformatics/topics/global-land-monitoring>`_ at the Helmholtz Center Potsdam GFZ German Research Centre for Geosciences. This transition to a production-ready tool was driven by the need to handle large datasets and complex queries effectively. The project remains open-source and welcomes contributions from the research community to support its growth and adaptability.
+icesat2db is an adaption of the Python package `icesat2db<https://github.com/simonbesnard1/icesat2db>`_ adapted for the IceSat2 product by Felix Dombrowski, Mikhail Urbazaev and Simon Besnard from the `Global Land Monitoring Group <https://www.gfz.de/en/section/remote-sensing-and-geoinformatics/topics/global-land-monitoring>`_ at the Helmholtz Center Potsdam GFZ German Research Centre for Geosciences. This transition to a production-ready tool was driven by the need to handle large datasets and complex queries effectively. The project remains open-source and welcomes contributions from the research community to support its growth and adaptability.
 
 ---
