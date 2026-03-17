@@ -1,6 +1,6 @@
 <p align="center">
 <a href="https://github.com/simonbesnard1/gedidb.git">
-        <img src="https://raw.githubusercontent.com/simonbesnard1/gedidb/main/doc/_static/logos/icesat2db_logo.svg"
+        <img src="https://raw.githubusercontent.com/simonbesnard1/icesat2db/main/doc/_static/logos/icesat2db_logo.svg"
          alt="icesat2db Logo" height="200px" hspace="0px" vspace="30px" align="left">
 </a>
 </p>
