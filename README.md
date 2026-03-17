@@ -44,11 +44,11 @@ You can find information about contributing to icesat2db on our
 
 Felix Dombrowski is a Bachelor’s student in Computer Science at the University of Potsdam and a research intern in the Global Land Monitoring Group at GFZ Helmholtz Centre Potsdam. At GFZ, his work has focused on developing toolboxes to process Earth Observation data efficiently.
 
-Mikhail Urbazaev is a senior researcher in the Global Land Monitoring Group at GFZ Helmholtz Centre Potsdam.
+Mikhail Urbazaev is a Research Associate at the Helmholtz Centre for Geosciences (GFZ). His research focuses on the synergetic use of lidar, synthetic aperture radar, and optical remote sensing data for estimation of aboveground biomass and vegetation structural parameters across different biomes.
 
 Simon Besnard, a senior researcher in the Global Land Monitoring Group at GFZ Helmholtz Centre Potsdam, studies terrestrial ecosystems' dynamics and their feedback on environmental conditions. He specializes in developing methods to analyze large EO and climate datasets to understand ecosystem functioning in a changing climate. His current research focuses on forest structure changes over the past decade and their links to the carbon cycle. 
 
-Amelia Holcomb is a PhD candidate in Computer Science at the University of Cambridge, researching remote sensing and machine learning to study carbon sequestration and forest regrowth. Previously, she worked as a site reliability engineer at Google on Bigtable. She holds an MMath from the University of Waterloo and a B.A. in Mathematics from Yale.
+Amelia Holcomb is a Postdoc at the University of Maryland, researching remote sensing of tropical forest degradation and recovery. She completed her PhD in Computer Science at the University of Cambridge, where she studied remote sensing and machine learning for carbon sequestration and forest regrowth. Previously, she worked as a site reliability engineer at Google on Bigtable. She holds an MMath from the University of Waterloo and a B.A. in Mathematics from Yale.
 
 ## Contact
 
