@@ -36,7 +36,6 @@ dependencies:
   - retry
   - setuptools<82
   - scipy
-  - setuptools
   - xarray
   - pip:
       - tiledb
