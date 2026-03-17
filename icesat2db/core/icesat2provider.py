@@ -28,7 +28,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DEFAULT_DIMS = ["shot_number"]
+DEFAULT_DIMS = ["segment_id"]
 
 
 class IceSat2Provider(TileDBProvider):
@@ -406,30 +406,30 @@ class IceSat2Provider(TileDBProvider):
 
         This function takes scalar data (single-point measurements) and profile data
         (multi-point measurements per shot) and combines them into a single DataFrame.
-        Profile data is aggregated for each `shot_number`, with profile values stored as lists.
+        Profile data is aggregated for each `segment_id`, with profile values stored as lists.
 
         Parameters
         ----------
         scalar_data : Dict[str, np.ndarray]
             Dictionary containing scalar data variables, where each key is a variable name
-            and each value is a numpy array of measurements indexed by `shot_number`.
+            and each value is a numpy array of measurements indexed by `segment_id`.
         profile_data : Dict[str, np.ndarray]
             Dictionary containing profile data variables, where each key is a variable name
             and each value is a numpy array of measurements. Profile data includes multiple
-            measurements per `shot_number` and `profile_point`.
+            measurements per `segment_id` and `profile_point`.
 
         Returns
         -------
         pd.DataFrame
             A pandas DataFrame where scalar data is stored as individual columns, and
-            profile data is grouped by `shot_number` with each variable represented as a
-            list of values per `shot_number`.
+            profile data is grouped by `segment_id` with each variable represented as a
+            list of values per `segment_id`.
 
         Notes
         -----
         - Profile data columns (e.g., `latitude`, `longitude`, `time`, `profile_point`)
           are dropped after aggregation to avoid duplication.
-        - The returned DataFrame merges scalar and profile data on `shot_number`, ensuring
+        - The returned DataFrame merges scalar and profile data on `segment_id`, ensuring
           alignment between the two datasets.
 
         """
@@ -457,14 +457,14 @@ class IceSat2Provider(TileDBProvider):
         Convert scalar and profile data to an Xarray Dataset, with metadata attached.
 
         This function creates an Xarray Dataset by transforming scalar and profile data dictionaries
-        into separate DataArrays, then merging them based on the `shot_number` dimension.
+        into separate DataArrays, then merging them based on the `segment_id` dimension.
         Metadata is added to each variable in the final Dataset for descriptive context.
 
         Parameters
         ----------
         scalar_data : Dict[str, np.ndarray]
             Dictionary containing scalar data variables. Keys are variable names, and values
-            are numpy arrays indexed by `shot_number`.
+            are numpy arrays indexed by `segment_id`.
         metadata : pd.DataFrame
             DataFrame containing variable metadata (e.g., descriptions and units). The index
             should match the variable names in `scalar_data` and `profile_vars`.
@@ -476,12 +476,12 @@ class IceSat2Provider(TileDBProvider):
         -------
         xr.Dataset
             An Xarray Dataset containing scalar and profile data with attached metadata, indexed
-            by `shot_number` for scalar data and both `shot_number` and `profile_point` for profile data.
+            by `segment_id` for scalar data and both `segment_id` and `profile_point` for profile data.
 
         Notes
         -----
-        - Scalar data variables are included in the Dataset with the dimension `shot_number`.
-        - Profile data variables are reshaped to include the `profile_point` dimension alongside `shot_number`.
+        - Scalar data variables are included in the Dataset with the dimension `segment_id`.
+        - Profile data variables are reshaped to include the `profile_point` dimension alongside `segment_id`.
         - The Dataset is annotated with metadata (descriptions, units, etc.) from the provided metadata DataFrame.
         """
 
@@ -497,7 +497,7 @@ class IceSat2Provider(TileDBProvider):
             var
             for var in scalar_data
             if var
-            not in ["latitude", "longitude", "time", "shot_number"]
+            not in ["latitude", "longitude", "time", "segment_id"]
             + profile_var_components
         ]
 
@@ -508,8 +508,8 @@ class IceSat2Provider(TileDBProvider):
         for var in scalar_vars:
             data_vars[var] = xr.DataArray(
                 scalar_data[var],
-                coords={"shot_number": scalar_data["shot_number"]},
-                dims=["shot_number"],
+                coords={"segment_id": scalar_data["segment_id"]},
+                dims=["segment_id"],
             )
 
         # Pre-allocate profile arrays (keep existing optimization)
@@ -524,22 +524,22 @@ class IceSat2Provider(TileDBProvider):
             data_vars[base_var] = xr.DataArray(
                 profile_data,
                 coords={
-                    "shot_number": scalar_data["shot_number"],
+                    "segment_id": scalar_data["segment_id"],
                     "profile_points": np.arange(
                         num_profile_points, dtype="int16" or "int32"
                     ),
                 },
-                dims=["shot_number", "profile_points"],
+                dims=["segment_id", "profile_points"],
             )
 
         # Create dataset once with all variables (no merge needed)
         dataset = xr.Dataset(
             data_vars=data_vars,
             coords={
-                "shot_number": scalar_data["shot_number"],
-                "latitude": ("shot_number", scalar_data["latitude"]),
-                "longitude": ("shot_number", scalar_data["longitude"]),
-                "time": ("shot_number", time_coord),
+                "segment_id": scalar_data["segment_id"],
+                "latitude": ("segment_id", scalar_data["latitude"]),
+                "longitude": ("segment_id", scalar_data["longitude"]),
+                "time": ("segment_id", time_coord),
             },
         )
 

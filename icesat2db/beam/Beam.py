@@ -34,6 +34,7 @@ class beam_handler(h5py.Group):
         """
         super().__init__(granule[beam].id)
         self.parent_granule = granule
+        self.beam_name = beam
         self.field_mapping = field_mapping
         self._cached_data: Optional[pd.DataFrame] = (
             None  # Cache for the beam's main data
@@ -55,9 +56,9 @@ class beam_handler(h5py.Group):
             np.ndarray: A boolean mask indicating which rows pass the filters.
         """
         if not filters:
-            return np.ones(len(data["shot_number"]), dtype=bool)
+            return np.ones(len(data["segment_id"]), dtype=bool)
 
-        mask = np.ones(len(data["shot_number"]), dtype=bool)
+        mask = np.ones(len(data["segment_id"]), dtype=bool)
         for filter_name, filter_func in filters.items():
             try:
                 filter_mask = filter_func()
@@ -70,14 +71,14 @@ class beam_handler(h5py.Group):
         return mask
 
     @property
-    def n_shots(self) -> int:
+    def n_segments(self) -> int:
         """
         Get the number of shots in the beam.
 
         Returns:
             int: The number of shots in the beam.
         """
-        return len(self["shot_number"])
+        return len(self["segment_id"])
 
     @property
     def beam_type(self) -> str:
