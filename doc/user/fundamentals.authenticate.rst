@@ -1,8 +1,8 @@
 .. _fundamentals-authenticate:
 
-#####################
+###################
 NASA authentication
-#####################
+###################
 
 To interact with NASA's Common Metadata Repository (CMR) and download the required `.h5` files, icesat2db requires NASA Earthdata credentials for authentication. This guide will help you set up and securely store your credentials to enable seamless access.
 

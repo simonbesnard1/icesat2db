@@ -33,7 +33,7 @@ Downloading functions
    CMRQuery
    
 IceSat2 data processing functions
-==============================
+=================================
 
 .. autosummary::
    :toctree: generated/
@@ -47,7 +47,7 @@ IceSat2 data processing functions
    IceSat2NameMetadata
    
 TileDB functions
-=======================
+================
 
 .. autosummary::
    :toctree: generated/

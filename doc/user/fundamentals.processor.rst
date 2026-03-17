@@ -7,7 +7,7 @@ Data Processing
 The :py:class:`icesat2db.IceSat2Processor` class in icesat2db manages the entire workflow of downloading, processing, and storing IceSat2 data in either a local or s3-based tileDB. This section outlines the key functions of :py:class:`icesat2db.IceSat2Processor`, example usage, core functions, and customization options for efficient IceSat2 data handling.
 
 Overview of IceSat2Processor workflow
-----------------------------------
+-------------------------------------
 
 The :py:class:`icesat2db.IceSat2Processor` class handles the following tasks:
 

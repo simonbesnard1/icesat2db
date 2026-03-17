@@ -654,4 +654,4 @@ level_atl08:
     segment_id:
       SDS_Name: "segment_id"
       description: "Unique segment id"
-      dtype: "U30"
+      dtype: "int64"

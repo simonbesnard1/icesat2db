@@ -1,8 +1,8 @@
 .. _icesat2db_docs_mainpage:
 
-######################
+#######################
 icesat2db Documentation
-######################
+#######################
 
 .. toctree::
    :maxdepth: 1

@@ -5,14 +5,14 @@ Frequently Asked Questions (FAQ)
 ################################
 
 How should I cite icesat2db?
--------------------------
+----------------------------
 
 Please use the following citation when referencing icesat2db in your work:
 
 > Besnard, S., Dombrowski, F., & Holcomb, A. (2025). icesat2db (2025.2.0). Zenodo. https://doi.org/10.5281/zenodo.13885229
 
 What are the main features of icesat2db?
--------------------------------------
+----------------------------------------
 
 GediDB is a TileDB-based Python package designed to efficiently manage, query, and analyze large-scale IceSat2 data. Its main features include:
 
