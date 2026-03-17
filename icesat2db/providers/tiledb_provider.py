@@ -180,11 +180,11 @@ class TileDBProvider:
         """
         Build attribute list and per-variable column mappings for profile and
         sub-segment variables.
-    
+
         Profile variables are stored as ``{var}_1 … {var}_N`` where N comes from
         ``{var}.profile_length`` in the array metadata.  Sub-segment variables
         follow the same layout but use ``{var}.subsegment_length`` instead.
-    
+
         Returns
         -------
         attr_list : List[str]
@@ -198,24 +198,26 @@ class TileDBProvider:
         attr_list: List[str] = []
         profile_vars: Dict[str, List[str]] = {}
         subsegment_vars: Dict[str, List[str]] = {}
-    
+
         for var in variables:
             profile_key = f"{var}.profile_length"
             subsegment_key = f"{var}.subsegment_length"
-    
+
             if profile_key in array_meta:
                 expanded = [f"{var}_{i}" for i in range(1, array_meta[profile_key] + 1)]
                 attr_list.extend(expanded)
                 profile_vars[var] = expanded
-    
+
             elif subsegment_key in array_meta:
-                expanded = [f"{var}_{i}" for i in range(1, array_meta[subsegment_key] + 1)]
+                expanded = [
+                    f"{var}_{i}" for i in range(1, array_meta[subsegment_key] + 1)
+                ]
                 attr_list.extend(expanded)
                 subsegment_vars[var] = expanded
-    
+
             else:
                 attr_list.append(var)
-    
+
         return attr_list, profile_vars, subsegment_vars
 
     def _build_condition_string(self, filters: Dict[str, str]) -> Optional[str]:
@@ -326,8 +328,8 @@ class TileDBProvider:
             with tiledb.open(self.scalar_array_uri, mode="r", ctx=self.ctx) as array:
                 # Build attribute list and profile variables (cached metadata)
                 attr_list, profile_vars, subsegment_vars = self._build_profile_attrs(
-                        variables, array.meta
-                    )
+                    variables, array.meta
+                )
 
                 # Build condition string
                 cond_string = self._build_condition_string(filters)
@@ -421,24 +423,29 @@ class TileDBProvider:
             Query results or None if no data found
         """
         data, profile_vars, subsegment_vars = self._query_array(
-            variables, lat_min, lat_max, lon_min, lon_max,
-            start_time, end_time,
+            variables,
+            lat_min,
+            lat_max,
+            lon_min,
+            lon_max,
+            start_time,
+            end_time,
             geometry=geometry,
             use_polygon_filter=use_polygon_filter,
             **filters,
         )
-    
+
         if data is None:
             return None
-    
+
         df = pd.DataFrame(data)
-    
+
         # Collapse expanded columns back into list-typed columns for both kinds
         for var_name, expanded_cols in {**profile_vars, **subsegment_vars}.items():
             if all(col in df.columns for col in expanded_cols):
                 df[var_name] = df[expanded_cols].values.tolist()
                 df = df.drop(columns=expanded_cols)
-    
+
         return df
 
     def close(self):
