@@ -1214,7 +1214,7 @@ level_atl08:
       units: "1"
 
     # additional parameter shot_number, constructed from the delta_time, latitude and longitude. This will be added as a reference information parameter.
-    shot_number:
-      SDS_Name: "shot_number"
-      description: "Unique shot number"
-      dtype: "U30"
+    segment_id:
+      SDS_Name: "segment_id"
+      description: "Unique segment_id number"
+      dtype: "int64"

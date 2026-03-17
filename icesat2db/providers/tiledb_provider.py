@@ -18,7 +18,7 @@ import tiledb
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DIMS = ["shot_number"]
+DEFAULT_DIMS = ["segment_id"]
 
 
 class TileDBProvider:
@@ -257,7 +257,7 @@ class TileDBProvider:
         Dict[str, np.ndarray]
             Filtered data containing only points within the polygon
         """
-        if data is None or len(data.get("shot_number", [])) == 0:
+        if data is None or len(data.get("segment_id", [])) == 0:
             return data
 
         # Get lon/lat from data
@@ -322,7 +322,7 @@ class TileDBProvider:
                 ]
 
                 # Early return if no data
-                if not data or len(data.get("shot_number", [])) == 0:
+                if not data or len(data.get("segment_id", [])) == 0:
                     return None, profile_vars
 
                 # Apply polygon filter if requested
@@ -330,7 +330,7 @@ class TileDBProvider:
                     data = self._filter_by_polygon(data, geometry)
 
                     # Check again after polygon filter
-                    if len(data.get("shot_number", [])) == 0:
+                    if len(data.get("segment_id", [])) == 0:
                         return None, profile_vars
 
                 return data, profile_vars

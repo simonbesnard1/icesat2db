@@ -172,9 +172,6 @@ class IceSat2Database:
         """
         Create a sparse TileDB array.
 
-        allows_duplicates=True: multiple IceSat2 shots can share the same
-        (lat, lon, day) coordinate. Silently overwriting or erroring on
-        duplicates (the old behaviour without this flag) is incorrect.
         """
         if tiledb.array_exists(uri, ctx=self.ctx):
             if self.overwrite:
@@ -191,7 +188,6 @@ class IceSat2Database:
                 domain=self._create_domain(),
                 attrs=self._create_attributes(),
                 sparse=True,
-                allows_duplicates=True,
                 capacity=cfg_td.get("capacity", 200_000),
                 cell_order=cfg_td.get("cell_order", "hilbert"),
             )
