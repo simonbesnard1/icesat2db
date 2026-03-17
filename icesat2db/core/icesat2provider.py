@@ -142,7 +142,7 @@ class IceSat2Provider(TileDBProvider):
         lon_min, lat_min = point[0] - radius, point[1] - radius
         lon_max, lat_max = point[0] + radius, point[1] + radius
 
-        scalar_data_subset, profile_vars = self._query_array(
+        scalar_data_subset, profile_vars, subsegment_vars = self._query_array(
             scalar_vars,
             lat_min,
             lat_max,
@@ -176,7 +176,7 @@ class IceSat2Provider(TileDBProvider):
 
         scalar_data = {k: v[indices] for k, v in scalar_data_subset.items()}
 
-        return scalar_data, profile_vars
+        return scalar_data, profile_vars, subsegment_vars
 
     def query_data(
         self,
@@ -253,7 +253,7 @@ class IceSat2Provider(TileDBProvider):
 
         # Query with optimized filtering
         scalar_vars = variables + DEFAULT_DIMS
-        scalar_data, profile_vars = self._query_array(
+        scalar_data, profile_vars, subsegment_vars = self._query_array(
             scalar_vars,
             lat_min,
             lat_max,
@@ -266,7 +266,7 @@ class IceSat2Provider(TileDBProvider):
             **quality_filters,
         )
 
-        return scalar_data, profile_vars
+        return scalar_data, profile_vars, subsegment_vars
 
     def get_data(
         self,
@@ -366,7 +366,7 @@ class IceSat2Provider(TileDBProvider):
 
         # Execute query
         if query_type == "nearest":
-            scalar_data, profile_vars = self.query_nearest_shots(
+            scalar_data, profile_vars, subsegment_vars = self.query_nearest_shots(
                 variables,
                 point,
                 num_shots,
@@ -376,7 +376,7 @@ class IceSat2Provider(TileDBProvider):
                 **quality_filters,
             )
         elif query_type == "bounding_box":
-            scalar_data, profile_vars = self.query_data(
+            scalar_data, profile_vars, subsegment_vars = self.query_data(
                 variables,
                 geometry,
                 start_time,
@@ -392,14 +392,15 @@ class IceSat2Provider(TileDBProvider):
         # Return in requested format
         if return_type == "xarray":
             metadata = self.get_available_variables()
-            return self.to_xarray(scalar_data, metadata, profile_vars)
+            return self.to_xarray(scalar_data, metadata, profile_vars, subsegment_vars)
         elif return_type == "dataframe":
-            return self.to_dataframe(scalar_data, profile_vars)
+            return self.to_dataframe(scalar_data, profile_vars, subsegment_vars)
 
     def to_dataframe(
         self,
         scalar_data: Dict[str, np.ndarray],
         profile_vars: Dict[str, List[str]] = None,
+        subsegment_vars: Dict[str, List[str]] = None,
     ) -> pd.DataFrame:
         """
         Convert scalar and profile data dictionaries into a unified pandas DataFrame.
@@ -452,87 +453,87 @@ class IceSat2Provider(TileDBProvider):
         scalar_data: Dict[str, np.ndarray],
         metadata: pd.DataFrame,
         profile_vars: Dict[str, List[str]],
+        subsegment_vars: Dict[str, List[str]],
     ) -> xr.Dataset:
         """
-        Convert scalar and profile data to an Xarray Dataset, with metadata attached.
-
-        This function creates an Xarray Dataset by transforming scalar and profile data dictionaries
-        into separate DataArrays, then merging them based on the `segment_id` dimension.
-        Metadata is added to each variable in the final Dataset for descriptive context.
+        Convert scalar, profile, and sub-segment data to an Xarray Dataset.
 
         Parameters
         ----------
         scalar_data : Dict[str, np.ndarray]
-            Dictionary containing scalar data variables. Keys are variable names, and values
-            are numpy arrays indexed by `segment_id`.
+            Scalar data variables keyed by name, indexed by segment_id.
         metadata : pd.DataFrame
-            DataFrame containing variable metadata (e.g., descriptions and units). The index
-            should match the variable names in `scalar_data` and `profile_vars`.
+            Variable metadata (descriptions, units, …). Index matches variable names.
         profile_vars : Dict[str, List[str]]
-            Dictionary where keys are base names of profile variables (e.g., 'rh') and values
-            are lists of associated variable names (e.g., ['rh_1', 'rh_2', ...]).
+            Base name → expanded column list for profile variables
+            (dimension: ``profile_point``).
+        subsegment_vars : Dict[str, List[str]]
+            Base name → expanded column list for sub-segment variables
+            (dimension: ``subsegment_point``).
 
         Returns
         -------
         xr.Dataset
-            An Xarray Dataset containing scalar and profile data with attached metadata, indexed
-            by `segment_id` for scalar data and both `segment_id` and `profile_point` for profile data.
-
-        Notes
-        -----
-        - Scalar data variables are included in the Dataset with the dimension `segment_id`.
-        - Profile data variables are reshaped to include the `profile_point` dimension alongside `segment_id`.
-        - The Dataset is annotated with metadata (descriptions, units, etc.) from the provided metadata DataFrame.
+            Dataset indexed by ``segment_id`` for scalars, ``(segment_id,
+            profile_point)`` for profile variables, and ``(segment_id,
+            subsegment_point)`` for sub-segment variables.
         """
-
         time_coord = _timestamp_to_datetime(scalar_data["time"])
 
-        # Extract profile variable components
-        profile_var_components = [
-            item for sublist in profile_vars.values() for item in sublist
-        ]
+        # Collect all expanded column names to exclude from scalar list
+        profile_components = {col for cols in profile_vars.values() for col in cols}
+        subsegment_components = {
+            col for cols in subsegment_vars.values() for col in cols
+        }
+        reserved = {"latitude", "longitude", "time", "segment_id"}
 
-        # Identify scalar variables
-        scalar_vars = [
+        scalar_var_names = [
             var
             for var in scalar_data
-            if var
-            not in ["latitude", "longitude", "time", "segment_id"]
-            + profile_var_components
+            if var not in reserved | profile_components | subsegment_components
         ]
 
-        # Create dataset with data_vars dict (faster than merging)
         data_vars = {}
 
-        # Add scalar variables
-        for var in scalar_vars:
+        # ── Scalar variables ──────────────────────────────────────────────────
+        for var in scalar_var_names:
             data_vars[var] = xr.DataArray(
                 scalar_data[var],
                 coords={"segment_id": scalar_data["segment_id"]},
                 dims=["segment_id"],
             )
 
-        # Pre-allocate profile arrays (keep existing optimization)
+        # ── Profile variables  (dim: profile_point) ───────────────────────────
         for base_var, components in profile_vars.items():
-            num_profile_points = len(components)
             profile_data = np.stack(
-                [scalar_data[comp] for comp in components],
-                axis=-1,
+                [scalar_data[comp] for comp in components], axis=-1
             ).astype(np.float32, copy=False)
 
-            # Add to data_vars dict
             data_vars[base_var] = xr.DataArray(
                 profile_data,
                 coords={
                     "segment_id": scalar_data["segment_id"],
-                    "profile_points": np.arange(
-                        num_profile_points, dtype="int16" or "int32"
-                    ),
+                    "profile_point": np.arange(len(components), dtype=np.int16),
                 },
-                dims=["segment_id", "profile_points"],
+                dims=["segment_id", "profile_point"],
             )
 
-        # Create dataset once with all variables (no merge needed)
+        # ── Sub-segment variables  (dim: subsegment_point) ────────────────────
+        for base_var, components in subsegment_vars.items():
+            subsegment_data = np.stack(
+                [scalar_data[comp] for comp in components], axis=-1
+            ).astype(np.float32, copy=False)
+
+            data_vars[base_var] = xr.DataArray(
+                subsegment_data,
+                coords={
+                    "segment_id": scalar_data["segment_id"],
+                    "subsegment_point": np.arange(len(components), dtype=np.int16),
+                },
+                dims=["segment_id", "subsegment_point"],
+            )
+
+        # ── Assemble dataset ──────────────────────────────────────────────────
         dataset = xr.Dataset(
             data_vars=data_vars,
             coords={
@@ -543,9 +544,7 @@ class IceSat2Provider(TileDBProvider):
             },
         )
 
-        # Attach metadata
         self._attach_metadata(dataset, metadata)
-
         return dataset
 
     def _attach_metadata(self, dataset: xr.Dataset, metadata: pd.DataFrame) -> None:
