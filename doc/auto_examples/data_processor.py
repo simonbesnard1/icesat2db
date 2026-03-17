@@ -1,6 +1,6 @@
 """
 IceSat2Processor example with different parallel engines
-========================================================
+=========================================================
 
 This example demonstrates how to use the `icesat2db` library to process IceSat2 granules
 with different parallel engines, such as `concurrent.futures.ThreadPoolExecutor` and `dask.distributed.Client`.

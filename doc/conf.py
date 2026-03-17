@@ -83,6 +83,8 @@ copyright = f"2025-{year}, icesat2DB Developers"
 # The full version, including alpha/beta/rc tags.
 version = version_("icesat2db")
 
+suppress_warnings = ["docutils.parsers.rst.states"]
+
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
 # today = ''
