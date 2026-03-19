@@ -346,10 +346,10 @@ class TileDBProvider:
                 data = query.multi_index[
                     lat_min:lat_max, lon_min:lon_max, start_time:end_time
                 ]
-
+                
                 # Early return if no data
                 if not data or len(data.get("segment_id", [])) == 0:
-                    return None, profile_vars
+                    return None, profile_vars, subsegment_vars
 
                 # Apply polygon filter if requested
                 if use_polygon_filter and geometry is not None:
@@ -357,7 +357,7 @@ class TileDBProvider:
 
                     # Check again after polygon filter
                     if len(data.get("segment_id", [])) == 0:
-                        return None, profile_vars
+                        return None, profile_vars, subsegment_vars
 
                 return data, profile_vars, subsegment_vars
 
