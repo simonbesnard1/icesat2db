@@ -12,7 +12,6 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Union
-from collections import defaultdict
 import time
 
 import geopandas as gpd
@@ -397,35 +396,21 @@ class IceSat2Processor:
             )
             ledger.append(row)
 
-        def _buffer_by_window(buffers, df: pd.DataFrame):
-            """
-            Split one DF into spatial windows and append each sub-DF to buffers.
-            buffers key is (i_lat, i_lon) or bounds tuple; we use bounds as key for simplicity.
-            """
-            for bounds, sub in self.database_writer.spatial_chunking(df):
-                if sub is None or sub.empty:
-                    continue
-                buffers[bounds].append(sub)
-
         def _flush_buffers(buffers, processed_ids, timeframe):
             """
-            Concatenate per-window buffers and write once per window (or a small capped number).
-            Only mark processed after successful write.
+            Concatenate all buffered DataFrames and write in a single TileDB
+            open/close cycle, then mark all granules processed in one more.
             """
             if not buffers:
                 return
 
             try:
-                for bounds, parts in buffers.items():
-                    if not parts:
-                        continue
-                    window_df = pd.concat(parts, ignore_index=True)
+                combined = pd.concat(buffers, ignore_index=True)
+                self.database_writer.write_granule(combined)
 
-                    self.database_writer.write_granule(window_df)
-
-                # mark processed only after all window writes succeed
-                for ids_ in processed_ids:
-                    self.database_writer.mark_granule_as_processed(ids_)
+                # mark processed only after write succeeds
+                if processed_ids:
+                    self.database_writer.mark_granules_as_processed_batch(processed_ids)
 
             except Exception as e:
                 logger.error(
@@ -454,12 +439,10 @@ class IceSat2Processor:
                         )
                         future_map[fut] = gid
 
-                    # Per-window buffers (bounds -> list[df])
-                    buffers = defaultdict(list)
+                    buffers = []
                     processed_ids = []
                     counter = 0
 
-                    # Collect + buffer streaming (no global concat)
                     for fut in as_completed(future_map):
                         gid = future_map[fut]
                         started_ts = time.time()
@@ -472,7 +455,7 @@ class IceSat2Processor:
                                 processed_ids.append(ids_)
 
                             if gdf is not None and not gdf.empty:
-                                _buffer_by_window(buffers, gdf)
+                                buffers.append(gdf)
 
                             _append_ledger_row(
                                 ledger,
@@ -538,7 +521,7 @@ class IceSat2Processor:
                     )
                     futures.append((gid, fut))
 
-                buffers = defaultdict(list)
+                buffers = []
                 processed_ids = []
                 counter = 0
 
@@ -553,7 +536,7 @@ class IceSat2Processor:
                             processed_ids.append(ids_)
 
                         if gdf is not None and not gdf.empty:
-                            _buffer_by_window(buffers, gdf)
+                            buffers.append(gdf)
 
                         _append_ledger_row(
                             ledger,

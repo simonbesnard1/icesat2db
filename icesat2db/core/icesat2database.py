@@ -36,9 +36,11 @@ class IceSat2Database:
       compression and read locality, but costs an argsort + fancy-index copy per
       granule. Disable when write throughput matters more than read performance.
 
-    - TileDBFilterPolicy is opt-in via config ('use_filters': true). Compression
-      filters (DeltaFilter, DoubleDelta, Zstd) reduce storage size but add CPU cost
-      on every write. Default is Zstd-only for a balanced trade-off.
+    - TileDBFilterPolicy defaults to fast-write mode ('use_filters': false).
+      In fast mode only Zstd(1) is applied — no ByteShuffle or BitWidthReduction
+      pre-processors. Set 'use_filters: true' in config to enable the full
+      compression pipeline (ByteShuffle+Zstd for floats, BitWidthReduction+Zstd
+      for narrow ints). DoubleDelta is kept on time/timestamp in both modes.
 
     - dtype coercion in _extract_variable_data is skipped when the source Series
       already matches the target dtype — avoids a full array copy for every attribute
@@ -220,7 +222,6 @@ class IceSat2Database:
         if time_min >= time_max:
             raise ValueError("time_min must be less than time_max.")
 
-        # Filters — only applied when explicitly enabled
         spatial_filters = self.filter_policy.spatial_dim_filters()
         time_filters = self.filter_policy.time_dim_filters()
 
@@ -365,17 +366,19 @@ class IceSat2Database:
             return self._schema_cache
 
         with tiledb.open(self.array_uri, "r", ctx=self.ctx) as A:
-            dim_names = {A.schema.domain.dim(i).name for i in range(A.schema.ndim)}
+            schema = A.schema
+            dim_names = [schema.domain.dim(i).name for i in range(schema.ndim)]
             attr_dtypes: Dict[str, np.dtype] = {
-                A.schema.attr(i).name: np.dtype(A.schema.attr(i).dtype)
-                for i in range(A.schema.nattr)
+                schema.attr(i).name: np.dtype(schema.attr(i).dtype)
+                for i in range(schema.nattr)
             }
 
         all_attrs = set(attr_dtypes.keys())
         # Pre-sort once: reused on every write, avoids per-write set arithmetic
-        sorted_data_attrs = sorted(all_attrs - dim_names - {"timestamp_ns"})
+        sorted_data_attrs = sorted(all_attrs - set(dim_names) - {"timestamp_ns"})
 
         self._schema_cache = {
+            "dim_names": dim_names,
             "attrs": all_attrs,
             "attr_dtypes": attr_dtypes,
             "sorted_data_attrs": sorted_data_attrs,
@@ -569,9 +572,9 @@ class IceSat2Database:
         data : dict
             Variable data to write to the TileDB array.
         """
+        cache = self._get_schema_cache()
         with tiledb.open(self.array_uri, mode="w", ctx=self.ctx) as array:
-            dim_names = [dim.name for dim in array.schema.domain]
-            dims = tuple(coords[dim_name] for dim_name in dim_names)
+            dims = tuple(coords[name] for name in cache["dim_names"])
             array[dims] = data
 
     def write_granule(self, granule_data: pd.DataFrame) -> None:
@@ -597,8 +600,8 @@ class IceSat2Database:
             # Validate granule data
             self._validate_granule_data(granule_data)
 
-            # Get spatial domain from config
-            min_lon, max_lon, min_lat, max_lat = self._get_tiledb_spatial_domain()
+            # Get spatial domain from cache
+            min_lon, max_lon, min_lat, max_lat = self._spatial_bounds
 
             # Filter out shots outside the TileDB spatial domain
             filtered_data = granule_data[
@@ -671,6 +674,28 @@ class IceSat2Database:
             logger.debug(f"Marked granule {granule_key} as processed")
         except tiledb.TileDBError as e:
             logger.error(f"Failed to mark granule {granule_key} as processed: {e}")
+            raise
+
+    @retry(
+        (tiledb.TileDBError, ConnectionError),
+        tries=10,
+        delay=5,
+        backoff=3,
+        logger=logger,
+    )
+    def mark_granules_as_processed_batch(self, granule_keys: list) -> None:
+        """Mark multiple granules as processed in a single TileDB open/close."""
+        if not granule_keys:
+            return
+        try:
+            ts = pd.Timestamp.utcnow().isoformat()
+            with tiledb.open(self.array_uri, mode="w", ctx=self.ctx) as array:
+                for key in granule_keys:
+                    array.meta[f"granule_{key}_status"] = "processed"
+                    array.meta[f"granule_{key}_processed_date"] = ts
+            logger.debug(f"Marked {len(granule_keys)} granules as processed")
+        except tiledb.TileDBError as e:
+            logger.error(f"Failed to mark granules as processed: {e}")
             raise
 
     # ---------------------------------------------------------------------- #
