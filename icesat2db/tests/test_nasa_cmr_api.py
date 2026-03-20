@@ -20,8 +20,8 @@ from pathlib import Path
 import geopandas as gpd
 import yaml
 
-from gedidb.downloader import cmr_query
-from gedidb.utils import constants
+from icesat2db.downloader import cmr_query
+from icesat2db.utils import constants
 
 data_dir = Path(__file__).parent / "data"
 
@@ -44,46 +44,10 @@ class TestNasaCmrApi(unittest.TestCase):
         with open("data/data_config.yml", "r") as file:
             return yaml.safe_load(file)["earth_data_info"]
 
-    def test_l2a(self):
+    def test_atl08(self):
         geom, start_date, end_date, earth_data_info = self._get_test_data()
         cmr = cmr_query.GranuleQuery(
-            constants.GediProduct.L2A,
-            geom,
-            start_date,
-            end_date,
-            earth_data_info,
-        )
-        granules = cmr.query_granules()
-        self.assertGreater(len(granules), 0)
-
-    def test_l2b(self):
-        geom, start_date, end_date, earth_data_info = self._get_test_data()
-        cmr = cmr_query.GranuleQuery(
-            constants.GediProduct.L2B,
-            geom,
-            start_date,
-            end_date,
-            earth_data_info,
-        )
-        granules = cmr.query_granules()
-        self.assertGreater(len(granules), 0)
-
-    def test_l4a(self):
-        geom, start_date, end_date, earth_data_info = self._get_test_data()
-        cmr = cmr_query.GranuleQuery(
-            constants.GediProduct.L4A,
-            geom,
-            start_date,
-            end_date,
-            earth_data_info,
-        )
-        granules = cmr.query_granules()
-        self.assertGreater(len(granules), 0)
-
-    def test_l4c(self):
-        geom, start_date, end_date, earth_data_info = self._get_test_data()
-        cmr = cmr_query.GranuleQuery(
-            constants.GediProduct.L4C,
+            constants.IceSat2Product.ATL08,
             geom,
             start_date,
             end_date,

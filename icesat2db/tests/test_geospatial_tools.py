@@ -13,7 +13,7 @@ from pathlib import Path
 import geopandas as gpd
 from shapely import MultiPolygon, Polygon
 
-from gedidb.utils import geo_processing as gt
+from icesat2db.utils import geo_processing as gt
 
 data_dir = Path(__file__).parent / "data"
 
