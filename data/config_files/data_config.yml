@@ -1,8 +1,6 @@
 # database parameters
 tiledb:
-  storage_type: 's3'
-  s3_bucket: "dog.icesat2db.icesat2-atl008-v007"      # TileDB URI for storing data
-  url: "https://s3.gfz-potsdam.de"
+  storage_type: 'local'
   overwrite: false                                  # Whether to overwrite existing arrays
   temporal_batching: "weekly"
   time_range:                                      # Global time range for data
@@ -39,7 +37,7 @@ level_atl08:
       dtype: "float32"
       description: "Apparent surface reflectance"
       long_name: "apparent surface reflectance"
-      units: "1"
+      units: "adimensional"
 
     atlas_pa:
       SDS_Name: "land_segments/atlas_pa"
@@ -67,7 +65,7 @@ level_atl08:
       dtype: "int8"
       description: "Flag indicating that the ground surface is bright (e.g. snow-covered or other bright surfaces)"
       long_name: "brightness flag"
-      units: "1"
+      units: "adimensional"
 
     can_noise:
       SDS_Name: "land_segments/canopy/can_noise"
@@ -75,7 +73,6 @@ level_atl08:
       description: "Number of noise photons calculated that fall within the canopy height for each 100 m segment based on ATL03 background rate parameters."
       long_name: "canopy noise rate"
       units: "count/meter"
-      valid_min: "0.0"
 
     canopy_h_metrics:
       SDS_Name: "land_segments/canopy/canopy_h_metrics"
@@ -100,14 +97,14 @@ level_atl08:
       dtype: "float32"
       description: "Standard Deviation of all photons classified as canopy photons within the segment to provide inference of canopy openness."
       long_name: "canopy openness"
-      units: "1"
+      units: "adimensional"
 
     canopy_rh_conf:
       SDS_Name: "land_segments/canopy/canopy_rh_conf"
       dtype: "int8"
       description: "Canopy relative height confidence flag based on percentage of ground and canopy photons within a segment: 0 (<5% canopy), 1 (>5% canopy, <5% ground), 2 (>5% canopy, >5% ground)."
       long_name: "canopy relative height confidence"
-      units: "1"
+      units: "adimenisional"
 
     centroid_height:
       SDS_Name: "land_segments/canopy/centroid_height"
@@ -128,7 +125,7 @@ level_atl08:
       dtype: "float32"
       description: "Canopy height for each 20m geosegment with each 100m land segment."
       long_name: "canopy height 20m"
-      units: "m"
+      units: "meters"
       is_subsegment: True
       subsegment_length: 5
 
@@ -221,14 +218,14 @@ level_atl08:
       dtype: "int32"
       description: "The number of photons classified as canopy within the segment."
       long_name: "number canopy photons"
-      units: "1"
+      units: "adimensional"
 
     n_toc_photons:
       SDS_Name: "land_segments/canopy/n_toc_photons"
       dtype: "int32"
       description: "The number of photons classified as top of canopy within the segment."
       long_name: "number top of canopy photons"
-      units: "1"
+      units: "adimenisional"
 
     photon_rate_can:
       SDS_Name: "land_segments/canopy/photon_rate_can"
@@ -249,14 +246,14 @@ level_atl08:
       dtype: "int16"
       description: "Average percentage value of the valid (value <= 100) Copernicus fractional cover product for each 100 m segment"
       long_name: "canopy cover percentage"
-      units: "1"
+      units: "adimensional"
 
     subset_can_flag:
       SDS_Name: "land_segments/canopy/subset_can_flag"
       dtype: "int8"
       description: "Quality flag indicating the canopy photons populating the 100 m segment statistics are derived from less than 100 m worth of photons and/or less than 5 20m ATL03 segments."
       long_name: "subset canopy flag"
-      units: "1"
+      units: "adimensional"
       is_subsegment: True
       subsegment_length: 5
 
@@ -272,14 +269,14 @@ level_atl08:
       dtype: "int8"
       description: "Cloud confidence flag from ATL09 that indicates the number of cloud or aerosol layers identified in each 25Hz atmospheric profile. If the flag is greater than 0, aerosols or clouds could be present. Valid range is 0 - 10."
       long_name: "cloud flag atm"
-      units: "1"
+      units: "adimensional"
 
     cloud_fold_flag:
       SDS_Name: "land_segments/cloud_fold_flag"
       dtype: "int8"
       description: "Flag that indicates this profile likely contains cloud signal folded down from above 15 km to the last 2-3 km of the profile. See ATL09 ATBD Table 3.9 for detailed flag value meanings."
       long_name: "cloud folding flag"
-      units: "1"
+      units: "adimensional"
 
     delta_time:
       SDS_Name: "land_segments/delta_time"
@@ -308,7 +305,7 @@ level_atl08:
       dtype: "int8"
       description: "Indicates source of the DEM height. Values: 0=None, 1=Arctic, 2=Global, 3=MSS, 4=Antarctic."
       long_name: "dem source flag"
-      units: "1"
+      units: "adimensional"
 
     dem_h:
       SDS_Name: "land_segments/dem_h"
@@ -322,7 +319,7 @@ level_atl08:
       dtype: "int8"
       description: "Flag indicating more than dem_removal_percent_limit (default 20.0) removed from land segment due to failing DEM-QA tests"
       long_name: "dem removal flag"
-      units: "1"
+      units: "adimensional"
 
     h_dif_ref:
       SDS_Name: "land_segments/h_dif_ref"
@@ -353,7 +350,7 @@ level_atl08:
       dtype: "int8"
       description: "This flag is a combination of multiple flags (cloud_flag_atm, cloud_flag_asr, and bsnow_con) and takes daytime/nighttime into consideration. A value of 1 means clouds or blowing snow are likely present. A value of 0 indicates the likely absence of clouds or blowing snow."
       long_name: "consolidated cloud flag"
-      units: "1"
+      units: "adimensional"
 
     longitude_20m:
       SDS_Name: "land_segments/longitude_20m"
@@ -369,133 +366,133 @@ level_atl08:
       dtype: "int8"
       description: "Multiple Scattering warning flag. The multiple scattering warning flag (ATL09 parameter msw_flag) has values from -1 to 5 where zero means no multiple scattering and 5 the greatest. If no layers were detected, then msw_flag = 0. If blowing snow is detected and its estimated optical depth is greater than or equal to 0.5, then msw_flag = 5. If the blowing snow optical depth is less than 0.5, then msw_flag = 4. If no blowing snow is detected but there are cloud or aerosol layers detected, the msw_flag assumes values of 1 to 3 based on the height of the bottom of the lowest layer: < 1 km, msw_flag = 3; 1-3 km, msw_flag = 2; > 3km, msw_flag = 1. A value of -1 indicates that the signal to noise of the data was too low to reliably ascertain the presence of cloud or blowing snow. We expect values of -1 to occur only during daylight."
       long_name: "multiple scattering warning flag"
-      units: "1"
+      units: "adimensional"
 
     n_seg_ph:
       SDS_Name: "land_segments/n_seg_ph"
       dtype: "int32"
       description: "Number of photons within each land segment."
       long_name: "number of photons"
-      units: "1"
+      units: "adimensional"
 
     night_flag:
       SDS_Name: "land_segments/night_flag"
       dtype: "int32"
       description: "Flag indicating the data were acquired in night conditions: 0=day, 1=night.  Flag is derived from solar elevation at the geolocated segment.  IF solar elevation is above threshold it is day, if not then it is night.  Threshold is set in atlas_l3a_const_mod."
       long_name: "night flag"
-      units: "1"
+      units: "adimensional"
 
     ph_ndx_beg:
       SDS_Name: "land_segments/ph_ndx_beg"
       dtype: "int64"
       description: "Index (1-based) within the photon-rate data (/land_segments/photons) of the first photon within this each land segment."
       long_name: "photon index begin"
-      units: "1"
+      units: "adimensional"
 
     ph_removal_flag:
       SDS_Name: "land_segments/ph_removal_flag"
       dtype: "int8"
       description: "Flag indicating more than ph_removal_percent_limit (default 50.0) removed from land segment due to failing QA tests"
       long_name: "ph removal flag"
-      units: "1"
+      units: "adimensional"
 
     psf_flag:
       SDS_Name: "land_segments/psf_flag"
       dtype: "int8"
       description: "Flag is set to 1 if the point spread function (computed as sigma_atlas_land) has exceeded the threshold (1 m)"
       long_name: "point spread function flag"
-      units: "1"
+      units: "adimensional"
 
     rgt:
       SDS_Name: "land_segments/rgt"
       dtype: "int16"
       description: "The reference ground track (RGT) is the track on the earth at which a specified unit vector within the observatory is pointed. Under nominal operating conditions, there will be no data collected along the RGT, as the RGT is spanned by GT3 and GT4.  During slews or off-pointing, it is possible that ground tracks may intersect the RGT. The ICESat-2 mission has 1387 RGTs."
       long_name: "reference ground track"
-      units: "1"
+      units: "adimensional"
 
     sat_flag:
       SDS_Name: "land_segments/sat_flag"
       dtype: "int8"
       description: "Flag derived from full_sat_fract on the ATL03 data product, averaged over 5 geosegments in 100m land segment"
       long_name: "saturation flag"
-      units: "1"
+      units: "adimensional"
 
     segment_id_beg:
       SDS_Name: "land_segments/segment_id_beg"
       dtype: "int32"
       description: "Geolocation segment number of the first photon in the land segment."
       long_name: "begin geolocation segment bin"
-      units: "1"
+      units: "adimensional"
 
     segment_id_end:
       SDS_Name: "land_segments/segment_id_end"
       dtype: "int32"
       description: "Geolocation segment number of the last photon in the land segment."
       long_name: "end geolocation segment bin"
-      units: "1"
+      units: "adimensional"
 
     segment_landcover:
       SDS_Name: "land_segments/segment_landcover"
       dtype: "int16"
       description: "UN-FAO Land Cover Surface type classification as reference from Copernicus Land Cover(ANC18) at the 100m resolution."
       long_name: "segment landcover"
-      units: "1"
+      units: "adimensional"
 
     segment_snowcover:
       SDS_Name: "land_segments/segment_snowcover"
       dtype: "int8"
       description: "Daily snow/ice cover from ATL09 at the 25 Hz rate(275m) indicating likely presence of snow and ice within each segment. 0=ice free water; 1=snow free land;  2=snow; 3=ice."
       long_name: "segment snowcover"
-      units: "1"
+      units: "adimensional"
 
     segment_watermask:
       SDS_Name: "land_segments/segment_watermask"
       dtype: "int32"
       description: "Water mask(i.e. flag) indicating inland water as referenced from the Global Raster Water Mask(ANC33) at 250 m spatial resolution."
       long_name: "segment watermask"
-      units: "1"
+      units: "adimensional"
 
     sigma_across:
       SDS_Name: "land_segments/sigma_across"
       dtype: "float32"
       description: "Total cross-track uncertainty due to PPD and POD knowledge.  Read from ATL03 product gtx/geolocation/sigma_across. Sigma_atlas_y is reported on ATL08 as the uncertainty of the center-most reference photon of the 100m ATL08 segment."
       long_name: "sigma atlas y"
-      units: "1"
+      units: "meters"
 
     sigma_along:
       SDS_Name: "land_segments/sigma_along"
       dtype: "float32"
       description: "Total along-track uncertainty due to PPD and POD knowledge.  Read from ATL03 product gtx/geolocation/sigma_along. Sigma_atlas_x is reported on ATL08 as the uncertainty of the center-most reference photon of the 100m ATL08 segment."
       long_name: "sigma atlas x"
-      units: "1"
+      units: "meters"
 
     sigma_atlas_land:
       SDS_Name: "land_segments/sigma_atlas_land"
       dtype: "float32"
       description: "Total vertical geolocation error due to ranging and local surface slope.  The parameter is computed for ATL08 as described in equation 1.2."
       long_name: "sigma atlas land"
-      units: "1"
+      units: "meters"
 
     sigma_h:
       SDS_Name: "land_segments/sigma_h"
       dtype: "float32"
       description: "Estimated uncertainty for the reference photon bounce point ellipsoid height: 1- sigma (m) provided at the geolocation segment rate on ATL03.  Sigma_h is reported on ATL08 as the uncertainty of the center-most reference photon of the 100m ATL08 segment."
       long_name: "height uncertainty"
-      units: "1"
+      units: "meters"
 
     sigma_topo:
       SDS_Name: "land_segments/sigma_topo"
       dtype: "float32"
       description: "Total uncertainty that include sigma_h plus geolocation uncertainty due to local slope (equation 1.3).  The local slope is multiplied by the geolocation uncertainty factor. This will be used to determine the total vertical geolocation error due to ranging and local slope."
       long_name: "sigma atlas topo"
-      units: "1"
+      units: "meters"
 
     snr:
       SDS_Name: "land_segments/snr"
       dtype: "float32"
       description: "The signal to noise ratio of geolocated photons as determined by the ratio of the superset of ATL03 signal and DRAGANN found signal photons used for processing the ATL08 segments to the background photons (i.e. noise) within the same ATL08 segments."
       long_name: "signal to noise ratio"
-      units: "1"
+      units: "adimensional"
 
     solar_azimuth:
       SDS_Name: "land_segments/solar_azimuth"
@@ -516,7 +513,7 @@ level_atl08:
       dtype: "int8"
       description: "Flags describing which surface types this interval is associated with. 0=not type, 1=is type. Order of array is land, ocean, sea ice, land ice, inland water."
       long_name: "surface type"
-      units: "1"
+      units: "adimensional"
       is_subsegment: True
       subsegment_length: 5
 
@@ -532,7 +529,7 @@ level_atl08:
       dtype: "float32"
       description: "Best fit terrain height to center of each 20m geosegment within each 100m land segment."
       long_name: "best fit 20m"
-      units: "m"
+      units: "meters"
       is_subsegment: True
       subsegment_length: 5
 
@@ -611,7 +608,7 @@ level_atl08:
       dtype: "int32"
       description: "The number of the photons classified as terrain within the segment."
       long_name: "number of ground photons"
-      units: "1"
+      units: "adimensional"
 
     photon_rate_te:
       SDS_Name: "land_segments/terrain/photon_rate_te"
@@ -625,7 +622,7 @@ level_atl08:
       dtype: "int8"
       description: "Quality flag indicating the terrain photons populating the 100 m segment statistics are derived from less than 100 m worth of photons and/or less than 5 20m ATL03 segments."
       long_name: "subset terrain flag"
-      units: "1"
+      units: "adimensional"
       is_subsegment: True
       subsegment_length: 5
 
@@ -634,21 +631,21 @@ level_atl08:
       dtype: "float32"
       description: "The along-track slope of terrain, within each segment;computed by a linear fit of terrain classified photons. Slope is in units of delta height over delta along track distance."
       long_name: "segment terrain slope"
-      units: "1"
+      units: "meters"
 
     terrain_flg:
       SDS_Name: "land_segments/terrain_flg"
       dtype: "int32"
       description: "Terrain flag quality check to indicate a deviation above a threshold from the reference DEM height reported on the product."
       long_name: "terrain flag"
-      units: "1"
+      units: "adimensional"
 
     urban_flag:
       SDS_Name: "land_segments/urban_flag"
       dtype: "int32"
       description: "The urban flag indicates that a segment is likely located over an urban area."
       long_name: "segment urban flag"
-      units: "1"
+      units: "adimensional"
 
     # additional parameter segment_id, constructed from the delta_time, latitude and longitude. This will be added as a reference information parameter.
     segment_id:

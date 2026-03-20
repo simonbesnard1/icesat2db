@@ -7,7 +7,7 @@ end_date: '2020-12-31'
 tiledb:
   storage_type: 'local'
   local_path: ''     # TileDB URI for storing data
-  overwrite: false                                  # Whether to overwrite existing arrays
+  overwrite: true                                  # Whether to overwrite existing arrays
   # temporal_batching:
   time_range:                                      # Global time range for data
     start_time: "2018-01-01"

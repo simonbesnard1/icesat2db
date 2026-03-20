@@ -8,28 +8,27 @@
 
 import unittest
 
-from gedidb.granule import granule_name
+from icesat2db.granule import granule_name
 
-TEST_V2_NAME = "GEDI02_A_2019268053258_O04446_04_T02132_02_003_01_V002.h5"
-# GEDI02_A_YYYYDDDHHMMSS_O[orbit_number]_[granule_number]_T[track_number]_[PPDS_type]_ [release_number]_[production_version]_V[version_number].h5
+TEST_NAME = "ATL08_20181014001049_0235 01 02 _007_01.h5"
+# ATL08_[year][month][day][hour][minute][second]_[ref_ground_track][cycle_number][segment_number]_[version]_[revision].h5
 
 
 class TestCase(unittest.TestCase):
     def test_parse_name(self):
-        parsed = granule_name.parse_granule_filename(TEST_V2_NAME)
-        self.assertEqual(parsed.product, "GEDI02_A")
-        self.assertEqual(parsed.year, "2019")
-        self.assertEqual(parsed.julian_day, "268")
-        self.assertEqual(parsed.hour, "05")
-        self.assertEqual(parsed.minute, "32")
-        self.assertEqual(parsed.second, "58")
-        self.assertEqual(parsed.orbit, "O04446")
-        self.assertEqual(parsed.sub_orbit_granule, "04")
-        self.assertEqual(parsed.ground_track, "T02132")
-        self.assertEqual(parsed.positioning, "02")
-        self.assertEqual(parsed.release_number, "003")
-        self.assertEqual(parsed.granule_production_version, "01")
-        self.assertEqual(parsed.major_version_number, "V002")
+        parsed = granule_name.parse_granule_filename(TEST_NAME)
+        self.assertEqual(parsed.product, "ATL08")
+        self.assertEqual(parsed.year, "2018")
+        self.assertEqual(parsed.month, "10")
+        self.assertEqual(parsed.day, "14")
+        self.assertEqual(parsed.hour, "00")
+        self.assertEqual(parsed.minute, "10")
+        self.assertEqual(parsed.second, "49")
+        self.assertEqual(parsed.ref_ground_track, "0235")
+        self.assertEqual(parsed.cycle_number, "01")
+        self.assertEqual(parsed.segment_number, "02")
+        self.assertEqual(parsed.version, "007")
+        self.assertEqual(parsed.revision, "01")
 
 
 suite = unittest.TestLoader().loadTestsFromTestCase(TestCase)
