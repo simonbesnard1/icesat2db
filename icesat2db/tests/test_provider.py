@@ -16,10 +16,10 @@ import yaml
 from pandas import DataFrame
 from xarray import Dataset
 
-from gedidb import GEDIDatabase, GEDIProvider
+from icesat2db import IceSat2Database, IceSat2Provider
 
 
-class TestGEDIProvider(unittest.TestCase):
+class TestIceSat2Provider(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -33,13 +33,13 @@ class TestGEDIProvider(unittest.TestCase):
         cls.temp_dir = tempfile.TemporaryDirectory()
         cls.config["tiledb"]["local_path"] = cls.temp_dir.name
 
-        cls.gedi_db = GEDIDatabase(cls.config)
+        cls.gedi_db = IceSat2Database(cls.config)
         cls.gedi_db._create_arrays()  # Create the TileDB array for testing
         # write test data
         granule_data = pd.read_csv("data/example_data.csv")
         cls.gedi_db.write_granule(granule_data)
 
-        cls.gedi_provider = GEDIProvider(
+        cls.gedi_provider = IceSat2Provider(
             storage_type="local", local_path=cls.temp_dir.name
         )
 
