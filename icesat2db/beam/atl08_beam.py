@@ -35,19 +35,25 @@ class ATL08Beam(beam_handler):
         super().__init__(granule, beam, field_mapping)
 
         self._filtered_index: Optional[np.ndarray] = None  # Cache for filtered indices
+
+        # Each lambda reads its HDF5 dataset exactly once, avoiding the double-read
+        # that occurred when the same dataset appeared twice in a boolean expression.
+        def _h_te_uncertainty():
+            v = self["land_segments/terrain/h_te_uncertainty"][()]
+            return (v < 3.402823e23) & (v > -999)
+
+        def _h_te_best_fit():
+            v = self["land_segments/terrain/h_te_best_fit"][()]
+            return (v < 3.402823e23) & (v > -999)
+
+        def _h_te_median():
+            v = self["land_segments/terrain/h_te_median"][()]
+            return (v < 3.402823e23) | (v > -999)
+
         self.DEFAULT_QUALITY_FILTERS = {
-            "h_te_uncertainty": lambda: (
-                (self["land_segments/terrain/h_te_uncertainty"][()] < 3.402823e23)
-                & (self["land_segments/terrain/h_te_uncertainty"][()] > -999)
-            ),
-            "h_te_best_fit": lambda: (
-                (self["land_segments/terrain/h_te_best_fit"][()] < 3.402823e23)
-                & (self["land_segments/terrain/h_te_best_fit"][()] > -999)
-            ),
-            "h_te_median": lambda: (
-                (self["land_segments/terrain/h_te_median"][()] < 3.402823e23)
-                | (self["land_segments/terrain/h_te_median"][()] > -999)
-            ),
+            "h_te_uncertainty": _h_te_uncertainty,
+            "h_te_best_fit": _h_te_best_fit,
+            "h_te_median": _h_te_median,
             "h_canopy": lambda: self["land_segments/canopy/h_canopy"][()] < 3.402823e23,
             "h_canopy_uncertainty": lambda: self[
                 "land_segments/canopy/h_canopy_uncertainty"

@@ -561,49 +561,57 @@ class IceSat2Database:
         backoff=3,
         logger=logger,
     )
-    def _write_to_tiledb(self, coords, data):
+    def _write_to_tiledb(self, coords, data, mark_keys=None):
         """
-        Write data to the TileDB array with retry logic.
+        Write data (and optionally granule-processed metadata) in a single TileDB open.
 
-        Parameters:
+        Combining the data write and the metadata write into one open/close cycle
+        halves TileDB I/O overhead compared to calling write + mark separately.
+
+        Parameters
         ----------
         coords : dict
-            Coordinates for the TileDB array dimensions.
+            Dimension arrays (latitude, longitude, time).
         data : dict
-            Variable data to write to the TileDB array.
+            Attribute arrays.
+        mark_keys : list of str, optional
+            Granule keys to mark as processed in the same transaction.
         """
         cache = self._get_schema_cache()
         with tiledb.open(self.array_uri, mode="w", ctx=self.ctx) as array:
             dims = tuple(coords[name] for name in cache["dim_names"])
             array[dims] = data
+            if mark_keys:
+                ts = pd.Timestamp.utcnow().isoformat()
+                for key in mark_keys:
+                    array.meta[f"granule_{key}_status"] = "processed"
+                    array.meta[f"granule_{key}_processed_date"] = ts
 
-    def write_granule(self, granule_data: pd.DataFrame) -> None:
+    def write_granule(self, granule_data: pd.DataFrame, mark_keys=None) -> None:
         """
-        Write the parsed IceSat2 granule data to the global TileDB arrays,
-        filtering out shots that are outside the spatial domain.
+        Write parsed IceSat2 granule data to TileDB, filtering out-of-domain shots.
 
-        Parameters:
+        Parameters
         ----------
         granule_data : pd.DataFrame
-            DataFrame containing the granule data, with variable names matching the configuration.
+            Granule data with variable names matching the configuration.
+        mark_keys : list of str, optional
+            Granule IDs to mark as processed in the same TileDB open.
+            Pass this to avoid a second open/close just for metadata.
 
-        Raises:
-        -------
+        Raises
+        ------
         ValueError
-            If required dimension data or critical variables are missing.
+            If required dimension columns are missing.
         """
         try:
             granule_data = granule_data.drop_duplicates(
                 subset=["latitude", "longitude", "time"]
             )
 
-            # Validate granule data
             self._validate_granule_data(granule_data)
 
-            # Get spatial domain from cache
             min_lon, max_lon, min_lat, max_lat = self._spatial_bounds
-
-            # Filter out shots outside the TileDB spatial domain
             filtered_data = granule_data[
                 (granule_data["longitude"] >= min_lon)
                 & (granule_data["longitude"] <= max_lon)
@@ -612,16 +620,13 @@ class IceSat2Database:
             ]
 
             if filtered_data.empty:
-                return  # Skip writing if no valid data
+                if mark_keys:
+                    self.mark_granules_as_processed_batch(mark_keys)
+                return
 
-            # Prepare coordinates (dimensions)
             coords = self._prepare_coordinates(filtered_data)
-
-            # Extract data for scalar and profile variables
             data = self._extract_variable_data(filtered_data)
-
-            # Write to the TileDB array
-            self._write_to_tiledb(coords, data)
+            self._write_to_tiledb(coords, data, mark_keys=mark_keys)
 
         except Exception as e:
             logger.error(f"Failed to process and write granule data: {e}")

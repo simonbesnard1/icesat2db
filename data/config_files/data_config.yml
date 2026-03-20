@@ -1,9 +1,9 @@
 # database parameters
 tiledb:
-  storage_type: 's3'
-  s3_bucket: "dog.icesat2db.icesat2-atl008-v007"      # TileDB URI for storing data
-  url: "https://s3.gfz-potsdam.de"
-  overwrite: false                                  # Whether to overwrite existing arrays
+  storage_type: 'local'
+  #s3_bucket: "dog.icesat2db.icesat2-atl008-v007"      # TileDB URI for storing data
+  #url: "https://s3.gfz-potsdam.de"
+  overwrite: true                                  # Whether to overwrite existing arrays
   temporal_batching: "weekly"
   time_range:                                      # Global time range for data
     start_time: "2018-01-01"
@@ -20,6 +20,23 @@ tiledb:
    memory_budget_var: "50000000000"  # 50GB for variable-sized attributes
   cell_order: "hilbert"
   capacity: 100000
+  # -----------------------------------------------------------------------
+  # Compression trade-off
+  # use_filters: false (default) — write-optimised: Zstd(1) only, no pre-
+  #   processors. ~3–4× faster ingest, ~15–20 % larger files.
+  # use_filters: true — full pipeline: ByteShuffle+Zstd for floats,
+  #   BitWidthReduction+Zstd for narrow ints. Best storage efficiency.
+  # Individual Zstd levels can be tuned independently (only take effect
+  # when use_filters: true, except default_zstd_level which sets the fast-
+  # mode level too).
+  # -----------------------------------------------------------------------
+  use_filters: false
+  # default_zstd_level: 1    # fast-mode level for all dtypes (default 1)
+  # float_zstd_level: 4      # full-mode float level  (default 4)
+  # int_zstd_level: 3        # full-mode narrow-int level (default 3)
+  # time_zstd_level: 3       # time dimension level (default 3 full / 1 fast)
+  # timestamp_zstd_level: 2  # timestamp_ns attr level (default 2 full / 1 fast)
+  # spatial_zstd_level: 3    # lat/lon dimension level (default 3 full / 1 fast)
 
 # Data directory for downloading GEDI data
 data_dir: ''

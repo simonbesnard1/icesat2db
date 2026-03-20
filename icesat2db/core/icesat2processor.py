@@ -17,7 +17,7 @@ import time
 import geopandas as gpd
 import pandas as pd
 import yaml
-from dask.distributed import Client
+from dask.distributed import Client, as_completed as dask_as_completed
 import concurrent.futures
 from concurrent.futures import as_completed
 
@@ -398,20 +398,17 @@ class IceSat2Processor:
 
         def _flush_buffers(buffers, processed_ids, timeframe):
             """
-            Concatenate all buffered DataFrames and write in a single TileDB
-            open/close cycle, then mark all granules processed in one more.
+            Concatenate all buffered DataFrames and write everything — data and
+            granule-processed metadata — in a single TileDB open/close cycle.
             """
             if not buffers:
                 return
 
             try:
                 combined = pd.concat(buffers, ignore_index=True)
-                self.database_writer.write_granule(combined)
-
-                # mark processed only after write succeeds
-                if processed_ids:
-                    self.database_writer.mark_granules_as_processed_batch(processed_ids)
-
+                self.database_writer.write_granule(
+                    combined, mark_keys=processed_ids or None
+                )
             except Exception as e:
                 logger.error(
                     f"Write phase failed for timeframe {timeframe}: {e}", exc_info=True
@@ -509,7 +506,7 @@ class IceSat2Processor:
                     os.path.join(self.progress_dir, timeframe), timeframe
                 )
 
-                futures = []
+                future_map = {}
                 for gid, pinf in granules.items():
                     ledger.note_submit(gid)
                     fut = self.parallel_engine.submit(
@@ -519,16 +516,18 @@ class IceSat2Processor:
                         self.data_info,
                         self.download_path,
                     )
-                    futures.append((gid, fut))
+                    future_map[fut] = gid
 
                 buffers = []
                 processed_ids = []
                 counter = 0
 
-                for gid, fut in futures:
+                # as_completed yields each future as it finishes — no serial blocking
+                for fut in dask_as_completed(future_map):
+                    gid = future_map[fut]
                     started_ts = time.time()
                     try:
-                        ids_, gdf, metrics = self.parallel_engine.gather(fut)
+                        ids_, gdf, metrics = fut.result()
                         finished_ts = time.time()
                         ok = ids_ is not None
 
