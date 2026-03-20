@@ -173,7 +173,9 @@ class TileDBFilterPolicy:
         Fast mode : DoubleDelta → Zstd(1)
         Full mode : DoubleDelta → Zstd(timestamp_zstd_level, default 2)
         """
-        lvl = int(self.cfg.get("timestamp_zstd_level", 1 if not self.use_filters else 2))
+        lvl = int(
+            self.cfg.get("timestamp_zstd_level", 1 if not self.use_filters else 2)
+        )
         return tiledb.FilterList(
             [
                 tiledb.DoubleDeltaFilter(),
