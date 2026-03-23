@@ -48,7 +48,7 @@ class ATL08Beam(beam_handler):
 
         def _h_te_median():
             v = self["land_segments/terrain/h_te_median"][()]
-            return (v < 3.402823e23) | (v > -999)
+            return (v < 3.402823e23) & (v > -999)
 
         self.DEFAULT_QUALITY_FILTERS = {
             "h_te_uncertainty": _h_te_uncertainty,
@@ -103,10 +103,8 @@ class ATL08Beam(beam_handler):
         if "land_segments" not in self:
             return None
 
-        # Define IceSat-2 mission start time and calculate actual timestamps
         icesat2_count_start = pd.to_datetime("2018-01-01T00:00:00.000000Z")
         delta_time = self["land_segments/delta_time"][()]
-        # instead of delta_time we can use start_delta_time and end_delta_time for segments as mid point
 
         # Initialize the data dictionary with calculated fields
         land_data = {
