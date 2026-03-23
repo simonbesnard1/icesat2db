@@ -67,7 +67,10 @@ class beam_handler(h5py.Group):
                 logger.warning(
                     f"Filter '{filter_name}' not found in granule. Skipping."
                 )
-                continue  # Skip filters that are missing in the granule
+            except Exception as e:
+                logger.warning(
+                    f"Filter '{filter_name}' raised an unexpected error: {e}. Skipping."
+                )
         return mask
 
     @property
@@ -101,12 +104,13 @@ class beam_handler(h5py.Group):
         return self.field_mapping
 
     @property
-    def main_data(self) -> Dict[str, np.ndarray]:
+    def main_data(self) -> Optional[pd.DataFrame]:
         """
         Retrieve the main data for the beam from the granule file.
 
         Returns:
-            Dict[str, np.ndarray]: A dictionary where keys are variable names and values are NumPy arrays.
+            pd.DataFrame: DataFrame of filtered beam variables, or None if the beam
+            has no valid land segments.
         """
         if self._cached_data is None:
             data = self._get_main_data()  # Fetch main data

@@ -6,11 +6,14 @@
 # SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
 
 
+import logging
 import pathlib
 from typing import Iterable, List, Union
 
 import h5py
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 from icesat2db.beam.Beam import beam_handler
 from icesat2db.granule.granule_name import IceSat2NameMetadata, parse_granule_filename
@@ -42,7 +45,7 @@ class granule_handler(h5py.File):
             self.beam_names = [name for name in self.keys() if name in beams]
             self._is_open = True  # Mark as successfully opened
         except Exception as e:
-            print(f"Error opening granule {file_path}: {e}")
+            logger.error(f"Error opening granule {file_path}: {e}")
             self._is_open = False
 
     def close(self):
@@ -53,7 +56,7 @@ class granule_handler(h5py.File):
                     super().close()
                     self._is_open = False
             except Exception as e:
-                print(f"Error closing granule {self.file_path}: {e}")
+                logger.error(f"Error closing granule {self.file_path}: {e}")
 
     def __del__(self):
         """Ensure the file is closed when the object is deleted."""
@@ -104,7 +107,7 @@ class granule_handler(h5py.File):
 
     @property
     def version_granule(self) -> str:
-        """Get the granule version from the granule metadata."""
+        """Get the granule filename from the HDF5 dataset metadata."""
         return self._get_metadata_attr("fileName")
 
     @property

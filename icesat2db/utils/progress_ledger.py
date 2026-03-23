@@ -6,7 +6,10 @@
 # SPDX-FileCopyrightText: 2025 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
 #
 
-import csv, os, time, html
+import csv
+import html
+import os
+import time
 from dataclasses import dataclass
 from typing import Optional, Dict, List
 from datetime import datetime
@@ -87,7 +90,7 @@ class ProgressLedger:
         eta_min = self.eta_minutes()
         last5 = self._rows[-5:]
         lines = []
-        lines.append(f"# GEDI Processing — {self.timeframe}")
+        lines.append(f"# IceSat-2 Processing — {self.timeframe}")
         lines.append("")
         lines.append(f"- **Granules processed**: {ok+fail}/{total if total else '?'}")
         lines.append(f"- **Success**: {ok}   **Failed**: {fail}")
@@ -124,7 +127,7 @@ class ProgressLedger:
             ]
         )
         doc = f"""<!doctype html><html><head><meta charset="utf-8">
-<title>GEDI report — {html.escape(self.timeframe)}</title>
+<title>IceSat-2 report — {html.escape(self.timeframe)}</title>
 <style>
 body{{font-family:system-ui,Arial,sans-serif; margin:24px;}}
 h1,h2{{margin: 0.2em 0;}}
@@ -135,7 +138,7 @@ th,td{{border:1px solid #ddd;padding:6px 8px;font-size:14px;}}
 .bar{{height:100%;width:{pct:.2f}%;background:#7aa8;}}
 .meta{{color:#555;font-size:14px}}
 </style></head><body>
-<h1>GEDI Granules — {html.escape(self.timeframe)}</h1>
+<h1>IceSat-2 Granules — {html.escape(self.timeframe)}</h1>
 <div class="meta">Last update: {html.escape(datetime.now().isoformat(timespec='seconds'))}</div>
 
 <div class="card">

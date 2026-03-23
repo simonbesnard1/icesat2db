@@ -11,10 +11,10 @@ from enum import Enum
 
 class IceSat2Product(Enum):
     """
-    Enum representing different GEDI data products.
+    Enum representing different IceSat-2 data products.
 
     Attributes:
-        ATL08 (str): Represents the ATL08 product.
+        ATL08 (str): Represents the ATL08 land/vegetation product.
     """
 
     ATL08 = "atl08"
@@ -23,7 +23,7 @@ class IceSat2Product(Enum):
     @classmethod
     def list_products(cls):
         """
-        Get a list of all available GEDI product names.
+        Get a list of all available IceSat-2 product names.
 
         :return: List of product names as strings.
         """
