@@ -437,36 +437,6 @@ class IceSat2Database:
             yield (lat0, lat0 + block_lat, lon0, lon0 + block_lon), dataset.take(idx)
 
     # ---------------------------------------------------------------------- #
-    # Hilbert pre-sort (optional, off by default)
-    # ---------------------------------------------------------------------- #
-
-    @staticmethod
-    def _hilbert_sort_index(lat: np.ndarray, lon: np.ndarray) -> np.ndarray:
-        """
-        Return a sort index that arranges rows in approximate Morton/Hilbert order.
-
-        Enabled by config flag 'hilbert_presort: true'. Worth enabling when:
-        - use_filters=True (Delta/DoubleDelta filters compress better on sorted data)
-        - Read access patterns are spatially localised (improves tile cache hits)
-
-        Off by default because argsort + iloc fancy-index copies the DataFrame,
-        which is a meaningful cost at 10k-100k rows per granule.
-        """
-        lat_n = ((lat + 90.0) / 180.0 * 65535.0).astype(np.uint32)
-        lon_n = ((lon + 180.0) / 360.0 * 65535.0).astype(np.uint32)
-
-        def _spread(x: np.ndarray) -> np.ndarray:
-            x = x & 0x0000FFFF
-            x = (x | (x << 8)) & 0x00FF00FF
-            x = (x | (x << 4)) & 0x0F0F0F0F
-            x = (x | (x << 2)) & 0x33333333
-            x = (x | (x << 1)) & 0x55555555
-            return x
-
-        morton = _spread(lat_n) | (_spread(lon_n) << 1)
-        return np.argsort(morton, kind="stable")
-
-    # ---------------------------------------------------------------------- #
     # Write pipeline
     # ---------------------------------------------------------------------- #
     def _validate_granule_data(self, granule_data: pd.DataFrame) -> None:
