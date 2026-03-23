@@ -1,43 +1,67 @@
 <p align="center">
 <a href="https://github.com/simonbesnard1/icesat2db">
         <img src="https://raw.githubusercontent.com/simonbesnard1/icesat2db/main/doc/_static/logos/icesat2db_logo.png"
-         alt="icesat2db Logo" height="180px" hspace="0px" vspace="30px" align="left">
+         alt="icesat2db Logo" height="180px" hspace="0px" vspace="30px">
 </a>
 </p>
 
-# icesat2db: A toolbox for Ice, Cloud, and land Elevation Satellite 2 (IceSat2) ATL08 data
+# icesat2DB: A toolbox for Ice, Cloud, and land Elevation Satellite 2 (ICESat-2) ATL08 data
 
 [![Pipelines](https://github.com/simonbesnard1/icesat2db/actions/workflows/ci.yaml/badge.svg)](https://github.com/simonbesnard1/icesat2db/actions?query=workflow%3ACI)
 [![Code coverage](https://codecov.io/gh/simonbesnard1/icesat2db/branch/main/graph/badge.svg?flag=unittests)](https://codecov.io/gh/simonbesnard1/icesat2db)
 [![Docs](https://readthedocs.org/projects/icesat2db/badge/?version=latest)](https://icesat2db.readthedocs.io/en/latest/)
-<!--- [![Available on PyPI](https://img.shields.io/pypi/v/gedidb.svg)](https://pypi.python.org/pypi/gedidb/) --->
-<!--- [![PyPI Downloads](https://static.pepy.tech/badge/gedidb)](https://pepy.tech/projects/gedidb) --->
-<!--- [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13885229.svg)](https://doi.org/10.5281/zenodo.13885228) --->
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-**icesat2db** is an open-source Python package designed to streamline the processing, analysis, and management of IceSat2 ATL08 data. This toolbox enables efficient and flexible data querying and management of large IceSat2 datasets stored with [TileDB](https://tiledb.com/), a high-performance, multi-dimensional array database.
+**icesat2DB** is an open-source Python package designed to streamline the processing, analysis, and management of ICESat-2 ATL08 data. This toolbox enables efficient and flexible data querying and management of large ICESat-2 datasets stored with [TileDB](https://tiledb.com/), a high-performance, multi-dimensional array database.
 
-**icesat2db** integrates key functionalities such as structured data querying, multi-dimensional data processing, and metadata management. With built-in support for parallel engines (e.g. Dask), the toolbox ensures scalability for large datasets, allowing efficient parallel processing on local machines or clusters.
+**icesat2DB** integrates key functionalities such as structured data querying, multi-dimensional data processing, and metadata management. With built-in support for parallel engines (e.g. Dask), the toolbox ensures scalability for large datasets, allowing efficient parallel processing on local machines or clusters.
 
-## Key Features of icesat2db
+## Key Features of icesat2DB
 
-- **TileDB-Based Storage**: IceSat2 data is stored and managed in TileDB arrays, providing efficient, scalable, multi-dimensional data storage, enabling fast and flexible access to large volumes of data.
-- **Flexible Data Querying**: Easily query IceSat2 data across spatial, temporal, and variable dimensions. Access data within bounding boxes, or retrieve the nearest shots to a specific location, using intuitive filtering options for precision.
-- **Parallel Processing**: Process large IceSat2 datasets in parallel, enabling concurrent downloading, processing, and TileDB insertion of IceSat2 products. The number of concurrent processes can be easily controlled based on available system resources.
+- **TileDB-Based Storage**: ICESat-2 data is stored and managed in TileDB arrays, providing efficient, scalable, multi-dimensional data storage, enabling fast and flexible access to large volumes of data.
+- **Flexible Data Querying**: Easily query ICESat-2 data across spatial, temporal, and variable dimensions. Access data within bounding boxes, or retrieve the nearest shots to a specific location, using intuitive filtering options for precision.
+- **Parallel Processing**: Process large ICESat-2 datasets in parallel, enabling concurrent downloading, processing, and TileDB insertion of ICESat-2 products. The number of concurrent processes can be easily controlled based on available system resources.
 - **Metadata-Driven**: Maintain and manage metadata for each dataset, ensuring that important contextual information like units, descriptions, and source details are stored and accessible.
-- **Geospatial Data Management**: Integrate seamlessly with tileDB to enable spatial queries, transformations, and geospatial analyses.
+- **Geospatial Data Management**: Integrate seamlessly with TileDB to enable spatial queries, transformations, and geospatial analyses.
 
-## Why icesat2db?
-**icesat2db** simplifies and automates the workflow for IceSat2 data processing, making it easier to retrieve, filter, and analyze complex datasets in an efficient, scalable manner. Whether you're investigating biomass distribution, monitoring forest dynamics, or conducting large-scale ecological studies, **icesat2db** supports users with tools to handle and analyze large IceSat2 datasets with ease.
+## Why icesat2DB?
+**icesat2DB** simplifies and automates the workflow for ICESat-2 data processing, making it easier to retrieve, filter, and analyze complex datasets in an efficient, scalable manner. Whether you're investigating biomass distribution, monitoring forest dynamics, or conducting large-scale ecological studies, **icesat2DB** supports users with tools to handle and analyze large ICESat-2 datasets with ease.
+
+## Installation
+
+Install the latest release from PyPI:
+
+```bash
+pip install icesat2db
+```
+
+Or install from source:
+
+```bash
+git clone https://github.com/simonbesnard1/icesat2db.git
+cd icesat2db
+pip install -e .
+```
+
+For optional dependencies (visualization, I/O, etc.):
+
+```bash
+pip install "icesat2db[viz]"   # matplotlib, cartopy, plotly, ...
+pip install "icesat2db[io]"    # zarr, rasterio, fsspec, ...
+```
+
+Requires Python >= 3.10.
+
+See the [examples/](https://github.com/simonbesnard1/icesat2db/tree/main/examples) folder for full notebooks on authentication, data processing, and building a regional TileDB database.
 
 ## Documentation
 
-Learn more about icesat2db in its official documentation at
+Learn more about icesat2DB in its official documentation at
 <https://icesat2db.readthedocs.io/en/latest/>.
 
 ## Contributing
 
-You can find information about contributing to icesat2db on our
+You can find information about contributing to icesat2DB on our
 [Contributing page](https://icesat2db.readthedocs.io/en/latest/user/contributing.html).
 
 ## About the authors
@@ -56,10 +80,10 @@ For any questions or inquiries, please contact:
 - Felix Dombrowski (felixd@gfz.de)
 - Mikhail Urbazaev (urbazaev@gfz.de)
 - Simon Besnard (besnard@gfz.de)
-- Amelia Holcomb (ah2174@cam.ac.uk)
+- Amelia Holcomb (amelia.holcomb@gmail.com)
 
 ## Acknowledgments
-The development of gediDB was supported by the European Union through the [FORWARDS](https://forwards-project.eu/) and [NextGenCarbon](https://www.nextgencarbon-project.eu/) projects, and by the Helmholtz Association via the Helmholtz Foundation Model Initiative ([3D-ABC project](https://www.3d-abc.ai/)). Amelia Holcomb acknowledges funding from the Harding Distinguished Postgraduate Scholarship.
+The development of icesat2DB was supported by the European Union through the [FORWARDS](https://forwards-project.eu/) and [NextGenCarbon](https://www.nextgencarbon-project.eu/) projects, and by the Helmholtz Association via the Helmholtz Foundation Model Initiative ([3D-ABC project](https://www.3d-abc.ai/)). Amelia Holcomb acknowledges funding from the Harding Distinguished Postgraduate Scholarship.
 
 ## License
 This project is licensed under the EUROPEAN UNION PUBLIC LICENCE v.1.2 License - see the LICENSE file for details.

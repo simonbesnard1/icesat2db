@@ -9,15 +9,16 @@ requires = [
 [project]
 name = "icesat2db"
 dynamic = ["version"]
-description = "A toolbox to download, process, store and visualise Global Ecosystem Dynamics Investigation (GEDI) L2A-B and L4A-C data"
+description = "icesat2db: A toolbox for Ice, Cloud, and land Elevation Satellite 2 (ICESat-2) ATL08 data"
 readme = "README.md"
 authors = [
+    { name = "Felix Dombrowski", email = "felixd@gfz.de" },
+    { name = "Mikhail Urbazaev", email = "urbazaev@gfz.de" },
     { name = "Simon Besnard", email = "besnard@gfz.de" },
-    { name = "Felix Dombrowski", email = "felix.dombrowski@uni-potsdam.de" },
     { name = "Amelia Holcomb", email = "amelia.holcomb@gmail.com" }
 ]
 license = { file = "LICENSE" }
-keywords = ["geospatial", "GEDI", "database"]
+keywords = ["geospatial", "ICESat-2", "database"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -67,7 +68,7 @@ dev = [
     "pytest-xdist",
     "pytest-timeout",
     "ruff",
-    "gedidb[complete]",
+    "icesat2db[complete]",
     "black",
     "isort"
 ]
