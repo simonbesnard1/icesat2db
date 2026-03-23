@@ -111,6 +111,9 @@ class beam_handler(h5py.Group):
         if self._cached_data is None:
             data = self._get_main_data()  # Fetch main data
 
+            if data is None:
+                return None
+
             # Flatten multi-dimensional profile data
             flattened_data = {}
             for key, value in data.items():

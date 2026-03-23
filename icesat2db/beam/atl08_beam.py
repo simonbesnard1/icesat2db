@@ -98,6 +98,11 @@ class ATL08Beam(beam_handler):
         Returns:
             Optional[Dict[str, np.ndarray]]: The filtered data as a dictionary or None if no data is present.
         """
+        # Some beams exist as HDF5 groups but have no land_segments subgroup
+        # (no valid land observations on that pass) — skip them silently.
+        if "land_segments" not in self:
+            return None
+
         # Define IceSat-2 mission start time and calculate actual timestamps
         icesat2_count_start = pd.to_datetime("2018-01-01T00:00:00.000000Z")
         delta_time = self["land_segments/delta_time"][()]
