@@ -320,7 +320,9 @@ class TileDBProvider:
         use_polygon_filter: bool = False,
         quantization_factor: float = 1e6,
         **filters: Dict[str, str],
-    ) -> Tuple[Optional[Dict[str, np.ndarray]], Dict[str, List[str]], Dict[str, List[str]]]:
+    ) -> Tuple[
+        Optional[Dict[str, np.ndarray]], Dict[str, List[str]], Dict[str, List[str]]
+    ]:
         """
         Execute a query on a TileDB array with spatial, temporal, and additional filters.
         """

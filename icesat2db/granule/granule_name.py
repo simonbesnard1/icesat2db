@@ -61,7 +61,7 @@ IceSat2_FILENAME_PATTERN = re.compile(
         r"(?P<segment_number>\d{2})_"  # Segment / region number (01–14)
         r"(?P<version>\d{3})_"  # Product version number (3 digits)
         r"(?P<revision>\d{2})"  # Product revision number (2 digits)
-        r"(\.h5)?$"             # Optional .h5 extension
+        r"(\.h5)?$"  # Optional .h5 extension
     )
 )
 
