@@ -7,7 +7,6 @@
 # SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
 
 
-
 import logging
 from typing import Callable, Dict, Optional
 
