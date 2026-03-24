@@ -293,7 +293,9 @@ class H5FileDownloader:
             r.raise_for_status()
         except requests.exceptions.HTTPError as e:
             if e.response is not None and e.response.status_code == 401:
-                logger.error("Unauthorized: check your credentials or authentication token.")
+                logger.error(
+                    "Unauthorized: check your credentials or authentication token."
+                )
                 raise RuntimeError("401 Unauthorized, can not access the file.") from e
 
         cr = r.headers.get("Content-Range")
