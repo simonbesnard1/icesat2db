@@ -48,14 +48,14 @@ class TestDataConfig(unittest.TestCase):
         self.assertIsInstance(earth_data["CMR_PRODUCT_IDS"], dict)
 
     def test_level_atl08_variables(self):
-        """Verify structure and content of level_2a variables"""
+        """Verify structure and content of level_atl08 variables"""
         level_atl08 = self.config.get("level_atl08")
         self.assertIsNotNone(level_atl08, "'level_atl08' section is missing")
         variables = level_atl08.get("variables")
         self.assertIsNotNone(variables, "'variables' under level_atl08 is missing")
         self.assertIsInstance(variables, dict)
-        self.assertIn("shot_number", variables, "'shot_number' variable is missing")
-        shot_number = variables["shot_number"]
+        self.assertIn("segment_id", variables, "'segment_id' variable is missing")
+        shot_number = variables["segment_id"]
         # self.assertEqual(
         #     shot_number.get("dtype"),
         #     "uint64",

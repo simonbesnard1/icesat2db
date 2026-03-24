@@ -10,7 +10,7 @@ import unittest
 
 from icesat2db.granule import granule_name
 
-TEST_NAME = "ATL08_20181014001049_0235 01 02 _007_01.h5"
+TEST_NAME = "ATL08_20181014001049_02350102_007_01.h5"
 # ATL08_[year][month][day][hour][minute][second]_[ref_ground_track][cycle_number][segment_number]_[version]_[revision].h5
 
 

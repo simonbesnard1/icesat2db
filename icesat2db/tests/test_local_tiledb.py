@@ -73,7 +73,7 @@ class TestIceSat2Database(unittest.TestCase):
                 "The 'time' dimension is missing from the TileDB schema.",
             )
 
-            self.assertEqual(lat_dim.domain, (90.0, 90.0), "Latitude range mismatch")
+            self.assertEqual(lat_dim.domain, (-90.0, 90.0), "Latitude range mismatch")
             self.assertEqual(
                 lon_dim.domain, (-180.0, 180.0), "Longitude range mismatch"
             )
