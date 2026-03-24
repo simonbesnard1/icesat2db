@@ -288,8 +288,13 @@ class H5FileDownloader:
         downloaded_size = temp_path.stat().st_size if temp_path.exists() else 0
         total_size: Optional[int] = None
 
-        r = session.get(url, headers={"Range": "bytes=0-1"}, timeout=30)
-        r.raise_for_status()
+        try:
+            r = session.get(url, headers={"Range": "bytes=0-1"}, timeout=30)
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 401:
+                logger.error("Unauthorized: check your credentials or authentication token.")
+                raise RuntimeError("401 Unauthorized, can not access the file.") from e
 
         cr = r.headers.get("Content-Range")
         if cr:

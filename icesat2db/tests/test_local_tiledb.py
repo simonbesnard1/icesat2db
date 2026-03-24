@@ -90,9 +90,9 @@ class TestIceSat2Database(unittest.TestCase):
 
             # Check for expected attributes
             expected_attributes = [
-                "shot_number",
-                "beam_type",
-                "degrade_flag",
+                "delta_time",
+                "segment_id",
+                "canopy_h_metrics_16",
             ]  # Example attributes in the array
 
             for attr in expected_attributes:
@@ -133,37 +133,21 @@ class TestIceSat2Database(unittest.TestCase):
         with tiledb.open(
             self.icesat2_db.array_uri, mode="r", ctx=self.icesat2_db.ctx
         ) as array:
-            shot_number = array.query(attrs=("shot_number",)).multi_index[:, :, :]
-            beam_type = array.query(attrs=("beam_type",)).multi_index[:, :, :]
-            beam_name = array.query(attrs=("beam_name",)).multi_index[:, :, :]
-
-            print((shot_number["shot_number"]))
+            segment_id = array.query(attrs=("segment_id",)).multi_index[:, :, :]
 
             self.assertTrue(
                 np.array_equal(
-                    shot_number["shot_number"],
+                    segment_id["segment_id"],
                     [
-                        84480000200057734,
-                        84480000200057402,
-                        84480000200057755,
-                        84480000200057754,
-                        84480000200057753,
+                        5383848881708766,
+                        5383840291774169,
+                        5383840291774164,
+                        5383840291774364,
+                        5383840291774354,
+                        5383840291774324,
                     ],
                 ),
-                "Shot number mismatch",
-            )
-            self.assertTrue(
-                np.array_equal(
-                    beam_name["beam_name"],
-                    [
-                        "/BEAM0000",
-                        "/BEAM0000",
-                        "/BEAM0000",
-                        "/BEAM0000",
-                        "/BEAM0000",
-                    ],
-                ),
-                "Beam name mismatch",
+                "Segment_id mismatch",
             )
 
 

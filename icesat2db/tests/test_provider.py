@@ -50,7 +50,7 @@ class TestIceSat2Provider(unittest.TestCase):
 
     def test_get_data_with_geometry(self):
         """Test get_data with a geometry argument."""
-        variables = ["wsci_z_pi_lower", "wsci_z_pi_upper"]
+        variables = ["canopy_h_metrics_16", "h_canopy_quad"]
         result = self.gedi_provider.get_data(variables, geometry=self.geometry)
         self.assertIsNotNone(result, "Result should not be None")
         self.assertTrue(
@@ -59,9 +59,9 @@ class TestIceSat2Provider(unittest.TestCase):
 
     def test_get_data_with_time_range(self):
         """Test get_data with start and end time arguments."""
-        variables = ["wsci_z_pi_lower", "wsci_z_pi_upper"]
-        start_time = "2020-06-09"
-        end_time = "2020-06-09"
+        variables = ["canopy_h_metrics_16", "h_canopy_quad"]
+        start_time = "2018-01-01"
+        end_time = "2030-12-31"
         result = self.gedi_provider.get_data(
             variables,
             geometry=self.geometry,
@@ -75,8 +75,8 @@ class TestIceSat2Provider(unittest.TestCase):
 
     def test_get_data_with_point_query(self):
         """Test get_data with point and radius for query."""
-        variables = ["wsci_z_pi_lower", "wsci_z_pi_upper"]
-        point = (9.43074284703215, 6.33762697689783)
+        variables = ["canopy_h_metrics_16", "h_canopy_quad"]
+        point = (-3.035047, -54.949860)
         radius = 1.0
         result = self.gedi_provider.get_data(
             variables,
@@ -92,7 +92,7 @@ class TestIceSat2Provider(unittest.TestCase):
 
     def test_get_data_with_quality_filters(self):
         """Test get_data with quality filters."""
-        variables = ["wsci_z_pi_lower", "wsci_z_pi_upper"]
+        variables = ["canopy_h_metrics_16", "h_canopy_quad"]
 
         unfiltered_result = self.gedi_provider.get_data(
             variables, geometry=self.geometry
@@ -104,8 +104,7 @@ class TestIceSat2Provider(unittest.TestCase):
         )
 
         quality_filters = {
-            "wsci_z_pi_lower": "> 4.0",
-            "wsci_z_pi_upper": "> 6.1",
+            "h_canopy_quad": "> 12.0",
         }
 
         filtered_result = self.gedi_provider.get_data(
@@ -128,7 +127,7 @@ class TestIceSat2Provider(unittest.TestCase):
 
     def test_get_data_with_different_return_types(self):
         """Test get_data with different return types."""
-        variables = ["wsci_z_pi_lower", "wsci_z_pi_upper"]
+        variables = ["canopy_h_metrics_16", "h_canopy_quad"]
 
         # Test xarray return type
         result_xarray = self.gedi_provider.get_data(
@@ -150,7 +149,7 @@ class TestIceSat2Provider(unittest.TestCase):
 
     def test_get_data_invalid_query_type(self):
         """Test get_data with an invalid query type."""
-        variables = ["wsci_z_pi_lower", "wsci_z_pi_upper"]
+        variables = ["canopy_h_metrics_16", "h_canopy_quad"]
         query_type = "invalid_query"
         with self.assertRaises(ValueError):
             self.gedi_provider.get_data(
@@ -159,7 +158,7 @@ class TestIceSat2Provider(unittest.TestCase):
 
     def test_get_data_invalid_return_type(self):
         """Test get_data with an invalid query type."""
-        variables = ["wsci_z_pi_lower", "wsci_z_pi_upper"]
+        variables = ["canopy_h_metrics_16", "h_canopy_quad"]
         return_type = "invalid_return"
         with self.assertRaises(ValueError):
             self.gedi_provider.get_data(

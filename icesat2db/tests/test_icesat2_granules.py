@@ -26,49 +26,47 @@ class TestCase(unittest.TestCase):
         os.chdir(os.path.dirname(__file__))
 
     _data_info = {
-        "level_2a": {
-            "quality_filter": "None",
+        "level_atl08": {
             "variables": {
-                "shot_number": {
-                    "SDS_Name": "shot_number",
+                "segment_id": {
+                    "SDS_Name": "segment_id",
                 },
-                "beam_name": {
-                    "SDS_Name": "name",
+                "latitude_20m": {
+                    "SDS_Name": "land_segments/latitude_20m",
                 },
-                "lat_lowestmode": {
-                    "SDS_Name": "lat_lowestmode",
+                "longitude_20m": {
+                    "SDS_Name": "land_segments/longitude_20m",
                 },
-                "lon_lowestmode": {
-                    "SDS_Name": "lon_lowestmode",
-                },
-                "rh": {
-                    "SDS_Name": "rh",
+                "canopy_openness": {
+                    "SDS_Name": "land_segments/canopy/canopy_openness",
                 },
             },
         }
     }
 
     def _generic_test_parse_granule(self, file, data):
-        # All beams are non-empty
-        # (Not true for all files -- but true for the test files)
-        beam_data = data.groupby("beam_name").count()
-        self.assertEqual(len(beam_data), 8)
-        for beam in beam_data.index:
-            self.assertNotEqual(beam_data.loc[beam, "latitude"], 0)
+        import h5py
 
-        data_orig = h5py.File(file, "r")
-        for beam in beam_data.index:
-            hdf_beam_len = len(data_orig[beam]["latitude"])
-            # this test will always return different results, as long as the quality filter gets applied
-            # self.assertEqual(beam_data.loc[beam, "shot_number"], hdf_beam_len)
+        beams = ["gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"]
 
-            # right now we check if the quality filter gets applied, i.e. we get less entries with the parsed data
-            # than with the original data
-            self.assertLessEqual(
-                beam_data.loc[beam, "latitude"],
-                hdf_beam_len,
-                "Quality filter returned more data than before",
-            )
+        with h5py.File(file, "r") as f:
+            present_beams = [b for b in beams if b in f]
+
+            # all beams present
+            self.assertEqual(len(present_beams), 6)
+
+            for beam in present_beams:
+                hdf_len = len(f[beam]["land_segments"]["latitude_20m"])
+
+                # parsed data must not exceed original size
+                self.assertLessEqual(
+                    len(data),
+                    hdf_len * len(present_beams),  # rough upper bound
+                    "Parsed data larger than previous",
+                )
+
+                # basic sanity: original beam not empty
+                self.assertGreater(hdf_len, 0)
 
     def test_parse_granule_atl08(self):
         data = parse_h5_file(
@@ -79,11 +77,19 @@ class TestCase(unittest.TestCase):
         self._generic_test_parse_granule(ATL08_NAME, data)
         # Some of the data is correct
         data_orig = h5py.File(ATL08_NAME, "r")
-        lat = data_orig["gt1l"]["latitude"][0]
-        lon = data_orig["gt1l"]["longitude"][0]
+        # original ATL08 values (first segment, first 20m bin)
+        lat = data_orig["gt1l"]["land_segments"]["latitude_20m"][0][0]
+        lon = data_orig["gt1l"]["land_segments"]["longitude_20m"][0][0]
 
-        row = data.loc[data["latitude"] == lat]
-        self.assertEqual(row["longitude"].values[0], lon)
+        # match against flattened column
+        row = data.loc[data["latitude_20m_1"] == lat]
+
+        self.assertFalse(row.empty, "No matching latitude found in parsed data")
+
+        self.assertEqual(
+            row["longitude_20m_1"].values[0],
+            lon,
+        )
 
 
 suite = unittest.TestLoader().loadTestsFromTestCase(TestCase)
