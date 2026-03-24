@@ -94,7 +94,7 @@ class IceSat2Provider(TileDBProvider):
         start_time: Optional[np.datetime64] = None,
         end_time: Optional[np.datetime64] = None,
         **quality_filters,
-    ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+    ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         """
         Retrieve data for the nearest IceSat2 shots around a specified reference point, within a given radius.
 
@@ -155,7 +155,7 @@ class IceSat2Provider(TileDBProvider):
 
         if not scalar_data_subset:
             logger.info("No points found in the bounding box.")
-            return {}, {}
+            return {}, {}, {}
 
         longitudes, latitudes = (
             scalar_data_subset["longitude"],
@@ -165,7 +165,7 @@ class IceSat2Provider(TileDBProvider):
             logger.warning(
                 "No points found within the bounding box for nearest shot query."
             )
-            return {}, {}
+            return {}, {}, {}
 
         # Efficient KD-tree search
         tree = cKDTree(np.column_stack((longitudes, latitudes)))
@@ -375,6 +375,7 @@ class IceSat2Provider(TileDBProvider):
                 end_time,
                 **quality_filters,
             )
+
         elif query_type == "bounding_box":
             scalar_data, profile_vars, subsegment_vars = self.query_data(
                 variables,

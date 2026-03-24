@@ -76,7 +76,7 @@ class TestIceSat2Provider(unittest.TestCase):
     def test_get_data_with_point_query(self):
         """Test get_data with point and radius for query."""
         variables = ["canopy_h_metrics_16", "h_canopy_quad"]
-        point = (-3.035047, -54.949860)
+        point = (-54.949859619140625, -3.0350465774536133)
         radius = 1.0
         result = self.gedi_provider.get_data(
             variables,
