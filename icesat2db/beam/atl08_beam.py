@@ -40,29 +40,33 @@ class ATL08Beam(beam_handler):
         # that occurred when the same dataset appeared twice in a boolean expression.
         def _h_te_uncertainty():
             v = self["land_segments/terrain/h_te_uncertainty"][()]
-            return (v < 3.402823e23) & (v > -999)
+            return (v < 3.4028235e38) | (v > -999)
 
         def _h_te_best_fit():
             v = self["land_segments/terrain/h_te_best_fit"][()]
-            return (v < 3.402823e23) & (v > -999)
+            return (v < 3.4028235e38) | (v > -999)
 
         def _h_te_median():
             v = self["land_segments/terrain/h_te_median"][()]
-            return (v < 3.402823e23) & (v > -999)
+            return (v < 3.4028235e38) | (v > -999)
 
         self.DEFAULT_QUALITY_FILTERS = {
             "h_te_uncertainty": _h_te_uncertainty,
             "h_te_best_fit": _h_te_best_fit,
             "h_te_median": _h_te_median,
-            "h_canopy": lambda: self["land_segments/canopy/h_canopy"][()] < 3.402823e23,
+            "h_canopy": lambda: self["land_segments/canopy/h_canopy"][()]
+            < 3.4028235e38,
             "h_canopy_uncertainty": lambda: self[
                 "land_segments/canopy/h_canopy_uncertainty"
             ][()]
-            < 3.402823e23,
+            < 3.4028235e38,
             "urban_flag": lambda: self["land_segments/urban_flag"][()] == 0,
             "segment_watermask": lambda: self["land_segments/segment_watermask"][()]
             == 0,
         }
+
+        # Fields where invalid values are replaced with NaN rather than dropping the segment.
+        self.FILL_TO_NAN_FIELDS = ["h_te_best_fit_20m", "h_canopy_20m"]
 
     def construct_segment_id(self) -> np.ndarray:
         """
@@ -119,6 +123,16 @@ class ATL08Beam(beam_handler):
             sds_name = source["SDS_Name"]
             if "land_segments" in sds_name:
                 land_data[key] = np.array(self[sds_name][()])
+
+        # Replace fill/invalid values with NaN for sub-segment fields — keeps the
+        # parent segment but marks individual 20m values that failed the validity
+        # check (v >= 3.4028235e38 or v <= -999) as missing.
+        _FILL = np.float32(3.4028235e38)
+        for field in self.FILL_TO_NAN_FIELDS:
+            if field in land_data:
+                v = land_data[field].astype(np.float32)
+                v[(v >= _FILL) | (v <= np.float32(-999))] = np.nan
+                land_data[field] = v
 
         # Apply quality filters and store filtered index
         self._filtered_index = self.apply_filter(
