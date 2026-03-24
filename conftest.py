@@ -35,12 +35,12 @@ def add_standard_imports(doctest_namespace, tmpdir):
     import numpy as np
     import pandas as pd
 
-    import gedidb as gdb
+    import icesat2db as isdb
 
     # Add commonly used modules to the doctest namespace
     doctest_namespace["np"] = np
     doctest_namespace["pd"] = pd
-    doctest_namespace["gdb"] = gdb
+    doctest_namespace["isdb"] = isdb
 
     # Seed numpy.random for deterministic examples
     np.random.seed(0)
