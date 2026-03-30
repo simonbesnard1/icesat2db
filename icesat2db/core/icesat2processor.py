@@ -399,17 +399,19 @@ class IceSat2Processor:
 
         def _flush_buffers(buffers, processed_ids, timeframe):
             """
-            Concatenate all buffered DataFrames and write everything — data and
-            granule-processed metadata — in a single TileDB open/close cycle.
+            Concatenate buffered DataFrames, split into spatial tiles, and write
+            one TileDB fragment per tile so consolidation preserves tile boundaries.
+            Granules are marked processed only after all tiles succeed.
             """
             if not buffers:
                 return
 
             try:
                 combined = pd.concat(buffers, ignore_index=True)
-                self.database_writer.write_granule(
-                    combined, mark_keys=processed_ids or None
-                )
+                for _, tile_df in self.database_writer.spatial_chunking(combined):
+                    self.database_writer.write_granule(tile_df)
+                if processed_ids:
+                    self.database_writer.mark_granules_as_processed_batch(processed_ids)
             except Exception as e:
                 logger.error(
                     f"Write phase failed for timeframe {timeframe}: {e}", exc_info=True
