@@ -21,6 +21,7 @@ Welcome to the **icesat2db User Guide**! This guide provides an overview of the 
    :maxdepth: 1
 
    fundamentals
+   tiledb_database   
 
 .. toctree::
    :caption: Advanced Usage

@@ -10,6 +10,7 @@ icesat2db Documentation
 
    Installation <user/installing>
    User Guide <user/index>
+   IceSat2 Global Database <user/tiledb_database>
    API Reference <user/api>
    Examples <auto_examples/index>
    Discussions <https://github.com/simonbesnard1/icesat2db/discussions>
