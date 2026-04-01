@@ -36,13 +36,13 @@ If you are reporting a bug, please include:
 Fix Bugs
 ~~~~~~~~
 
-Look through the GitLab issues for bugs. Anything tagged with "bug" and "help
+Look through the GitHub issues for bugs. Anything tagged with "bug" and "help
 wanted" is open to whoever wants to implement it.
 
 Implement Features
 ~~~~~~~~~~~~~~~~~~
 
-Look through the GitLab issues for features. Anything tagged with "enhancement"
+Look through the GitHub issues for features. Anything tagged with "enhancement"
 and "help wanted" is open to whoever wants to implement it.
 
 Write Documentation
@@ -72,7 +72,7 @@ Commit Changes
 How to
 ~~~~~~
 
-1. Fork the `icesat2db` repo on GitLab.
+1. Fork the `icesat2db` repo on GitHub.
 2. Clone your fork locally::
 
     $ git clone git@github.com:simonbesnard1/icesat2db.git
@@ -99,13 +99,13 @@ How to
 
    To get flake8 and tox, just pip install them into your virtualenv.
 
-6. Commit your changes and push your branch to GitLab::
+6. Commit your changes and push your branch to GitHub::
 
     $ git add .
     $ git commit -m "Your detailed description of your changes."
     $ git push origin name-of-your-bugfix-or-feature
 
-7. Submit a merge request through the GitLab website.
+7. Submit a pull request through the GitHub website.
 
 Sign your commits
 ~~~~~~~~~~~~~~~~~
@@ -117,16 +117,16 @@ If you are using the PyCharm IDE, the `Commit changes` dialog has an option call
 automatically sign your work.
 
 
-Merge Request Guidelines
-------------------------
+Pull Request Guidelines
+-----------------------
 
 Before you submit a pull request, check that it meets these guidelines:
 
-1. The merge request should include tests.
-2. If the merge request adds functionality, the docs should be updated. Put
+1. The pull request should include tests.
+2. If the pull request adds functionality, the docs should be updated. Put
    your new functionality into a function with a docstring, and add the
    feature to the list in README.rst.
-3. The pull request should work for Python 3.6, 3.7, 3.8 and 3.9. Check
+3. The pull request should work for Python 3.10 and later. Check
    https://github.com/simonbesnard1/icesat2db/pulls
    and make sure that the tests pass for all supported Python versions.
 

@@ -12,9 +12,9 @@ Overview of IceSat2Processor workflow
 The :py:class:`icesat2db.IceSat2Processor` class handles the following tasks:
 
 - **Initialization**: Sets up paths, configurations, and database connections.
-- **Granule downloading**: Automatically downloads `.h5` granule files for multiple IceSat2 products (L2A, L2B, L4A, and L4C).
-- **Data processing**: Applies quality filtering, merges products, and prepares data for storage.
-- **Database writing**: Stores processed data in a tileSB array with proper metadata for easy querying.
+- **Granule downloading**: Automatically downloads `.h5` granule files for the IceSat2 ATL08 product.
+- **Data processing**: Applies quality filtering and prepares data for storage.
+- **Database writing**: Stores processed data in a TileDB array with proper metadata for easy querying.
 
 Example usage
 -------------
@@ -37,7 +37,7 @@ Below is a quick example of using the :py:class:`icesat2db.IceSat2Processor` in 
        geometry=geometry,
        start_date='2020-01-01',
        end_date='2020-12-31',   
-       earth_data_dir= ''/path/to/earthdata_credential_folder',
+       earth_data_dir='/path/to/earthdata_credential_folder',
        parallel_engine=concurrent_engine, 
    ) as processor:
        processor.compute(consolidate=True)
@@ -58,7 +58,7 @@ The :py:class:`compute()` method of :py:class:`icesat2db.IceSat2Processor` initi
 
    The granule downloading process consists of two main components:
 
-   - **CMR Data Querying**: The :py:class:`icesat2db.CMRDataDownloader` class queries NASA's CMR service for IceSat2 granules within the specified spatial and temporal bounds. It retrieves granule metadata and ensures that all required products (L2A, L2B, L4A, L4C) are consistently available for each granule ID. A retry mechanism is implemented to handle inconsistencies across products.
+   - **CMR Data Querying**: The :py:class:`icesat2db.CMRDataDownloader` class queries NASA's CMR service for IceSat2 ATL08 granules within the specified spatial and temporal bounds. It retrieves granule metadata and implements a retry mechanism to handle transient API failures.
    - **Granule File Downloading**: The :py:class:`icesat2db.H5FileDownloader` class downloads `.h5` granule files using a robust, resumable process. It supports partial downloads with a temporary `.part` file and only renames files to `.h5` upon successful completion. The class also handles network failures and retries failed downloads to ensure reliability.
 
    Granules are stored in structured directories, with each granule ID having separate subdirectories containing its corresponding IceSat2 product files.
@@ -108,7 +108,7 @@ The :py:class:`icesat2db.IceSat2Processor` class is highly configurable, allowin
 - **`data_config.yml`**: Modify this file to specify:
 
   - Database configuration details
-  - Variables list for each IceSat2 product (L2A, L2B, L4A, L4C)
+  - Variables list for the ATL08 product (`level_atl08`)
   
   For details on configuration files, refer to the :ref:`fundamentals-setup` page.
 

@@ -5,7 +5,7 @@
 API Reference
 =============
 
-This page provides an auto-generated summary of icesat2b’s API. For more details and examples, refer to the relevant chapters in the main part of the documentation.
+This page provides an auto-generated summary of icesat2db’s API. For more details and examples, refer to the relevant chapters in the main part of the documentation.
 
 Top-level functions
 ===================

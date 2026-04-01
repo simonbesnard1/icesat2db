@@ -22,24 +22,24 @@ Key capabilities
 Potential available variables
 -----------------------------
 
-The database includes a wide range of variables, covering spatial coordinates, elevation data, vegetation metrics, biomass estimates, and quality flags across multiple IceSat2 products (L2A, L2B, L4A, L4C). These variables enable detailed analyses of forest structure, canopy height, biomass density, and waveform complexity. Below is a table of some variables stored in the database:
+The database includes a wide range of variables from the ATL08 land and vegetation product, covering terrain elevation, canopy height metrics, quality flags, and ancillary data. Below is a table of commonly used variables:
 
 .. csv-table:: Variable Descriptions
-   :header: "Variable Name", "Description", "Units", "Product"
+   :header: "Variable Name", "Description", "Units", "Category"
    :widths: 20, 50, 15, 10
 
-   "agbd", "Aboveground biomass density", "Mg/ha", "L4A"
-   "cover", "Total canopy cover", "Percent", "L2B"
-   "cover_z", "Cumulative canopy cover vertical profile", "Percent", "L2B"
-   "rh", "Relative height metrics at 1% interval", "Meters", "L2A"
-   "wsci", "Waveform Structural Complexity Index", "adimensional", "L4C"
-   "rh100", "Height above ground of the received waveform signal start", "Meters", "L2B"
-   "fhd_normal", "Foliage Height Diversity", "adimensional", "L2B"
-   "pai", "Total Plant Area Index", "m²/m²", "L2B"
-   "pavd_z", "Plant Area Volume Density profile", "m²/m³", "L2B"
-   "sensitivity", "Maximum canopy cover that can be penetrated", "adimensional", "L2A"
+   "h_canopy", "98th percentile of relative canopy heights above estimated terrain", "meters", "Canopy"
+   "h_max_canopy", "Maximum relative canopy height within segment (equivalent to RH100)", "meters", "Canopy"
+   "h_mean_canopy", "Mean relative canopy height within segment", "meters", "Canopy"
+   "h_te_best_fit", "Best-fit terrain elevation at the mid-point of each 100 m segment", "meters", "Terrain"
+   "h_te_mean", "Mean terrain photon height above WGS84 Ellipsoid within segment", "meters", "Terrain"
+   "canopy_h_metrics", "Canopy height metrics at 10–95th percentiles (18 values per segment)", "meters", "Canopy"
+   "snr", "Signal-to-noise ratio of geolocated photons", "adimensional", "Land Segment"
+   "night_flag", "Day/night flag derived from solar elevation (0=day, 1=night)", "adimensional", "Land Segment"
+   "layer_flag", "Consolidated cloud/blowing snow flag (0=absent, 1=likely present)", "adimensional", "Land Segment"
+   "segment_snowcover", "Daily snow/ice cover flag (0=ice-free water; 1=snow-free; 2=snow; 3=ice)", "adimensional", "Land Segment"
 
-Additional variables include elevation data, geolocation flags, and quality indicators, allowing for comprehensive assessments of forest ecosystems. Users can refer to the configuration file or use the `gediDB` package to query the full list of available variables.
+For the complete list of available variables, see :ref:`tiledb_database` or call ``provider.get_available_variables()``.
 
 Retrieving IceSat2 data with the IceSat2 provider
 -------------------------------------------------
@@ -52,23 +52,23 @@ Basic query example
 .. code-block:: python
 
     import geopandas as gpd
-    import icesat2db as gdb
+    import icesat2db as isdb
 
     # Load region of interest
-    region_of_interest = gpd.read_file('./data/geojson/BR-Sa1.geojson')
+    region_of_interest = gpd.read_file('./data/geojson/region.geojson')
 
     # Instantiate the IceSat2Provider
-    provider = gdb.IceSat2Provider(storage_type='local', 
-                                local_path= "/path/to/your/database")
+    provider = isdb.IceSat2Provider(storage_type='local',
+                                    local_path="/path/to/your/database")
 
-    # Define the columns to query and additional parameters
-    variables = ["agbd", "rh"]
+    # Define the variables to query
+    variables = ["h_canopy", "h_te_best_fit"]
 
-    dataset = provider.get_data(variables = variables,
-                                geometry = region_of_interest,
-                                start_time = "2018-01-01",
-                                end_time = "2024-12-31",
-                                return_type= 'xarray')
+    dataset = provider.get_data(variables=variables,
+                                geometry=region_of_interest,
+                                start_time="2019-01-01",
+                                end_time="2024-12-31",
+                                return_type='xarray')
 
 Parameters for ``get_data()``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -94,7 +94,7 @@ You can further refine the data retrieval by specifying additional quality filte
 Example with additional quality filters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In the following example, we define specific quality filters for the **sensitivity** and **surface_flag** fields:
+In the following example, we filter for night-time acquisitions with no cloud/blowing snow contamination:
 
 .. code-block:: python
 
@@ -103,26 +103,26 @@ In the following example, we define specific quality filters for the **sensitivi
 
     # Instantiate the IceSat2Provider
     provider = isdb.IceSat2Provider(storage_type='local',
-                                local_path= "/path/to/your/database")
-
+                                    local_path="/path/to/your/database")
 
     # Load region of interest
-    region_of_interest = gpd.read_file('./data/geojson/BR-Sa1.geojson')
+    region_of_interest = gpd.read_file('./data/geojson/region.geojson')
 
-    # Define the columns to query, additional parameters, and quality filters
-    variables = ["atlas_pa"]
+    # Define variables and quality filters
+    variables = ["h_canopy", "h_te_best_fit", "snr"]
     quality_filters = {
-    'brightness_flag': "== '1'"
+        'night_flag': "== 1",
+        'layer_flag': "== 0",
     }
 
-    icesat2_data = provider.get_data(variables = variables,
-                                  geometry = region_of_interest,
-                                  start_time = "2018-01-01",
-                                  end_time = "2024-12-31",
-                                  return_type = 'xarray',
-                                  **quality_filters)
+    icesat2_data = provider.get_data(variables=variables,
+                                     geometry=region_of_interest,
+                                     start_time="2019-01-01",
+                                     end_time="2024-12-31",
+                                     return_type='xarray',
+                                     **quality_filters)
 
-Quality filters are passed as key-value pairs where the key is the variable name, and the value is the condition (e.g., `'brightness_flag': "== '1'"`). This adds flexibility to refine the query based on specific criteria, improving the relevance of the retrieved data.
+Quality filters are passed as key-value pairs where the key is the variable name and the value is the condition string (e.g., ``'night_flag': "== 1"``). This adds flexibility to refine the query based on specific criteria, improving the relevance of the retrieved data.
 
 Supported output formats
 ------------------------
@@ -136,41 +136,39 @@ Below is an example of how the dataset looks in the :py:class:`xarray.Dataset` f
 
 .. code-block:: python
 
-    <xarray.Dataset> Size: 291MB
-    Dimensions:         (shot_number: 660802, profile_points: 101)
+    <xarray.Dataset>
+    Dimensions:          (segment_id: 284305, profile_point: 18)
     Coordinates:
-      * shot_number     (shot_number) uint64 5MB 84121100400504737 ... 8412110040...
-      * profile_points  (profile_points) int64 808B 0 1 2 3 4 5 ... 96 97 98 99 100
-        latitude        (shot_number) float64 5MB -1.044 -1.139 ... -14.85 -14.85
-        longitude       (shot_number) float64 5MB -56.48 -56.38 ... -46.41 -46.41
-        time            (shot_number) datetime64[ns] 5MB 2020-06-07 ... 2020-06-07
+      * segment_id       (segment_id) int64 2MB 131271604800 ... 131271952640
+        latitude         (segment_id) float32 1MB 51.23 51.24 ... 47.89 47.90
+        longitude        (segment_id) float32 1MB 10.45 10.45 ... 14.12 14.13
+        time             (segment_id) datetime64[ns] 2MB 2021-06-15 ... 2021-06-15
     Data variables:
-        agbd            (shot_number) float32 3MB 143.8 45.86 50.03 ... 6.885 11.16
-        rh              (shot_number, profile_points) float32 267MB -1.53 ... 8.85
+        h_canopy         (segment_id) float32 1MB 18.4 22.1 ... 5.3 7.8
+        h_te_best_fit    (segment_id) float32 1MB 312.1 315.6 ... 198.4 201.2
+        canopy_h_metrics (segment_id, profile_point) float32 20MB 4.2 ... 17.9
 
 The dataset includes multiple dimensions and variables:
 
-- **Dimensions**: `shot_number` (unique ID for each shot) and `profile_points` (vertical profile points).
-- **Coordinates**: Metadata such as  `time`, `latitude`, and `longitude`, describing each shot's spatial and temporal context.
-- **Data Variables**: Core variables like `rh` (relative height) and `agbd` (Aboveground biomass density) for ecological analysis.
+- **Dimensions**: ``segment_id`` (unique ID for each 100 m land segment) and ``profile_point`` (index into profile arrays such as ``canopy_h_metrics``).
+- **Coordinates**: ``time``, ``latitude``, and ``longitude`` describing each segment's spatial and temporal context.
+- **Data Variables**: Variables such as ``h_canopy`` (98th percentile canopy height above terrain) and ``h_te_best_fit`` (best-fit terrain elevation).
 
 Below is an example of how the dataset looks in the :py:class:`pandas.DataFrame` format:
 
 .. code-block:: python
 
-                 latitude  longitude       time  ...  rh_99     rh_100     rh_101
-    0       -1.044146 -56.475181 2020-06-07  ...  25.59  26.040001  26.570000
-    1       -1.138822 -56.375156 2020-06-07  ...  15.30  15.680000  16.280001
-    2       -1.138396 -56.375457 2020-06-07  ...  14.48  14.740000  15.080000
-    3       -1.189413 -56.366139 2020-06-07  ...  16.48  16.809999  17.219999
-    4       -1.188570 -56.366732 2020-06-07  ...   9.97  10.200000  10.500000
-              ...        ...        ...  ...    ...        ...        ...
-    660797 -14.849312 -46.408216 2020-06-07  ...   2.42   2.760000   3.580000
-    660798 -14.848904 -46.408533 2020-06-07  ...   4.14   4.970000   6.650000
-    660799 -14.848492 -46.408853 2020-06-07  ...   6.53   7.920000   9.790000
-    660800 -14.847665 -46.409496 2020-06-07  ...   4.97   6.500000   8.740000
-    660801 -14.848078 -46.409175 2020-06-07  ...   6.09   7.170000   8.850000
+               latitude  longitude        time  h_canopy  h_te_best_fit
+    0         51.231842  10.453218  2021-06-15     18.40         312.10
+    1         51.240115  10.453501  2021-06-15     22.10         315.60
+    2         51.248388  10.453784  2021-06-15      9.80         318.30
+    3         51.256661  10.454067  2021-06-15     15.60         320.90
+    4         51.264934  10.454350  2021-06-15      7.20         323.40
+    ...              ...        ...         ...       ...            ...
+    284300    47.898234  14.121456  2021-06-15      3.10         195.20
+    284301    47.890011  14.121739  2021-06-15      5.30         198.40
+    284302    47.881788  14.122022  2021-06-15      7.80         201.20
 
-    [660802 rows x 106 columns]
+    [284305 rows x 5 columns]
 
 ---

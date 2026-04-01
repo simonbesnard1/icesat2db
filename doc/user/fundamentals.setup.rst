@@ -8,7 +8,7 @@ To maximize the functionality of icesat2db, it’s essential to configure key se
 
 The `data_config.yml` file is the main configuration file for settings related to data retrieval, database connectivity, and file management. Key configurations include:
 
- - **Database Connection Details**: Define database connection variables like `storage_type`, `dimensions`, `temporal_tiling`, and `consolidation_settings`.
+ - **Database Connection Details**: Define database connection variables like `storage_type`, `dimensions`, `temporal_batching`, and `consolidation_settings`.
  - **File Paths**: Specify directories for storing downloaded IceSat2 data, processed files, and metadata.
  - **Environment Settings**: Configure parameters for parallel processing and resource allocation.
  - **Data Extraction Settings**: Control which variables to extract from IceSat2 `.h5` files to streamline storage and improve processing efficiency.
@@ -94,23 +94,25 @@ The `data_config.yml` file also includes settings for configuring the database c
       storage_type: 'local'                             # either local or s3
       local_path: ''                                    # TileDB URI for storing data
       overwrite: true                                   # Whether to overwrite existing arrays
-      temporal_tiling: "weekly"                         # either daily or weekly
-      chunk_size: 25                                    # chunk siz ein degrees for spatial chunks
+      temporal_batching: "weekly"                       # either daily, weekly, or annual
+      latitude_tile: 6                                  # spatial tile size in degrees (latitude)
+      longitude_tile: 6                                 # spatial tile size in degrees (longitude)
+      flush_every: 20000                                # flush buffers every N granules to bound memory
       time_range:                                       # Global time range for data
-        start_time: "2018-01"                           # Global start time for data
+        start_time: "2018-01-01"                        # Global start time for data
         end_time: "2030-12-31"                          # Global end time for data
       spatial_range:                                    # Global spatial range (bounding box)
-        lat_min: -56.0
-        lat_max: 56.0
+        lat_min: -90.0
+        lat_max: 90.0
         lon_min: -180.0
         lon_max: 180.0
       dimensions: ['latitude', 'longitude', 'time']     # Dimensions for the TileDB array
       consolidation_settings:
-       fragment_size: 200_000_000_000                   # 100GB fragment size
+       fragment_size: 200000000000                      # 200GB fragment size
        memory_budget: "150000000000"                    # 150GB total memory budget
        memory_budget_var: "50000000000"                 # 50GB for variable-sized attributes
       cell_order: "hilbert"
       capacity: 100000
 
-Users are free to modify these settings to suit their specific requirements, such as changing the `storage_type` to `s3` for cloud storage or adjusting the `temporal_tiling` to `daily` for more granular temporal data.
+Users are free to modify these settings to suit their specific requirements, such as changing the `storage_type` to `s3` for cloud storage or adjusting the `temporal_batching` to `daily` or `annual` for different temporal granularity.
 Be aware that modifying these settings are for advanced users and may require additional knowledge of the TileDB library.

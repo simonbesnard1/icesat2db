@@ -16,7 +16,7 @@ Working with IceSat2 data in its raw HDF5 format can be challenging due to:
  - **High redundancy**: Users often need only a few metrics from across different products for each footprint, yet each HDF5 file contains extensive redundant information, leading to excessive disk and network load.
  - **Filter challenges**: When working with raw IceSat2 HDF5 files, researchers encounter a large volume of data, including many low-quality shots that are not suitable for scientific analysis. Although the raw HDF5 files contain various quality-related flags and variables, these filters are not pre-applied.
 
-icesat2db was designed to address these issues by providing an efficient, pre-filtered **tileDB** database system that combines IceSat2 L2A+B and L4A+C products.
+icesat2db was designed to address these issues by providing an efficient, pre-filtered **tileDB** database system for the IceSat2 ATL08 land and vegetation product.
 
 What icesat2db enables
 ----------------------
@@ -79,7 +79,7 @@ With a robust foundation for querying and processing IceSat2 data, icesat2db aim
 A collaborative project
 =======================
 
-icesat2db is an adaption of the Python package `icesat2db <https://github.com/simonbesnard1/icesat2db>`_ adapted for the IceSat2 product by Felix Dombrowski, Mikhail Urbazaev and Simon Besnard from the `Global Land Monitoring Group <https://www.gfz.de/en/section/remote-sensing-and-geoinformatics/topics/global-land-monitoring>`_ at the Helmholtz Center Potsdam GFZ German Research Centre for Geosciences. This transition to a production-ready tool was driven by the need to handle large datasets and complex queries effectively. The project remains open-source and welcomes contributions from the research community to support its growth and adaptability.
+icesat2db was developed by Felix Dombrowski, Mikhail Urbazaev, Simon Besnard, and Amelia Holcomb from the `Global Land Monitoring Group <https://www.gfz.de/en/section/remote-sensing-and-geoinformatics/topics/global-land-monitoring>`_ at the Helmholtz Centre Potsdam GFZ German Research Centre for Geosciences. It was built on design principles established in the GEDI-focused `gedidb <https://github.com/simonbesnard1/gedidb>`_ package and adapted to handle the ICESat-2 ATL08 product at global scale. The transition to a production-ready tool was driven by the need to handle large datasets and complex queries effectively. The project remains open-source and welcomes contributions from the research community to support its growth and adaptability.
 
 ---
 
