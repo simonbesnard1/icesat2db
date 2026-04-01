@@ -177,6 +177,8 @@ class IceSat2Processor:
             os.path.join(self.data_info["progress_dir"], "progress")
         )
         self.report_every = int(self.data_info["tiledb"].get("report_every", 25))
+        flush_every = self.data_info["tiledb"].get("flush_every", None)
+        self.flush_every = int(flush_every) if flush_every is not None else None
 
         # Initialize database writer
         self.database_writer = self._initialize_database_writer(credentials)
@@ -488,11 +490,24 @@ class IceSat2Processor:
 
                         finally:
                             counter += 1
+                            if (
+                                self.flush_every
+                                and counter % self.flush_every == 0
+                                and buffers
+                            ):
+                                try:
+                                    _flush_buffers(buffers, processed_ids, timeframe)
+                                    buffers.clear()
+                                    processed_ids.clear()
+                                except Exception as flush_exc:
+                                    logger.error(
+                                        f"Periodic flush failed (will retry at next flush): {flush_exc}"
+                                    )
                             if counter % self.report_every == 0:
                                 ledger.write_status_md()
                                 ledger.write_html()
 
-                    # Flush to TileDB once per window
+                    # Final flush for remaining buffer
                     if buffers:
                         try:
                             _flush_buffers(buffers, processed_ids, timeframe)
@@ -571,6 +586,19 @@ class IceSat2Processor:
 
                     finally:
                         counter += 1
+                        if (
+                            self.flush_every
+                            and counter % self.flush_every == 0
+                            and buffers
+                        ):
+                            try:
+                                _flush_buffers(buffers, processed_ids, timeframe)
+                                buffers.clear()
+                                processed_ids.clear()
+                            except Exception as flush_exc:
+                                logger.error(
+                                    f"Periodic flush failed (will retry at next flush): {flush_exc}"
+                                )
                         if counter % self.report_every == 0:
                             ledger.write_status_md()
                             ledger.write_html()
