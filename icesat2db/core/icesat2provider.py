@@ -7,8 +7,8 @@
 # SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
 
 import logging
-from collections import defaultdict
 import re
+from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Union
 
 import geopandas as gpd
@@ -583,32 +583,24 @@ class IceSat2Provider(TileDBProvider):
 
         """
         metadata_dict = metadata.to_dict(orient="index")
-        default_metadata = defaultdict(
-            lambda: {"description": "", "units": "", "product_level": ""}
-        )
+        default_metadata = {"description": "", "units": "", "product_level": ""}
 
-        # Variables that can have _<percentile> variants
-        base_vars_with_percentiles = {"rh", "cover_z", "pai_z", "pavd_z"}
-
+        # Profile and sub-segment variables are normally stored under their base
+        # name (with a profile_point / subsegment_point dimension).  When an
+        # expanded column such as h_canopy_20m_1 lands in the dataset directly
+        # (e.g. the user requested it as a scalar), fall back to the base
+        # variable's metadata entry by stripping the trailing _<index> suffix.
         for var in dataset.variables:
-            var_metadata = metadata_dict.get(var, default_metadata)
-
-            # Check for percentile variants (e.g., rh_95)
-            match = re.match(r"^(.+?)_(\d+)$", var)
-            if match:
-                base_var = match.group(1)
-                percentile = match.group(2)
-
-                if base_var in base_vars_with_percentiles:
-                    base_metadata = metadata_dict.get(base_var)
-                    if base_metadata:
-                        # Copy and modify metadata
-                        var_metadata = base_metadata.copy()
+            var_metadata = metadata_dict.get(var)
+            if var_metadata is None:
+                match = re.match(r"^(.+)_(\d+)$", var)
+                if match:
+                    base_meta = metadata_dict.get(match.group(1))
+                    if base_meta:
+                        var_metadata = base_meta.copy()
+                        idx = match.group(2)
                         desc = var_metadata.get("description", "")
                         var_metadata["description"] = (
-                            f"{desc} ({percentile}th percentile)"
-                            if desc
-                            else f"{percentile}th percentile of {base_var}"
+                            f"{desc} (index {idx})" if desc else f"index {idx}"
                         )
-
-            dataset[var].attrs.update(var_metadata)
+            dataset[var].attrs.update(var_metadata or default_metadata)
