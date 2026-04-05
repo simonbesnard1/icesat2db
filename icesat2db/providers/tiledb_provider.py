@@ -291,8 +291,13 @@ class TileDBProvider:
         lons = data["longitude"]
         lats = data["latitude"]
 
-        # Get the geometry (handle MultiPolygon or single Polygon)
-        geom = geometry.unary_union if len(geometry) > 1 else geometry.geometry.iloc[0]
+        # Resolve to a single shapely geometry (caller may pass a precomputed union)
+        if hasattr(geometry, "union_all"):
+            geom = (
+                geometry.union_all() if len(geometry) > 1 else geometry.geometry.iloc[0]
+            )
+        else:
+            geom = geometry  # already a shapely geometry
 
         # Vectorized point-in-polygon test (MUCH faster than iterating)
         mask = contains_xy(geom, lons, lats)

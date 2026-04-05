@@ -31,6 +31,9 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_DIMS = ["segment_id"]
 
+# Precompiled once — matches profile/subsegment expanded column names like h_canopy_20m_1
+_INDEX_SUFFIX_RE = re.compile(r"^(.+)_(\d+)$")
+
 
 class IceSat2Provider(TileDBProvider):
     """
@@ -231,28 +234,25 @@ class IceSat2Provider(TileDBProvider):
         start_time = _datetime_to_timestamp_days(start_time) if start_time else None
         end_time = _datetime_to_timestamp_days(end_time) if end_time else None
 
+        # Resolve to a single shapely geometry once — reused for both the area
+        # check and the polygon filter inside _query_array/_filter_by_polygon.
+        geom = geometry.union_all() if len(geometry) > 1 else geometry.geometry.iloc[0]
+
         # Auto-detect polygon filtering need
         if use_polygon_filter == "auto":
-
-            # Check if geometry is complex (not just a rectangle)
-            geom = (
-                geometry.unary_union if len(geometry) > 1 else geometry.geometry.iloc[0]
-            )
             bbox_area = (lon_max - lon_min) * (lat_max - lat_min)
             geom_area = geom.area
-
-            # If geometry fills less than 80% of bbox, use polygon filter
             use_polygon_filter = (
                 (geom_area / bbox_area) < 0.9 if bbox_area > 0 else False
             )
-
             if use_polygon_filter:
                 logger.info(
                     f"Auto-enabled polygon filter (geometry covers "
                     f"{100 * geom_area / bbox_area:.1f}% of bounding box)"
                 )
 
-        # Query with optimized filtering
+        # Query with optimized filtering — pass the precomputed shapely geometry
+        # so _filter_by_polygon skips the union_all() call it would otherwise make.
         scalar_vars = variables + DEFAULT_DIMS
         scalar_data, profile_vars, subsegment_vars = self._query_array(
             scalar_vars,
@@ -262,7 +262,7 @@ class IceSat2Provider(TileDBProvider):
             lon_max,
             start_time,
             end_time,
-            geometry=geometry,
+            geometry=geom,
             use_polygon_filter=use_polygon_filter,
             **quality_filters,
         )
@@ -436,9 +436,10 @@ class IceSat2Provider(TileDBProvider):
           alignment between the two datasets.
 
         """
-        # Create DataFrame (optimized with from_dict)
-        scalar_data["time"] = _timestamp_to_datetime(scalar_data["time"])
-        scalar_df = pd.DataFrame.from_dict(scalar_data)
+        # Build DataFrame without mutating the caller's dict
+        scalar_df = pd.DataFrame.from_dict(
+            {**scalar_data, "time": _timestamp_to_datetime(scalar_data["time"])}
+        )
 
         # Reconstruct profile variables if present
         if profile_vars:
@@ -498,26 +499,18 @@ class IceSat2Provider(TileDBProvider):
         data_vars = {}
 
         # ── Scalar variables ──────────────────────────────────────────────────
+        # Use (dims, data) tuples to skip per-variable xr.DataArray construction.
         for var in scalar_var_names:
-            data_vars[var] = xr.DataArray(
-                scalar_data[var],
-                coords={"segment_id": scalar_data["segment_id"]},
-                dims=["segment_id"],
-            )
+            data_vars[var] = (["segment_id"], scalar_data[var])
 
         # ── Profile variables  (dim: profile_point) ───────────────────────────
         for base_var, components in profile_vars.items():
             profile_data = np.stack(
                 [scalar_data[comp] for comp in components], axis=-1
             ).astype(np.float32, copy=False)
-
-            data_vars[base_var] = xr.DataArray(
+            data_vars[base_var] = (
+                ["segment_id", "profile_point"],
                 profile_data,
-                coords={
-                    "segment_id": scalar_data["segment_id"],
-                    "profile_point": np.arange(len(components), dtype=np.int16),
-                },
-                dims=["segment_id", "profile_point"],
             )
 
         # ── Sub-segment variables  (dim: subsegment_point) ────────────────────
@@ -525,14 +518,9 @@ class IceSat2Provider(TileDBProvider):
             subsegment_data = np.stack(
                 [scalar_data[comp] for comp in components], axis=-1
             ).astype(np.float32, copy=False)
-
-            data_vars[base_var] = xr.DataArray(
+            data_vars[base_var] = (
+                ["segment_id", "subsegment_point"],
                 subsegment_data,
-                coords={
-                    "segment_id": scalar_data["segment_id"],
-                    "subsegment_point": np.arange(len(components), dtype=np.int16),
-                },
-                dims=["segment_id", "subsegment_point"],
             )
 
         # ── Assemble dataset ──────────────────────────────────────────────────
@@ -593,7 +581,7 @@ class IceSat2Provider(TileDBProvider):
         for var in dataset.variables:
             var_metadata = metadata_dict.get(var)
             if var_metadata is None:
-                match = re.match(r"^(.+)_(\d+)$", var)
+                match = _INDEX_SUFFIX_RE.match(var)
                 if match:
                     base_meta = metadata_dict.get(match.group(1))
                     if base_meta:
