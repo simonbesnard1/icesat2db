@@ -8,7 +8,7 @@
 
 import logging
 import os
-from functools import lru_cache
+from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -149,7 +149,6 @@ class TileDBProvider:
             )
         return self._array_handle
 
-    @lru_cache(maxsize=1)
     def get_available_variables(self) -> pd.DataFrame:
         """
         Retrieve metadata for available variables in the scalar TileDB array.
@@ -158,28 +157,25 @@ class TileDBProvider:
             return self._metadata_cache
 
         try:
-            with tiledb.open(
-                self.scalar_array_uri, mode="r", ctx=self.ctx
-            ) as scalar_array:
-                metadata = {
-                    k: scalar_array.meta[k]
-                    for k in scalar_array.meta
-                    if not k.startswith("granule_") and "array_type" not in k
-                }
+            # Reuse the persistent handle — avoids a second S3 open/close.
+            scalar_array = self._get_array()
+            metadata = {
+                k: scalar_array.meta[k]
+                for k in scalar_array.meta
+                if not k.startswith("granule_") and "array_type" not in k
+            }
 
-                from collections import defaultdict
+            organized_metadata = defaultdict(dict)
+            for key, value in metadata.items():
+                if "." in key:
+                    var_name, attr_type = key.split(".", 1)
+                    organized_metadata[var_name][attr_type] = value
 
-                organized_metadata = defaultdict(dict)
-                for key, value in metadata.items():
-                    if "." in key:
-                        var_name, attr_type = key.split(".", 1)
-                        organized_metadata[var_name][attr_type] = value
-
-                result = pd.DataFrame.from_dict(
-                    dict(organized_metadata), orient="index"
-                )
-                self._metadata_cache = result
-                return result
+            result = pd.DataFrame.from_dict(
+                dict(organized_metadata), orient="index"
+            )
+            self._metadata_cache = result
+            return result
 
         except Exception as e:
             logger.error(f"Failed to retrieve variables from TileDB: {e}")
