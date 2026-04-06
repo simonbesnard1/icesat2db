@@ -171,9 +171,7 @@ class TileDBProvider:
                     var_name, attr_type = key.split(".", 1)
                     organized_metadata[var_name][attr_type] = value
 
-            result = pd.DataFrame.from_dict(
-                dict(organized_metadata), orient="index"
-            )
+            result = pd.DataFrame.from_dict(dict(organized_metadata), orient="index")
             self._metadata_cache = result
             return result
 
