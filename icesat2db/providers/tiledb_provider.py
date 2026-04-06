@@ -72,7 +72,6 @@ class TileDBProvider:
         self._schema_cache = None
         self._metadata_cache = None
         self._array_handle = None
-        self._array_meta_cache = None  # plain-dict cache of array.meta
 
     def _initialize_s3_context(
         self, credentials: Optional[dict], url: str, region: str
@@ -149,17 +148,6 @@ class TileDBProvider:
                 self.scalar_array_uri, mode="r", ctx=self.ctx
             )
         return self._array_handle
-
-    def _get_array_meta(self) -> dict:
-        """
-        Return a cached plain-dict copy of array.meta.
-        Reading array.meta from an S3-backed array triggers a metadata fetch;
-        caching it as a dict avoids repeating that on every query call.
-        """
-        if self._array_meta_cache is None:
-            array = self._get_array()
-            self._array_meta_cache = dict(array.meta)
-        return self._array_meta_cache
 
     @lru_cache(maxsize=1)
     def get_available_variables(self) -> pd.DataFrame:
@@ -359,9 +347,8 @@ class TileDBProvider:
         try:
             array = self._get_array()
 
-            # Use cached plain-dict metadata — avoids an S3 round-trip per call
             attr_list, profile_vars, subsegment_vars = self._build_profile_attrs(
-                variables, self._get_array_meta()
+                variables, array.meta
             )
 
             cond_string = self._build_condition_string(filters)
@@ -478,7 +465,6 @@ class TileDBProvider:
         """Close the persistent array handle and clear caches."""
         self._schema_cache = None
         self._metadata_cache = None
-        self._array_meta_cache = None
         if self._array_handle is not None:
             if self._array_handle.isopen:
                 self._array_handle.close()
