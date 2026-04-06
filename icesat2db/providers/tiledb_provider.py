@@ -72,6 +72,7 @@ class TileDBProvider:
         self._schema_cache = None
         self._metadata_cache = None
         self._array_handle = None
+        self._array_meta_cache = None  # plain-dict cache of array.meta
 
     def _initialize_s3_context(
         self, credentials: Optional[dict], url: str, region: str
@@ -136,6 +137,29 @@ class TileDBProvider:
                 "sm.io_concurrency_level": "32",
             }
         )
+
+    def _get_array(self) -> tiledb.Array:
+        """
+        Return a persistently open read handle to the scalar array.
+        Opening a TileDB array on S3 requires multiple metadata round-trips;
+        reusing the same handle across calls eliminates that overhead.
+        """
+        if self._array_handle is None or not self._array_handle.isopen:
+            self._array_handle = tiledb.open(
+                self.scalar_array_uri, mode="r", ctx=self.ctx
+            )
+        return self._array_handle
+
+    def _get_array_meta(self) -> dict:
+        """
+        Return a cached plain-dict copy of array.meta.
+        Reading array.meta from an S3-backed array triggers a metadata fetch;
+        caching it as a dict avoids repeating that on every query call.
+        """
+        if self._array_meta_cache is None:
+            array = self._get_array()
+            self._array_meta_cache = dict(array.meta)
+        return self._array_meta_cache
 
     @lru_cache(maxsize=1)
     def get_available_variables(self) -> pd.DataFrame:
@@ -333,41 +357,35 @@ class TileDBProvider:
         Execute a query on a TileDB array with spatial, temporal, and additional filters.
         """
         try:
-            with tiledb.open(self.scalar_array_uri, mode="r", ctx=self.ctx) as array:
-                # Build attribute list and profile variables (cached metadata)
-                attr_list, profile_vars, subsegment_vars = self._build_profile_attrs(
-                    variables, array.meta
-                )
+            array = self._get_array()
 
-                # Build condition string
-                cond_string = self._build_condition_string(filters)
+            # Use cached plain-dict metadata — avoids an S3 round-trip per call
+            attr_list, profile_vars, subsegment_vars = self._build_profile_attrs(
+                variables, self._get_array_meta()
+            )
 
-                # Execute query with optimized settings
-                query = array.query(
-                    attrs=attr_list,
-                    cond=cond_string,
-                    coords=return_coords,
-                    return_incomplete=False,
-                )
+            cond_string = self._build_condition_string(filters)
 
-                # Use multi_index for efficient spatial-temporal slicing
-                data = query.multi_index[
-                    lat_min:lat_max, lon_min:lon_max, start_time:end_time
-                ]
+            query = array.query(
+                attrs=attr_list,
+                cond=cond_string,
+                coords=return_coords,
+                return_incomplete=False,
+            )
 
-                # Early return if no data
-                if not data or len(data.get("segment_id", [])) == 0:
+            data = query.multi_index[
+                lat_min:lat_max, lon_min:lon_max, start_time:end_time
+            ]
+
+            if not data or len(data.get("segment_id", [])) == 0:
+                return None, profile_vars, subsegment_vars
+
+            if use_polygon_filter and geometry is not None:
+                data = self._filter_by_polygon(data, geometry)
+                if len(data.get("segment_id", [])) == 0:
                     return None, profile_vars, subsegment_vars
 
-                # Apply polygon filter if requested
-                if use_polygon_filter and geometry is not None:
-                    data = self._filter_by_polygon(data, geometry)
-
-                    # Check again after polygon filter
-                    if len(data.get("segment_id", [])) == 0:
-                        return None, profile_vars, subsegment_vars
-
-                return data, profile_vars, subsegment_vars
+            return data, profile_vars, subsegment_vars
 
         except Exception as e:
             logger.error(f"Error querying TileDB array '{self.scalar_array_uri}': {e}")
@@ -385,10 +403,10 @@ class TileDBProvider:
         if self._schema_cache is not None:
             return self._schema_cache
 
-        with tiledb.open(self.scalar_array_uri, mode="r", ctx=self.ctx) as array:
-            domain = array.schema.domain
-            min_lon, max_lon = domain.dim(1).domain
-            min_lat, max_lat = domain.dim(0).domain
+        array = self._get_array()
+        domain = array.schema.domain
+        min_lon, max_lon = domain.dim(1).domain
+        min_lat, max_lat = domain.dim(0).domain
 
         result = (min_lon, max_lon, min_lat, max_lat)
         self._schema_cache = result
@@ -457,8 +475,11 @@ class TileDBProvider:
         return df
 
     def close(self):
-        """Clean up resources."""
+        """Close the persistent array handle and clear caches."""
         self._schema_cache = None
         self._metadata_cache = None
+        self._array_meta_cache = None
         if self._array_handle is not None:
+            if self._array_handle.isopen:
+                self._array_handle.close()
             self._array_handle = None
