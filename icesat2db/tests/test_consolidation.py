@@ -76,11 +76,12 @@ class TestSpatialConsolidationPlan(unittest.TestCase):
 
 class TestGeneratePlan(unittest.TestCase):
 
-    def _frag(self, uri, lat_min, lat_max, lon_min, lon_max):
+    def _frag(self, uri, lat_min, lat_max, lon_min, lon_max, cell_num=10_000_000):
         return {
             "uri": uri,
             "latitude_range": (lat_min, lat_max),
             "longitude_range": (lon_min, lon_max),
+            "cell_num": cell_num,
         }
 
     def test_empty_fragments_returns_empty(self):

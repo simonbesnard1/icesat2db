@@ -215,8 +215,7 @@ class SpatialConsolidationPlanner:
             small_ids = [
                 nid
                 for nid, node in plan.items()
-                if node["num_fragments"] == 1
-                or (min_group_cells > 0 and node["cell_num"] < min_group_cells)
+                if min_group_cells > 0 and node["cell_num"] < min_group_cells
             ]
             for small_id in small_ids:
                 if small_id not in plan:
