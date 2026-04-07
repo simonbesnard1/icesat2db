@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'simonbesnard1/icesat2db'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         name: Install Python
         with:
           python-version: "3.12"
@@ -41,7 +41,7 @@ jobs:
           else
             echo "✅ Looks good"
           fi
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
           name: releases
           path: dist
@@ -50,11 +50,11 @@ jobs:
     needs: build-artifacts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         name: Install Python
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
         with:
           name: releases
           path: dist

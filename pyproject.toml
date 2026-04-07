@@ -35,10 +35,11 @@ dependencies = [
     "h5py",
     "numpy",
     "pandas",
+    "PyYAML",
     "requests",
     "retry",
     "scipy",
-    "tiledb==0.35.2",
+    "tiledb>=0.35.2",
     "xarray",
     "boto3"
 ]
@@ -68,12 +69,10 @@ dev = [
     "pytest-xdist",
     "pytest-timeout",
     "ruff",
-    "icesat2db[complete]",
     "black",
     "isort"
 ]
 io = [
-    "boto3",
     "netCDF4",
     "h5netcdf",
     'pydap; python_version<"3.10"',
