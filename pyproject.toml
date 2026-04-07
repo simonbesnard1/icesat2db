@@ -13,8 +13,8 @@ description = "icesat2db: A toolbox for Ice, Cloud, and land Elevation Satellite
 readme = "README.md"
 authors = [
     { name = "Felix Dombrowski", email = "felixd@gfz.de" },
-    { name = "Mikhail Urbazaev", email = "urbazaev@gfz.de" },
     { name = "Simon Besnard", email = "besnard@gfz.de" },
+    { name = "Mikhail Urbazaev", email = "urbazaev@gfz.de" },
     { name = "Amelia Holcomb", email = "amelia.holcomb@gmail.com" }
 ]
 license = { file = "LICENSE" }

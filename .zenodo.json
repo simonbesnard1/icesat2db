@@ -1,0 +1,54 @@
+{
+  "title": "icesat2DB: A toolbox for Ice, Cloud, and land Elevation Satellite 2 (ICESat-2) ATL08 data.",
+  "description": "icesat2DB is an open-source Python package designed to streamline the processing, analysis, and management of ICESat-2 ATL08 data. This toolbox enables efficient and flexible data querying and management of large ICESat-2 datasets stored with TileDB, a high-performance, multi-dimensional array database.",
+  "creators": [
+    
+    {
+      "name": "Dombrowski, Felix",
+      "orcid": "0009-0000-9210-3530",
+      "affiliation": "GFZ Helmholtz Centre for Geosciences Potsdam, Germany"
+    }, 
+    {
+      "name": "Besnard, Simon",
+      "orcid": "0000-0002-1137-103X",
+      "affiliation": "GFZ Helmholtz Centre for Geosciences Potsdam, Germany"
+    },
+
+    {
+      "name": "Urbazaev, Mikhail",
+      "orcid": "0000-0002-0327-6278",
+      "affiliation": "GFZ Helmholtz Centre for Geosciences Potsdam, Germany"
+    },
+
+    {
+      "name": "Holcomb, Amelia",
+      "orcid": "0000-0001-5081-7201",
+      "affiliation": "Department of Geographical Sciences, University of Maryland, USA"
+    }
+  ],
+  "license": {
+    "id": "EUPL-1.2"
+  },
+  "access_right": "open",
+  "keywords": [
+    "ICESat-2",
+    "LiDAR",
+    "forest",
+    "remote sensing",
+    "carbon cycle",
+    "Python"
+  ],
+  "related_identifiers": [
+    {
+      "relation": "isSupplementTo",
+      "identifier": "https://github.com/simonbesnard1/icesat2db",
+      "scheme": "url"
+    },
+    {
+      "relation": "isIdenticalTo",
+      "identifier": "https://doi.org/10.5281/zenodo.19458654",
+      "scheme": "doi"
+    }
+  ]
+}
+

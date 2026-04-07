@@ -2,7 +2,7 @@
 
 ## Our Pledge
 
-We, as contributors and maintainers of the `gediDB` project, pledge to create an open, welcoming, and inclusive environment where everyone can contribute and collaborate effectively, regardless of their background or identity.
+We, as contributors and maintainers of the `icesat2DB` project, pledge to create an open, welcoming, and inclusive environment where everyone can contribute and collaborate effectively, regardless of their background or identity.
 
 ## Our Standards
 
