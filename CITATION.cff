@@ -1,17 +1,36 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
+title: "icesat2DB: A toolbox for Ice, Cloud, and land Elevation Satellite 2 (ICESat-2) ATL08 data."
+abstract: >
+  icesat2DB is an open-source Python package designed to streamline the
+  processing, analysis, and management of ICESat-2 ATL08 data. This toolbox
+  enables efficient and flexible data querying and management of large ICESat-2
+  datasets stored with TileDB, a high-performance, multi-dimensional array
+  database.
 authors:
+  - family-names: "Dombrowski"
+    given-names: "Felix"
+    orcid: "https://orcid.org/0009-0000-9210-3530"
+    affiliation: "GFZ Helmholtz Centre for Geosciences Potsdam, Germany"
   - family-names: "Besnard"
     given-names: "Simon"
     orcid: "https://orcid.org/0000-0002-1137-103X"
-  - family-names: "Dombrowski"
-    given-names: "Felix"
+    affiliation: "GFZ Helmholtz Centre for Geosciences Potsdam, Germany"
+  - family-names: "Urbazaev"
+    given-names: "Mikhail"
+    orcid: "https://orcid.org/0000-0002-0327-6278"
+    affiliation: "GFZ Helmholtz Centre for Geosciences Potsdam, Germany"
   - family-names: "Holcomb"
     given-names: "Amelia"
     orcid: "https://orcid.org/0000-0001-5081-7201"
-title: "gediDB"
-abstract: "A toolbox for Global Ecosystem Dynamics Investigation (GEDI) L2A-B and L4A-C data."
+    affiliation: "Department of Geographical Sciences, University of Maryland, USA"
 license: "EUPL-1.2"
-doi: "https://doi.org/10.5281/zenodo.13885229"
-repository-code: "https://git.gfz-potsdam.de/global-land-monitoring/gedidb"
-
+doi: "10.5281/zenodo.19458654"
+repository-code: "https://github.com/simonbesnard1/icesat2db"
+keywords:
+  - ICESat-2
+  - LiDAR
+  - forest
+  - remote sensing
+  - carbon cycle
+  - Python
