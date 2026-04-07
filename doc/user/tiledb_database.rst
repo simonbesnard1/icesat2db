@@ -105,12 +105,12 @@ The database includes a wide range of variables from the ATL08 land and vegetati
    "beam_coelev", "Co-elevation (direction from vertical) of the laser beam", "radians", "Land Segment"
    "brightness_flag", "Flag indicating a bright ground surface (e.g. snow-covered)", "adimensional", "Land Segment"
    "can_noise", "Number of noise photons falling within the canopy height per 100 m segment", "count/meter", "Canopy"
-   "canopy_h_metrics", "Canopy height metrics at 10–95th percentiles of the canopy relative height distribution (18 values per segment)", "meters", "Canopy"
-   "canopy_h_metrics_abs", "Absolute canopy height metrics above WGS84 Ellipsoid at 10–95th percentiles (18 values per segment)", "meters", "Canopy"
+   "canopy_h_metrics", "Canopy height metrics at 10-95th percentiles of the canopy relative height distribution (18 values per segment)", "meters", "Canopy"
+   "canopy_h_metrics_abs", "Absolute canopy height metrics above WGS84 Ellipsoid at 10-95th percentiles (18 values per segment)", "meters", "Canopy"
    "canopy_openness", "Standard deviation of canopy photon heights, providing inference of canopy openness", "adimensional", "Canopy"
    "canopy_rh_conf", "Canopy relative height confidence flag (0=<5% canopy; 1=>5% canopy, <5% ground; 2=>5% canopy and ground)", "adimensional", "Canopy"
    "centroid_height", "Optical centroid height of canopy and ground photons above the reference ellipsoid", "meters", "Canopy"
-   "cloud_flag_atm", "Cloud/aerosol confidence flag from ATL09 (0–10; >0 means aerosols or clouds may be present)", "adimensional", "Land Segment"
+   "cloud_flag_atm", "Cloud/aerosol confidence flag from ATL09 (0-10; >0 means aerosols or clouds may be present)", "adimensional", "Land Segment"
    "cloud_fold_flag", "Flag indicating likely cloud signal folded down from above 15 km", "adimensional", "Land Segment"
    "delta_time", "Mean GPS seconds since the ATLAS SDP epoch for the segment", "seconds since 2018-01-01", "Land Segment"
    "delta_time_beg", "GPS seconds since ATLAS SDP epoch for the first photon in the segment", "seconds since 2018-01-01", "Land Segment"
@@ -161,7 +161,7 @@ The database includes a wide range of variables from the ATL08 land and vegetati
    "photon_rate_can_nr", "Noise-removed photon canopy rate within each 100 m segment", "s^-1", "Canopy"
    "photon_rate_te", "Photon rate of terrain photons within each 100 m segment", "s^-1", "Terrain"
    "psf_flag", "Flag set to 1 if the point spread function (sigma_atlas_land) exceeds 1 m", "adimensional", "Land Segment"
-   "rgt", "Reference ground track number (1–1387)", "adimensional", "Land Segment"
+   "rgt", "Reference ground track number (1-1387)", "adimensional", "Land Segment"
    "sat_flag", "Saturation flag derived from full_sat_fract on ATL03, averaged over 5 geosegments", "adimensional", "Land Segment"
    "segment_cover", "Average Copernicus fractional canopy cover percentage for each 100 m segment", "adimensional", "Canopy"
    "segment_id", "Unique segment identifier", "adimensional", "Reference"
@@ -270,6 +270,167 @@ Here are some example use cases:
           start_time="2020-01-01",
           end_time="2023-12-31",
           return_type='dataframe')
+
+Application: Northern Hemisphere Canopy Height Dynamics
+--------------------------------------------------------
+
+This example demonstrates how to use the TileDB global database to analyse
+multi-temporal canopy height changes across the Northern Hemisphere. The
+workflow queries ``h_canopy`` for two consecutive periods (2018-2021 and
+2022-2025), aggregates the shots onto a global H3 hexagonal grid (resolution 3,
+~830 km² per cell), and maps the per-cell change in median canopy height.
+
+The key steps are:
+
+1. **Query** ``h_canopy`` for each period over the full Northern Hemisphere
+   bounding box (0°-80°N) using ``IceSat2Provider``.
+2. **Filter** shots to the physically plausible canopy height range (2-60 m).
+3. **Aggregate** shots to H3 hexagons (minimum 30 shots per cell) to suppress
+   noise from sparse sampling.
+4. **Compute** the per-cell difference Δh\ :sub:`canopy` = period 2 − period 1.
+5. **Plot** the baseline canopy height and the change map side-by-side.
+
+.. code-block:: python
+
+   import geopandas as gpd
+   import matplotlib.pyplot as plt
+   import matplotlib as mpl
+   import numpy as np
+   import h3
+   import icesat2db as idb
+   from shapely.geometry import Polygon, box
+
+   # ── Style ──────────────────────────────────────────────────────────────────
+   params = {
+       'font.family': 'serif',
+       'font.size': 16,
+       'axes.titlesize': 13,
+       'axes.labelsize': 12,
+       'axes.linewidth': 0.5,
+       'xtick.labelsize': 11,
+       'ytick.labelsize': 11,
+       'xtick.major.width': 0.3,
+       'ytick.major.width': 0.3,
+       'legend.fontsize': 12,
+       'text.usetex': True,
+   }
+   mpl.rcParams.update(params)
+
+   # ── Provider ───────────────────────────────────────────────────────────────
+   provider = idb.IceSat2Provider(
+       storage_type='s3',
+       s3_bucket="dog.icesat2db.icesat2-atl08-v007",
+       url="https://s3.gfz-potsdam.de"
+   )
+
+   H3_RES    = 3      # ~830 km² hexagons
+   MIN_SHOTS = 30
+   NH_BBOX   = gpd.GeoDataFrame(geometry=[box(-180, 0, 180, 80)], crs="EPSG:4326")
+
+   periods = [
+       ("2018-10-01", "2021-12-31"),
+       ("2022-01-01", "2025-12-31"),
+   ]
+
+   def fetch_and_aggregate(provider, start, end):
+    ds = provider.get_data(
+        variables=["h_canopy"],
+        query_type="bounding_box",
+        geometry=NH_BBOX,
+        start_time=start,
+        end_time=end,
+        return_type="xarray"
+    )
+
+    # Pull only the needed variables; cast to float32 to halve memory
+    df = (
+        ds[["h_canopy", "latitude", "longitude"]]  # drop all other coords/vars
+        .to_dataframe()
+        .reset_index()[["latitude", "longitude", "h_canopy"]]
+        .dropna(subset=["h_canopy"])
+        .astype({"h_canopy": "float32", "latitude": "float32", "longitude": "float32"})
+    )
+    del ds  # release xarray dataset immediately
+
+    # Quality filter — no GeoDataFrame needed here
+    df = df[(df["h_canopy"] >= 2) & (df["h_canopy"] <= 60)]
+
+    # Vectorized H3 assignment via h3pandas (no list comprehension)
+    h3_fn = np.vectorize(lambda lat, lon: h3.latlng_to_cell(lat, lon, H3_RES))
+    df["h3_index"] = h3_fn(df["latitude"].values, df["longitude"].values)
+    
+    agg = (
+        df.groupby("h3_index")["h_canopy"]
+        .agg(h_canopy="median", n_shots="count")
+    )
+    
+    del df  # release shot-level data
+
+    return agg[agg["n_shots"] >= MIN_SHOTS][["h_canopy"]]
+
+   agg1 = fetch_and_aggregate(provider, *periods[0])
+   agg2 = fetch_and_aggregate(provider, *periods[1])
+
+   # ── Delta ──────────────────────────────────────────────────────────────────
+   hex_df = agg1.rename(columns={"h_canopy": "h_canopy_p1"}).join(
+            agg2.rename(columns={"h_canopy": "h_canopy_p2"}), how="inner")
+   hex_df["delta_h_canopy"] = (
+       hex_df["h_canopy_p2"] - hex_df["h_canopy_p1"]
+   ).astype("float32")
+   del agg1, agg2
+
+   # ── H3 → polygons ──────────────────────────────────────────────────────────
+   polys = [
+       Polygon([(lng, lat) for lat, lng in h3.cell_to_boundary(idx)])
+       for idx in hex_df.index
+   ]
+   hex_gdf = gpd.GeoDataFrame(hex_df, geometry=polys, crs="EPSG:4326")
+
+   # ── Plot ───────────────────────────────────────────────────────────────────
+   fig, axs = plt.subplots(2, 1, figsize=(16, 10), constrained_layout=True)
+   legend_kw = {"shrink": 0.45, "orientation": "vertical", "pad": 0.02}
+
+   hex_gdf.plot(
+       column="h_canopy_p1", ax=axs[0],
+       cmap="YlGn", edgecolor="none", legend=True,
+       vmin=2, vmax=40,
+       legend_kwds={**legend_kw, "label": r"Median $h_{\mathrm{canopy}}$ [m]"}
+   )
+   axs[0].set_title(r"Canopy Height Baseline --- 2018--2021", fontsize=14)
+   axs[0].set_xlabel("Longitude"); axs[0].set_ylabel("Latitude")
+   for sp in axs[0].spines.values(): sp.set_visible(False)
+
+   lim = 3
+   hex_gdf.plot(
+       column="delta_h_canopy", ax=axs[1],
+       cmap="RdBu", edgecolor="none", legend=True,
+       vmin=-lim, vmax=lim,
+       legend_kwds={**legend_kw,
+                    "label": r"$\Delta h_{\mathrm{canopy}}$ [m]"}
+   )
+   axs[1].set_title(
+       r"$\Delta$ Canopy Height (2022--2025 vs.\ 2018--2021)", fontsize=14)
+   axs[1].set_xlabel("Longitude"); axs[1].set_ylabel("Latitude")
+   for sp in axs[1].spines.values(): sp.set_visible(False)
+
+   plt.savefig("nh_canopy_dynamics.png", dpi=300, bbox_inches='tight')
+   plt.show()
+
+The resulting figure shows (top) the median baseline canopy height for
+2018-2021 and (bottom) the change in median canopy height between the two
+periods. Positive values (blue) indicate taller canopy in 2022-2025; negative
+values (red) indicate a decline.
+
+.. figure:: /_static/images/nh_canopy_dynamics.png
+   :alt: Northern Hemisphere canopy height dynamics derived from ICESat-2 ATL08
+   :align: center
+   :width: 100%
+
+   **Figure 2**: Northern Hemisphere canopy height baseline (2018-2021, top) and
+   change in median canopy height between 2022-2025 and 2018-2021 (bottom),
+   aggregated on an H3 hexagonal grid at resolution 3 (~830 km² per cell).
+   Only cells with at least 30 shots in both periods are shown.
+
 
 Resources
 ---------
