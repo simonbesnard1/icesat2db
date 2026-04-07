@@ -271,13 +271,13 @@ Here are some example use cases:
           end_time="2023-12-31",
           return_type='dataframe')
 
-Application: Northern Hemisphere Canopy Height Dynamics
---------------------------------------------------------
+Application: Global Canopy Height Dynamics
+------------------------------------------
 
 This example demonstrates how to use the TileDB global database to analyse
-multi-temporal canopy height changes across the Northern Hemisphere. The
+multi-temporal canopy height changes across the globe. The
 workflow queries ``h_canopy`` for two consecutive periods (2018-2021 and
-2022-2025), aggregates the shots onto a global H3 hexagonal grid (resolution 3,
+2022-2025), aggregates the segments onto a global H3 hexagonal grid (resolution 3,
 ~830 km² per cell), and maps the per-cell change in median canopy height.
 
 The key steps are:
@@ -285,7 +285,7 @@ The key steps are:
 1. **Query** ``h_canopy`` for each period over the full Northern Hemisphere
    bounding box (0°-80°N) using ``IceSat2Provider``.
 2. **Filter** shots to the physically plausible canopy height range (2-60 m).
-3. **Aggregate** shots to H3 hexagons (minimum 30 shots per cell) to suppress
+3. **Aggregate** segments to H3 hexagons (minimum 1000 segments per cell) to suppress
    noise from sparse sampling.
 4. **Compute** the per-cell difference Δh\ :sub:`canopy` = period 2 − period 1.
 5. **Plot** the baseline canopy height and the change map side-by-side.
@@ -296,11 +296,10 @@ The key steps are:
    import matplotlib.pyplot as plt
    import matplotlib as mpl
    import numpy as np
-   import h3
    import icesat2db as idb
    from shapely.geometry import Polygon, box
 
-   # ── Style ──────────────────────────────────────────────────────────────────
+   # ── Style ─────────────────────────────────────────────────────────────────────
    params = {
        'font.family': 'serif',
        'font.size': 16,
@@ -316,120 +315,185 @@ The key steps are:
    }
    mpl.rcParams.update(params)
 
-   # ── Provider ───────────────────────────────────────────────────────────────
+   # ── Config ────────────────────────────────────────────────────────────────────
+   PROJ         = "EPSG:8857"   # Equal Earth — equal-area, good for global
+   HEX_DIAMETER = 100_000       # metres (~100 km)
+   MIN_SHOTS    = 1000
+   OUTPATH      = 'global_canopy_dynamics.png'
+
+   GLOBAL_BBOX = gpd.GeoDataFrame(geometry=[box(-180, 20, 180, 80)], crs="EPSG:4326")
+   
+   PERIODS = [
+       ("2018-10-01", "2021-12-31"),
+       ("2022-01-01", "2025-12-31"),
+   ]
+
+   # ── Provider ──────────────────────────────────────────────────────────────────
    provider = idb.IceSat2Provider(
        storage_type='s3',
        s3_bucket="dog.icesat2db.icesat2-atl08-v007",
        url="https://s3.gfz-potsdam.de"
    )
 
-   H3_RES    = 3      # ~830 km² hexagons
-   MIN_SHOTS = 30
-   NH_BBOX   = gpd.GeoDataFrame(geometry=[box(-180, 0, 180, 80)], crs="EPSG:4326")
+   # ── Hex grid — built once, reused for both periods ────────────────────────────
+   def create_hex_grid(bounds_gdf, hex_diameter=HEX_DIAMETER):
+       """Flat-top hexagon grid in Equal Earth projection over the bounding box."""
+       gdf_proj = bounds_gdf.to_crs(PROJ)
+       xmin, ymin, xmax, ymax = gdf_proj.total_bounds
 
-   periods = [
-       ("2018-10-01", "2021-12-31"),
-       ("2022-01-01", "2025-12-31"),
-   ]
+       r  = hex_diameter / 2
+       dx = 3 / 2 * r
+       dy = np.sqrt(3) * r
 
-   def fetch_and_aggregate(provider, start, end):
-    ds = provider.get_data(
-        variables=["h_canopy"],
-        query_type="bounding_box",
-        geometry=NH_BBOX,
-        start_time=start,
-        end_time=end,
-        return_type="xarray"
-    )
+       cols = int((xmax - xmin) / dx) + 2
+       rows = int((ymax - ymin) / dy) + 2
 
-    # Pull only the needed variables; cast to float32 to halve memory
-    df = (
-        ds[["h_canopy", "latitude", "longitude"]]  # drop all other coords/vars
-        .to_dataframe()
-        .reset_index()[["latitude", "longitude", "h_canopy"]]
-        .dropna(subset=["h_canopy"])
-        .astype({"h_canopy": "float32", "latitude": "float32", "longitude": "float32"})
-    )
-    del ds  # release xarray dataset immediately
+       hexes = []
+       for row in range(rows):
+           for col in range(cols):
+               x = xmin + col * dx
+               y = ymin + row * dy + (dy / 2 if col % 2 == 1 else 0)
+               hexes.append(Polygon([
+                   (x + r * np.cos(t), y + r * np.sin(t))
+                   for t in np.linspace(0, 2 * np.pi, 7)[:-1]
+               ]))
 
-    # Quality filter — no GeoDataFrame needed here
-    df = df[(df["h_canopy"] >= 2) & (df["h_canopy"] <= 60)]
+       return gpd.GeoDataFrame(
+           {"hex_id": np.arange(len(hexes))},
+           geometry=hexes,
+           crs=PROJ
+       )
 
-    # Vectorized H3 assignment via h3pandas (no list comprehension)
-    h3_fn = np.vectorize(lambda lat, lon: h3.latlng_to_cell(lat, lon, H3_RES))
-    df["h3_index"] = h3_fn(df["latitude"].values, df["longitude"].values)
-    
-    agg = (
-        df.groupby("h3_index")["h_canopy"]
-        .agg(h_canopy="median", n_shots="count")
-    )
-    
-    del df  # release shot-level data
+   print("Building hex grid...")
+   hex_grid = create_hex_grid(GLOBAL_BBOX)
+   print(f"  {len(hex_grid):,} hexes generated")
 
-    return agg[agg["n_shots"] >= MIN_SHOTS][["h_canopy"]]
+   # ── Fetch → filter → spatial join → aggregate ─────────────────────────────────
+   def fetch_and_aggregate(provider, start, end, hex_grid):
+       print(f"  Fetching {start} → {end}...")
+       ds = provider.get_data(
+           variables=["h_canopy"],
+           query_type="bounding_box",
+           geometry=GLOBAL_BBOX,
+           start_time=start,
+           end_time=end,
+           return_type="xarray"
+       )
 
-   agg1 = fetch_and_aggregate(provider, *periods[0])
-   agg2 = fetch_and_aggregate(provider, *periods[1])
+       df = (
+           ds[["h_canopy", "latitude", "longitude"]]
+           .to_dataframe()
+           .reset_index()[["latitude", "longitude", "h_canopy"]]
+           .dropna(subset=["h_canopy"])
+           .astype({"h_canopy": "float32", "latitude": "float32", "longitude": "float32"})
+       )
+       del ds
+       print(f"  {len(df):,} shots after dropna")
 
-   # ── Delta ──────────────────────────────────────────────────────────────────
-   hex_df = agg1.rename(columns={"h_canopy": "h_canopy_p1"}).join(
-            agg2.rename(columns={"h_canopy": "h_canopy_p2"}), how="inner")
-   hex_df["delta_h_canopy"] = (
-       hex_df["h_canopy_p2"] - hex_df["h_canopy_p1"]
-   ).astype("float32")
+       # Quality filter
+       df = df[(df["h_canopy"] >= 2) & (df["h_canopy"] <= 60)]
+       print(f"  {len(df):,} shots after quality filter")
+
+       # Project points into Equal Earth — no intermediate shapely Points needed
+       gdf = gpd.GeoDataFrame(
+           df[["h_canopy"]],
+           geometry=gpd.points_from_xy(df["longitude"], df["latitude"]),
+           crs="EPSG:4326"
+       ).to_crs(PROJ)
+       del df
+
+       # Spatial join — each shot gets the hex_id of the hex it falls in
+       joined = gpd.sjoin(
+           gdf,
+           hex_grid[["hex_id", "geometry"]],
+           how="inner",
+           predicate="within"
+       )
+       del gdf
+       print(f"  {len(joined):,} shots matched to hexes")
+
+       # Aggregate per hex
+       agg = (
+           joined.groupby("hex_id")["h_canopy"]
+           .agg(h_canopy="median", n_shots="count")
+       )
+       del joined
+
+       return agg[agg["n_shots"] >= MIN_SHOTS][["h_canopy"]]
+
+   print("Processing period 1...")
+   agg1 = fetch_and_aggregate(provider, *PERIODS[0], hex_grid)
+   print(f"  {len(agg1):,} valid hexes in period 1")
+
+   print("Processing period 2...")
+   agg2 = fetch_and_aggregate(provider, *PERIODS[1], hex_grid)
+   print(f"  {len(agg2):,} valid hexes in period 2")
+
+   # ── Delta ─────────────────────────────────────────────────────────────────────
+   hex_df = (
+       agg1.rename(columns={"h_canopy": "h_canopy_p1"})
+           .join(agg2.rename(columns={"h_canopy": "h_canopy_p2"}), how="inner")
+   )
+   hex_df["delta_h_canopy"] = (hex_df["h_canopy_p2"] - hex_df["h_canopy_p1"]).astype("float32")
    del agg1, agg2
+   print(f"  {len(hex_df):,} hexes with data in both periods")
 
-   # ── H3 → polygons ──────────────────────────────────────────────────────────
-   polys = [
-       Polygon([(lng, lat) for lat, lng in h3.cell_to_boundary(idx)])
-       for idx in hex_df.index
-   ]
-   hex_gdf = gpd.GeoDataFrame(hex_df, geometry=polys, crs="EPSG:4326")
+   # ── Attach geometry — reproject to 4326 for display ──────────────────────────
+   hex_gdf = (
+       hex_grid.set_index("hex_id")
+               .join(hex_df, how="inner")
+               #.to_crs("EPSG:4326")
+   )
+   del hex_df, hex_grid
 
-   # ── Plot ───────────────────────────────────────────────────────────────────
+   # ── Plot ──────────────────────────────────────────────────────────────────────
    fig, axs = plt.subplots(2, 1, figsize=(16, 10), constrained_layout=True)
-   legend_kw = {"shrink": 0.45, "orientation": "vertical", "pad": 0.02}
 
+   legend_kw_base = {"shrink": 0.45, "orientation": "vertical", "pad": 0.02}
+
+   # Top: baseline canopy height
    hex_gdf.plot(
        column="h_canopy_p1", ax=axs[0],
        cmap="YlGn", edgecolor="none", legend=True,
        vmin=2, vmax=40,
-       legend_kwds={**legend_kw, "label": r"Median $h_{\mathrm{canopy}}$ [m]"}
+       legend_kwds={**legend_kw_base, "label": r"Median $h_{\mathrm{canopy}}$ [m]"}
    )
-   axs[0].set_title(r"Canopy Height Baseline --- 2018--2021", fontsize=14)
-   axs[0].set_xlabel("Longitude"); axs[0].set_ylabel("Latitude")
+   axs[0].set_title(r"Canopy Height Baseline: 2018-2021", fontsize=14)
+   axs[0].set_xlabel("Longitude", fontsize=12)
+   axs[0].set_ylabel("Latitude", fontsize=12)
    for sp in axs[0].spines.values(): sp.set_visible(False)
 
-   lim = 3
+   # Bottom: delta canopy height
+   lim = np.percentile(hex_gdf["delta_h_canopy"].abs().dropna(), 95)  # robust symmetric clim
    hex_gdf.plot(
        column="delta_h_canopy", ax=axs[1],
        cmap="RdBu", edgecolor="none", legend=True,
        vmin=-lim, vmax=lim,
-       legend_kwds={**legend_kw,
-                    "label": r"$\Delta h_{\mathrm{canopy}}$ [m]"}
+       legend_kwds={**legend_kw_base, "label": r"$\Delta h_{\mathrm{canopy}}$ [m]"}
    )
-   axs[1].set_title(
-       r"$\Delta$ Canopy Height (2022--2025 vs.\ 2018--2021)", fontsize=14)
-   axs[1].set_xlabel("Longitude"); axs[1].set_ylabel("Latitude")
+   axs[1].set_title(r"$\Delta$ Canopy Height (2022-2025 vs.\ 2018-2021)", fontsize=14)
+   axs[1].set_xlabel("Longitude", fontsize=12)
+   axs[1].set_ylabel("Latitude", fontsize=12)
    for sp in axs[1].spines.values(): sp.set_visible(False)
 
-   plt.savefig("nh_canopy_dynamics.png", dpi=300, bbox_inches='tight')
+   plt.savefig(OUTPATH, dpi=300, bbox_inches='tight')
    plt.show()
+   print(f"Saved to {OUTPATH}")
 
 The resulting figure shows (top) the median baseline canopy height for
 2018-2021 and (bottom) the change in median canopy height between the two
 periods. Positive values (blue) indicate taller canopy in 2022-2025; negative
 values (red) indicate a decline.
 
-.. figure:: /_static/images/nh_canopy_dynamics.png
-   :alt: Northern Hemisphere canopy height dynamics derived from ICESat-2 ATL08
+.. figure:: /_static/images/global_canopy_dynamics.png
+   :alt: Global canopy height dynamics derived from ICESat-2 ATL08
    :align: center
    :width: 100%
 
-   **Figure 2**: Northern Hemisphere canopy height baseline (2018-2021, top) and
+   **Figure 2**: Global canopy height baseline (2018-2021, top) and
    change in median canopy height between 2022-2025 and 2018-2021 (bottom),
    aggregated on an H3 hexagonal grid at resolution 3 (~830 km² per cell).
-   Only cells with at least 30 shots in both periods are shown.
+   Only cells with at least 1000 segments in both periods are shown.
 
 
 Resources
