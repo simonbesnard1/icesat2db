@@ -112,13 +112,15 @@ class ATL08Beam(beam_handler):
         icesat2_count_start = pd.to_datetime("2018-01-01T00:00:00.000000Z")
         delta_time = self["land_segments/delta_time"][()]
 
+        n_segs = len(delta_time)
+
         # Initialize the data dictionary with calculated fields
         land_data = {
             "time": icesat2_count_start + pd.to_timedelta(delta_time, unit="seconds"),
             "longitude": self["land_segments/longitude"][()],
             "latitude": self["land_segments/latitude"][()],
             "segment_id": self.construct_segment_id(),
-            "beam_id": np.full(len(delta_time), self.beam_name),
+            "beam_id": np.full(n_segs, self.beam_name),
         }
 
         # Populate data dictionary with fields from field mapping
@@ -126,6 +128,11 @@ class ATL08Beam(beam_handler):
             sds_name = source["SDS_Name"]
             if "land_segments" in sds_name:
                 land_data[key] = np.array(self[sds_name][()])
+            elif "orbit_info" in sds_name:
+                # orbit_info fields are scalars (one value per granule) —
+                # broadcast to segment length so they can be filtered and written.
+                scalar = self.parent_granule[sds_name][0]
+                land_data[key] = np.full(n_segs, scalar)
 
         # Replace fill/invalid values with NaN for sub-segment fields — keeps the
         # parent segment but marks individual 20m values that failed the validity
