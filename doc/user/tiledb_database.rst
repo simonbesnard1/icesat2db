@@ -165,7 +165,7 @@ The database includes a wide range of variables from the ATL08 land and vegetati
    "psf_flag", "Flag set to 1 if the point spread function (sigma_atlas_land) exceeds 1 m", "adimensional", "Land Segment"
    "rgt", "Reference ground track number (1-1387)", "adimensional", "Land Segment"
    "sat_flag", "Saturation flag derived from full_sat_fract on ATL03, averaged over 5 geosegments", "adimensional", "Land Segment"
-   "sc_orient", "Spacecraft orientation between forward, backward and transitional flight modes (0=backward, 1=forward, 2=transition)", "adimensional", "Land Segment"
+   "sc_orient", "Spacecraft orientation between forward, backward and transitional flight modes (0=backward, 1=forward, 2=transition)", "adimensional", "Orbit Information"
    "segment_cover", "Average Copernicus fractional canopy cover percentage for each 100 m segment", "adimensional", "Canopy"
    "segment_id", "Unique segment identifier", "adimensional", "Reference"
    "segment_id_beg", "Geolocation segment number of the first photon in the land segment", "adimensional", "Land Segment"
