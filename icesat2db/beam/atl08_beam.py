@@ -118,6 +118,7 @@ class ATL08Beam(beam_handler):
             "longitude": self["land_segments/longitude"][()],
             "latitude": self["land_segments/latitude"][()],
             "segment_id": self.construct_segment_id(),
+            "beam_id": np.full(len(delta_time), self.beam_name),
         }
 
         # Populate data dictionary with fields from field mapping

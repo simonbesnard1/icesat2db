@@ -103,6 +103,7 @@ The database includes a wide range of variables from the ATL08 land and vegetati
    "atlas_pa", "Off nadir pointing angle of the satellite", "radians", "Land Segment"
    "beam_azimuth", "Azimuth of the unit pointing vector for the reference photon in the local ENU frame", "radians", "Land Segment"
    "beam_coelev", "Co-elevation (direction from vertical) of the laser beam", "radians", "Land Segment"
+   "beam_id", "Beam identifier (gt1l, gt2l, gt3l, gt1r, gt2r, gt3r)", "adimensional", "Reference"
    "brightness_flag", "Flag indicating a bright ground surface (e.g. snow-covered)", "adimensional", "Land Segment"
    "can_noise", "Number of noise photons falling within the canopy height per 100 m segment", "count/meter", "Canopy"
    "canopy_h_metrics", "Canopy height metrics at 10-95th percentiles of the canopy relative height distribution (18 values per segment)", "meters", "Canopy"
@@ -163,6 +164,7 @@ The database includes a wide range of variables from the ATL08 land and vegetati
    "psf_flag", "Flag set to 1 if the point spread function (sigma_atlas_land) exceeds 1 m", "adimensional", "Land Segment"
    "rgt", "Reference ground track number (1-1387)", "adimensional", "Land Segment"
    "sat_flag", "Saturation flag derived from full_sat_fract on ATL03, averaged over 5 geosegments", "adimensional", "Land Segment"
+   "sc_orient", "Spacecraft orientation between forward, backward and transitional flight modes (0=backward, 1=forward, 2=transition)", "adimensional", "Land Segment"
    "segment_cover", "Average Copernicus fractional canopy cover percentage for each 100 m segment", "adimensional", "Canopy"
    "segment_id", "Unique segment identifier", "adimensional", "Reference"
    "segment_id_beg", "Geolocation segment number of the first photon in the land segment", "adimensional", "Land Segment"
@@ -294,194 +296,240 @@ The key steps are:
 
 .. code-block:: python
 
-   import geopandas as gpd
-   import pandas as pd
-   import matplotlib.pyplot as plt
-   import matplotlib as mpl
-   import numpy as np
-   from scipy.spatial import cKDTree
-   from pyproj import Transformer
-   from shapely.geometry import Polygon, box
-   import icesat2db as idb
+    import geopandas as gpd
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    import numpy as np
+    from scipy.spatial import cKDTree
+    from pyproj import Transformer
+    from shapely.geometry import Polygon, box
+    import icesat2db as idb
 
-   # ── Style ──────────────────────────────────────────────────────────────────────
-   mpl.rcParams.update({
-       'font.family': 'serif',
-       'font.size': 16,
-       'axes.titlesize': 13,
-       'axes.labelsize': 12,
-       'axes.linewidth': 0.5,
-       'xtick.labelsize': 11,
-       'ytick.labelsize': 11,
-       'xtick.major.width': 0.3,
-       'ytick.major.width': 0.3,
-       'legend.fontsize': 12,
-       'text.usetex': True,
-   })
+    # ── Style ──────────────────────────────────────────────────────────────────────
+    mpl.rcParams.update({
+        'font.family': 'serif',
+        'font.size': 16,
+        'axes.titlesize': 13,
+        'axes.labelsize': 12,
+        'axes.linewidth': 0.5,
+        'xtick.labelsize': 11,
+        'ytick.labelsize': 11,
+        'xtick.major.width': 0.3,
+        'ytick.major.width': 0.3,
+        'legend.fontsize': 12,
+        'text.usetex': True,
+    })
 
-   # ── Config ─────────────────────────────────────────────────────────────────────
-   PROJ         = "EPSG:8857"    # Equal Earth — equal-area
-   HEX_DIAMETER = 100_000        # metres (~100 km)
-   MIN_SHOTS    = 100
-   OUTPATH      = 'global_canopy_dynamics.png'
+    # ── Config ─────────────────────────────────────────────────────────────────────
+    PROJ         = "+proj=eqearth +lon_0=0 +datum=WGS84 +units=m +no_defs"  # Equal Earth, seam at 30°W (Atlantic)
+    HEX_DIAMETER = 100_000        # metres (~100 km)
+    MIN_SHOTS    = 100
+    OUTPATH      = 'global_canopy_dynamics.png'
 
-   # ±179.9° avoids floating-point artefacts at the TileDB domain boundary (±180°)
-   GLOBAL_BBOX = gpd.GeoDataFrame(geometry=[box(-179.9, -60, 179.9, 80)], crs="EPSG:4326")
-   PERIODS = [
-       ("2018-10-01", "2021-12-31"),
-       ("2022-01-01", "2025-12-31"),
-   ]
+    # Quality filters — applied server-side via TileDB before any data is transferred
+    # segment_landcover: Copernicus closed forest (111–116) + open forest (121–126)
+    _FOREST_CLASSES = [111, 112, 113, 114, 115, 116, 121, 122, 123, 124, 125, 126]
+    QUALITY_FILTERS = {
+        "segment_landcover": f"in {_FOREST_CLASSES}",
+        "h_canopy":          ">= 5 and <= 60",    # metres
+        "n_ca_photons":      ">= 2 and <= 140",  # upper bound excludes noise misclassified as canopy
+        "n_te_photons":      ">= 10",
+    }
 
-   # ── Provider ───────────────────────────────────────────────────────────────────
-   provider = idb.IceSat2Provider(
-       storage_type='s3',
-       s3_bucket="dog.icesat2db.icesat2-atl08-v007",
-       url="https://s3.gfz-potsdam.de"
-   )
+    GLOBAL_BBOX = gpd.GeoDataFrame(geometry=[box(-179.9, -60, 179.9, 80)], crs="EPSG:4326")
+    PERIODS = [
+        ("2018-10-01", "2021-12-31"),
+        ("2022-01-01", "2025-12-31"),
+    ]
 
-   # ── Hex centres: vectorised, no polygons yet ───────────────────────────────────
-   def build_hex_centers(bounds_gdf, hex_diameter=HEX_DIAMETER):
-       """Return (centers, hex_ids) in PROJ coordinates."""
-       xmin, ymin, xmax, ymax = bounds_gdf.to_crs(PROJ).total_bounds
+    # ── Provider ───────────────────────────────────────────────────────────────────
+    provider = idb.IceSat2Provider(
+        storage_type='s3',
+        s3_bucket="dog.icesat2db.icesat2-atl08-v007",
+        url="https://s3.gfz-potsdam.de"
+    )
 
-       r  = hex_diameter / 2
-       dx = 3 / 2 * r
-       dy = np.sqrt(3) * r
-
-       cols = int((xmax - xmin) / dx) + 2
-       rows = int((ymax - ymin) / dy) + 2
-
-       col_idx = np.arange(cols)
-       row_idx = np.arange(rows)
-       col_flat, row_flat = np.meshgrid(col_idx, row_idx)
-       col_flat = col_flat.ravel()
-       row_flat = row_flat.ravel()
-
-       cx = xmin + col_flat * dx
-       cy = ymin + row_flat * dy + np.where(col_flat % 2 == 1, dy / 2, 0.0)
-
-       centers = np.column_stack([cx, cy])
-       hex_ids = np.arange(len(centers))
-       return centers, hex_ids
+    # ── Hex centers: vectorised, land-clipped, no polygons yet ────────────────────
+    def _proj_extent(lat_min=-60, lat_max=80):
+        """
+        Return (xmin, ymin, xmax, ymax) of the Equal Earth projection in metres.
+        Robust to any lon_0: samples lons densely so both sides of the seam are hit.
+        """
+        _tr = Transformer.from_crs("EPSG:4326", PROJ, always_xy=True)
+        sample_xs, _ = _tr.transform(np.linspace(-179.9, 179.9, 720), np.zeros(720))
+        _, ymin = _tr.transform(0, lat_min)
+        _, ymax = _tr.transform(0, lat_max)
+        return sample_xs.min(), ymin, sample_xs.max(), ymax
 
 
-   centers, hex_ids = build_hex_centers(GLOBAL_BBOX)
+    def build_hex_centers(hex_diameter=HEX_DIAMETER):
+        """
+        Return (centers, hex_ids) where:
+        centers  — (N, 2) float64 array of hex centres in PROJ
+        hex_ids  — (N,)   int64  array of stable hex labels (original grid index)
+        Ocean hexes carry no shots and are dropped automatically by MIN_SHOTS.
+        """
+        xmin, ymin, xmax, ymax = _proj_extent()
 
-   # KDTree and coordinate transformer — built once, reused for both periods
-   tree    = cKDTree(centers)
-   to_proj = Transformer.from_crs("EPSG:4326", PROJ, always_xy=True)
+        r  = hex_diameter / 2
+        dx = 3 / 2 * r
+        dy = np.sqrt(3) * r
 
+        cols = int((xmax - xmin) / dx) + 2
+        rows = int((ymax - ymin) / dy) + 2
 
-   # ── Fetch → filter → KDTree assign → aggregate ────────────────────────────────
-   def fetch_and_aggregate(provider, start, end):
-       ds = provider.get_data(
-           variables=["h_canopy"],
-           query_type="bounding_box",
-           geometry=GLOBAL_BBOX,
-           start_time=start,
-           end_time=end,
-           return_type="dataframe",
-       )
+        # Vectorised centre computation — no Python loop
+        col_idx = np.arange(cols)
+        row_idx = np.arange(rows)
+        col_flat, row_flat = np.meshgrid(col_idx, row_idx)
+        col_flat = col_flat.ravel()
+        row_flat = row_flat.ravel()
 
-       df = (
-           ds[["h_canopy", "latitude", "longitude"]]
-           .reset_index()[["latitude", "longitude", "h_canopy"]]
-           .dropna(subset=["h_canopy"])
-           .astype({"h_canopy": "float32", "latitude": "float32", "longitude": "float32"})
-       )
-       del ds
-       df = df[(df["h_canopy"] >= 2) & (df["h_canopy"] <= 60)]
+        cx = xmin + col_flat * dx
+        cy = ymin + row_flat * dy + np.where(col_flat % 2 == 1, dy / 2, 0.0)
 
-       lons     = df["longitude"].values
-       lats     = df["latitude"].values
-       h_canopy = df["h_canopy"].values
-       del df
-
-       # Project to Equal Earth — pure numpy, no GeoDataFrame
-       px, py = to_proj.transform(lons, lats)
-       del lons, lats
-
-       # Nearest-centre assignment (Voronoi identity for a regular grid)
-       _, nn_idx = tree.query(np.column_stack([px, py]), workers=-1)
-       del px, py
-       assigned = hex_ids[nn_idx]
-       del nn_idx
-
-       agg = (
-           pd.DataFrame({"hex_id": assigned, "h_canopy": h_canopy})
-           .groupby("hex_id")["h_canopy"]
-           .agg(h_canopy="median", n_shots="count")
-       )
-       del assigned, h_canopy
-
-       return agg[agg["n_shots"] >= MIN_SHOTS][["h_canopy"]]
+        centers = np.column_stack([cx, cy])
+        hex_ids = np.arange(len(centers))
+        return centers, hex_ids
 
 
-   agg1 = fetch_and_aggregate(provider, *PERIODS[0])
-   agg2 = fetch_and_aggregate(provider, *PERIODS[1])
+    print("Building hex centres...")
+    centers, hex_ids = build_hex_centers()
+    print(f"  {len(centers):,} hexes")
 
-   # ── Delta ──────────────────────────────────────────────────────────────────────
-   hex_df = (
-       agg1.rename(columns={"h_canopy": "h_canopy_p1"})
-           .join(agg2.rename(columns={"h_canopy": "h_canopy_p2"}), how="inner")
-   )
-   hex_df["delta_h_canopy"] = (hex_df["h_canopy_p2"] - hex_df["h_canopy_p1"]).astype("float32")
-   del agg1, agg2
+    # Build KDTree and Transformer once — reused for both periods
+    tree    = cKDTree(centers)
+    to_proj = Transformer.from_crs("EPSG:4326", PROJ, always_xy=True)
 
-   # ── Polygons: deferred to surviving hexes only ─────────────────────────────────
-   r       = HEX_DIAMETER / 2
-   angles  = np.linspace(0, 2 * np.pi, 7)[:-1]
-   offsets = np.stack([r * np.cos(angles), r * np.sin(angles)], axis=1)
 
-   pos_mask          = np.isin(hex_ids, hex_df.index.values)
-   surviving_centers = centers[pos_mask]
-   surviving_labels  = hex_ids[pos_mask]
+    # ── Fetch → filter → KDTree assign → aggregate ────────────────────────────────
+    def fetch_and_aggregate(provider, start, end):
+        """
+        Query one period, assign each shot to its nearest hex centre via KDTree
+        (equivalent to polygon containment for a regular grid), then aggregate.
+        No GeoDataFrame or shapely Point objects are created for the shots.
+        """
+        print(f"  Fetching {start} → {end}...")
+        ds = provider.get_data(
+            variables=["h_canopy"],
+            query_type="bounding_box",
+            geometry=GLOBAL_BBOX,
+            start_time=start,
+            end_time=end,
+            return_type="dataframe",
+            **QUALITY_FILTERS,
+        )
 
-   vertices = surviving_centers[:, np.newaxis, :] + offsets[np.newaxis, :, :]
-   polys    = [Polygon(v) for v in vertices]
+        # Extract numpy arrays immediately — drop xarray and the DataFrame ASAP
+        df = (
+            ds[["h_canopy", "latitude", "longitude"]]
+            .reset_index()[["latitude", "longitude", "h_canopy"]]
+            .dropna(subset=["h_canopy"])
+            .astype({"h_canopy": "float32", "latitude": "float32", "longitude": "float32"})
+        )
+        del ds
+        print(f"  {len(df):,} shots after quality filter")
 
-   # Polygons stay in Equal Earth — do NOT convert to EPSG:4326 here.
-   # Hexes near ±180° would straddle the antimeridian and render as
-   # full-width horizontal bands in geographic coordinates.
-   hex_gdf = gpd.GeoDataFrame(hex_df.reindex(surviving_labels), geometry=polys, crs=PROJ)
-   del hex_df, centers, hex_ids, vertices, polys
+        lons      = df["longitude"].values
+        lats      = df["latitude"].values
+        h_canopy  = df["h_canopy"].values
+        del df
 
-   # Derive axis limits from the projected bbox so the full global extent is shown
-   _xmin, _ymin, _xmax, _ymax = GLOBAL_BBOX.to_crs(PROJ).total_bounds
+        # Project to Equal Earth — pure numpy via pyproj, no GeoDataFrame
+        px, py = to_proj.transform(lons, lats)
+        del lons, lats
 
-   # ── Plot ───────────────────────────────────────────────────────────────────────
-   fig, axs = plt.subplots(2, 1, figsize=(16, 10), constrained_layout=True)
-   legend_kw = {"shrink": 0.45, "orientation": "vertical", "pad": 0.02}
+        # Nearest-centre assignment — parallel C code, no shapely objects
+        # For a regular hex grid, nearest-centre == polygon containment (Voronoi identity)
+        _, nn_idx = tree.query(np.column_stack([px, py]), workers=-1)
+        del px, py
+        assigned = hex_ids[nn_idx]
+        del nn_idx
 
-   hex_gdf.plot(
-       column="h_canopy_p1", ax=axs[0],
-       cmap="YlGnBu", edgecolor="none", legend=True,
-       vmin=2, vmax=40,
-       legend_kwds={**legend_kw, "label": r"Median $h_{\mathrm{canopy}}$ [m]"},
-   )
-   axs[0].set_xlim(_xmin, _xmax)
-   axs[0].set_ylim(_ymin, _ymax)
-   axs[0].set_title(r"Canopy Height Baseline: 2018-2021", fontsize=14)
-   axs[0].set_xlabel("Easting (m, Equal Earth)")
-   axs[0].set_ylabel("Northing (m, Equal Earth)")
-   for sp in axs[0].spines.values(): sp.set_visible(False)
+        agg = (
+            pd.DataFrame({"hex_id": assigned, "h_canopy": h_canopy})
+            .groupby("hex_id")["h_canopy"]
+            .agg(h_canopy="median", n_shots="count")
+        )
+        del assigned, h_canopy
 
-   lim = np.percentile(hex_gdf["delta_h_canopy"].abs().dropna(), 95)
-   hex_gdf.plot(
-       column="delta_h_canopy", ax=axs[1],
-       cmap="BrBG", edgecolor="none", legend=True,
-       vmin=-lim, vmax=lim,
-       legend_kwds={**legend_kw, "label": r"$\Delta h_{\mathrm{canopy}}$ [m]"},
-   )
-   axs[1].set_xlim(_xmin, _xmax)
-   axs[1].set_ylim(_ymin, _ymax)
-   axs[1].set_title(r"$\Delta$ Canopy Height (2022-2025 vs.\ 2018-2021)", fontsize=14)
-   axs[1].set_xlabel("Easting (m, Equal Earth)")
-   axs[1].set_ylabel("Northing (m, Equal Earth)")
-   for sp in axs[1].spines.values(): sp.set_visible(False)
+        return agg[agg["n_shots"] >= MIN_SHOTS][["h_canopy"]]
 
-   plt.savefig(OUTPATH, dpi=300, bbox_inches='tight')
-   plt.show()
+
+    print("Processing period 1...")
+    agg1 = fetch_and_aggregate(provider, *PERIODS[0])
+    print(f"  {len(agg1):,} valid hexes")
+
+    print("Processing period 2...")
+    agg2 = fetch_and_aggregate(provider, *PERIODS[1])
+    print(f"  {len(agg2):,} valid hexes")
+
+    # ── Delta ──────────────────────────────────────────────────────────────────────
+    hex_df = (
+        agg1.rename(columns={"h_canopy": "h_canopy_p1"})
+            .join(agg2.rename(columns={"h_canopy": "h_canopy_p2"}), how="inner")
+    )
+    hex_df["delta_h_canopy"] = (hex_df["h_canopy_p2"] - hex_df["h_canopy_p1"]).astype("float32")
+    del agg1, agg2
+    print(f"  {len(hex_df):,} hexes with data in both periods")
+
+    # ── Polygons: created only for the hexes that survived all filters ─────────────
+    r       = HEX_DIAMETER / 2
+    angles  = np.linspace(0, 2 * np.pi, 7)[:-1]
+    offsets = np.stack([r * np.cos(angles), r * np.sin(angles)], axis=1)  # (6, 2)
+
+    pos_mask          = np.isin(hex_ids, hex_df.index.values)
+    surviving_centers = centers[pos_mask]
+    surviving_labels  = hex_ids[pos_mask]
+
+    # Broadcasting: (M, 1, 2) + (1, 6, 2) → (M, 6, 2)
+    vertices = surviving_centers[:, np.newaxis, :] + offsets[np.newaxis, :, :]
+    polys    = [Polygon(v) for v in vertices]
+
+    # Keep polygons in Equal Earth — converting to EPSG:4326 would break hexes
+    # that straddle the antimeridian (near ±180°), causing rendering artifacts
+    # over eastern Australia and the Pacific.
+    hex_gdf = gpd.GeoDataFrame(hex_df.reindex(surviving_labels), geometry=polys, crs=PROJ)
+    del hex_df, centers, hex_ids, vertices, polys
+
+    _xmin, _ymin, _xmax, _ymax = _proj_extent()
+
+    # ── Plot ───────────────────────────────────────────────────────────────────────
+    fig, axs = plt.subplots(2, 1, figsize=(16, 10), constrained_layout=True)
+    legend_kw = {"shrink": 0.45, "orientation": "vertical", "pad": 0.02}
+
+    hex_gdf.plot(
+        column="h_canopy_p1", ax=axs[0],
+        cmap="YlGnBu", edgecolor="none", legend=True,
+        vmin=2, vmax=40,
+        legend_kwds={**legend_kw, "label": r"Median $h_{\mathrm{canopy}}$ [m]"},
+    )
+    axs[0].set_xlim(_xmin, _xmax)
+    axs[0].set_ylim(_ymin, _ymax)
+    axs[0].set_title(r"Canopy Height Baseline --- 2018--2021", fontsize=14)
+    axs[0].set_xlabel("Easting (m, Equal Earth)")
+    axs[0].set_ylabel("Northing (m, Equal Earth)")
+    for sp in axs[0].spines.values(): sp.set_visible(False)
+
+    lim = np.percentile(hex_gdf["delta_h_canopy"].abs().dropna(), 95)
+    hex_gdf.plot(
+        column="delta_h_canopy", ax=axs[1],
+        cmap="BrBG", edgecolor="none", legend=True,
+        vmin=-lim, vmax=lim,
+        legend_kwds={**legend_kw, "label": r"$\Delta h_{\mathrm{canopy}}$ [m]"},
+    )
+    axs[1].set_xlim(_xmin, _xmax)
+    axs[1].set_ylim(_ymin, _ymax)
+    axs[1].set_title(r"$\Delta$ Canopy Height (2022--2025 vs.\ 2018--2021)", fontsize=14)
+    axs[1].set_xlabel("Easting (m, Equal Earth)")
+    axs[1].set_ylabel("Northing (m, Equal Earth)")
+    for sp in axs[1].spines.values(): sp.set_visible(False)
+
+    plt.savefig(OUTPATH, dpi=300, bbox_inches='tight')
+    plt.show()
+    print(f"Saved to {OUTPATH}")
+
 
 The resulting figure shows (top) the median baseline canopy height for
 2018-2021 and (bottom) the change in median canopy height between the two
