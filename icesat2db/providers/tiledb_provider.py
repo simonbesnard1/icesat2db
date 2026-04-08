@@ -235,6 +235,11 @@ class TileDBProvider:
     def _build_condition_string(self, filters: Dict[str, str]) -> Optional[str]:
         """
         Build optimized TileDB query condition string from filter dictionary.
+
+        Supported syntax per filter value:
+        - Simple comparison:  ``">= 5"``
+        - Compound AND:       ``">= 5 and <= 60"``
+        - Membership list:    ``"in [111, 112, 113]"`` — expands to OR-joined equalities
         """
         if not filters:
             return None
@@ -246,8 +251,15 @@ class TileDBProvider:
         for key, condition in filters.items():
             condition = condition.strip()
 
-            # Handle compound conditions (AND/OR)
-            if " and " in condition.lower():
+            # Handle membership list: "in [v1, v2, ...]"
+            if condition.lower().startswith("in "):
+                inner = condition[3:].strip().strip("[]")
+                values = [v.strip() for v in inner.split(",")]
+                or_parts = " or ".join(f"{key} == {v}" for v in values)
+                cond_list.append(f"({or_parts})")
+
+            # Handle compound conditions (AND)
+            elif " and " in condition.lower():
                 parts = condition.lower().split(" and ")
                 for part in parts:
                     part = part.strip()
