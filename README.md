@@ -11,8 +11,10 @@
 [![Code coverage](https://codecov.io/gh/simonbesnard1/icesat2db/branch/main/graph/badge.svg?flag=unittests)](https://codecov.io/gh/simonbesnard1/icesat2db)
 [![Docs](https://readthedocs.org/projects/icesat2db/badge/?version=latest)](https://icesat2db.readthedocs.io/en/latest/)
 [![Available on PyPI](https://img.shields.io/pypi/v/icesat2db.svg)](https://pypi.python.org/pypi/icesat2db/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/icesat2db)](https://pypi.python.org/pypi/icesat2db/)
 [![PyPI Downloads](https://static.pepy.tech/badge/icesat2db)](https://pepy.tech/projects/icesat2db)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL--1.2-blue.svg)](https://opensource.org/licenses/EUPL-1.2)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19458654.svg)](https://doi.org/10.5281/zenodo.19458654)
 
 **icesat2DB** is an open-source Python package designed to streamline the processing, analysis, and management of ICESat-2 ATL08 data. This toolbox enables efficient and flexible data querying and management of large ICESat-2 datasets stored with [TileDB](https://tiledb.com/), a high-performance, multi-dimensional array database.
