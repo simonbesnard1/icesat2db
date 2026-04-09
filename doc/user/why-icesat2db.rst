@@ -42,7 +42,7 @@ Processing within icesat2DB involves the following steps:
 It is important to note that icesat2DB maintains the scientific integrity of the original ICESat-2 measurements. No temporal aggregation, spatial binning, or correction factors are applied unless explicitly requested by the user.
 
 ICESat-2 data structure and icesat2DB’s solution
------------------------------------------------
+------------------------------------------------
 
 ICESat-2’s multi-dimensional data—spanning time, space, and height—presents unique challenges in processing and interpretation. icesat2DB simplifies these complexities by aligning data dimensions and providing intuitive modules for accessing and manipulating data. Users can:
 

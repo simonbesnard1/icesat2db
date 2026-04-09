@@ -9,7 +9,7 @@
 
 """
 Querying Processed ICESat-2 Data from TileDB
-===========================================
+============================================
 
 This example demonstrates how to use the `IceSat2Provider` class to query and retrieve ICESat-2 data stored in TileDB arrays.
 We will:

@@ -33,7 +33,7 @@ Downloading functions
    CMRQuery
    
 ICESat-2 data processing functions
-=================================
+==================================
 
 .. autosummary::
    :toctree: generated/

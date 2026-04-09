@@ -14,7 +14,7 @@ Start by importing the **icesat2db** package:
     import concurrent.futures
 
 Processing ICESat-2 Data
------------------------
+------------------------
 
 To process ICESat-2 data, specify paths to a ``YAML`` configuration file (`config_file`). See :ref:`fundamentals-setup` for more information on the data configuration files.
 
@@ -48,7 +48,7 @@ In this example, the :py:class:`icesat2db.IceSat2Processor` performs:
 - **Storing** the processed data in the tileDB database.
 
 Querying ICESat-2 Data
----------------------
+----------------------
 
 Once the data is processed and stored, use :py:class:`icesat2db.IceSat2Provider` to query it. The results can be returned in either **Xarray** or **Pandas** format, providing flexibility for various workflows.
 

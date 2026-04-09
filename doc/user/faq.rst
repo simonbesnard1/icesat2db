@@ -23,7 +23,7 @@ icesat2DB is a TileDB-based Python package designed to efficiently manage, query
 - **Integration with Python libraries**: Outputs data in formats compatible with pandas, geopandas, and xarray for seamless analysis.
 
 How do I set up the database for ICESat-2?
------------------------------------------
+------------------------------------------
 
 The TileDB database is set up automatically using the `icesat2DB` package. By default, it creates and manages the schema required for ICESat-2 data. If you prefer to use a pre-existing database, ensure that the structure aligns with the schema defined by `icesat2DB`.
 
@@ -35,17 +35,17 @@ icesat2DB (currently) supports the following ICESat-2 data products:
 - **Level ATL08**
 
 Can I use the ICESat-2 database on cloud-hosted databases?
----------------------------------------------------------
+----------------------------------------------------------
 
 Yes, the ICESat-2 database can be deployed on cloud-hosted storage systems like AWS S3. Use TileDB’s integration with cloud platforms to store and access ICESat-2 data seamlessly. Refer to the cloud storage documentation in TileDB for setup instructions.
 
 Can I add data to my ICESat-2 database?
---------------------------------------
+---------------------------------------
 
 Yes, you can add data to an existing ICESat-2 database using `icesat2DB`. Simply configure the database with the appropriate schema and use the :py:class:`icesat2db.IceSat2Processor` class to process and ingest new data. Make sure to backup your database before making modifications.
 
 How do I write ICESat-2 data into the database?
-----------------------------------------------
+-----------------------------------------------
 
 ICESat-2 data can be written to the database using the :py:class:`icesat2db.IceSat2Processor` class. Steps include:
 

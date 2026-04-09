@@ -42,7 +42,7 @@ The database includes a wide range of variables from the ATL08 land and vegetati
 For the complete list of available variables, see :ref:`tiledb_database` or call ``provider.get_available_variables()``.
 
 Retrieving ICESat-2 data with the ICESat-2 provider
--------------------------------------------------
+---------------------------------------------------
 
 The :py:class:`icesat2db.IceSat2Provider` class is your main tool for querying ICESat-2 data from the tileDB database. The following example demonstrates how to configure and use the provider to retrieve data with options to include additional quality filters for customized data refinement.
 
