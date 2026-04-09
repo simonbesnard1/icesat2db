@@ -13,12 +13,12 @@ Start by importing the **icesat2db** package:
     import icesat2db as isdb
     import concurrent.futures
 
-Processing IceSat2 Data
+Processing ICESat-2 Data
 -----------------------
 
-To process IceSat2 data, specify paths to a ``YAML`` configuration file (`config_file`). See :ref:`fundamentals-setup` for more information on the data configuration files.
+To process ICESat-2 data, specify paths to a ``YAML`` configuration file (`config_file`). See :ref:`fundamentals-setup` for more information on the data configuration files.
 
-This setup initiates the download, processing, and storage of IceSat2 data in your database.
+This setup initiates the download, processing, and storage of ICESat-2 data in your database.
 
 .. code-block:: python
 
@@ -43,11 +43,11 @@ This setup initiates the download, processing, and storage of IceSat2 data in yo
 
 In this example, the :py:class:`icesat2db.IceSat2Processor` performs:
 
-- **Downloading** IceSat2 ATL08 product.
+- **Downloading** ICESat-2 ATL08 product.
 - **Filtering** data by quality.
 - **Storing** the processed data in the tileDB database.
 
-Querying IceSat2 Data
+Querying ICESat-2 Data
 ---------------------
 
 Once the data is processed and stored, use :py:class:`icesat2db.IceSat2Provider` to query it. The results can be returned in either **Xarray** or **Pandas** format, providing flexibility for various workflows.
@@ -85,7 +85,7 @@ This :py:class:`provider.get_data()` function allows you to:
 - **Apply spatial and temporal filters** using `geometry`, `start_time`, and `end_time`.
 - **Return data** in either `xarray` or `pandas` format based on `return_type`.
 
-This functionality offers a flexible, scalable approach to querying IceSat2 data, streamlining its integration into your data workflows.
+This functionality offers a flexible, scalable approach to querying ICESat-2 data, streamlining its integration into your data workflows.
 
 ---
 

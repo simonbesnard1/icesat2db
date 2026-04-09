@@ -1,7 +1,7 @@
 .. _icesat2db_docs_mainpage:
 
 #######################
-icesat2db Documentation
+icesat2DB Documentation
 #######################
 
 .. toctree::
@@ -10,13 +10,13 @@ icesat2db Documentation
 
    Installation <user/installing>
    User Guide <user/index>
-   IceSat2 Global Database <user/tiledb_database>
+   ICESat-2 Global Database <user/tiledb_database>
    API Reference <user/api>
    Examples <auto_examples/index>
    Discussions <https://github.com/simonbesnard1/icesat2db/discussions>
    Development <user/contributing>
 
-**icesat2db** is an open-source Python package designed to simplify working with IceSat2 ATL08 datasets, streamlining data analysis for efficient data exploration. It offers intuitive modules for processing, querying, and analyzing IceSat2 data stored in **tileDB databases**.
+**icesat2DB** is an open-source Python package designed to simplify working with ICESat-2 ATL08 datasets, streamlining data analysis for efficient data exploration. It offers intuitive modules for processing, querying, and analyzing ICESat-2 data stored in **tileDB databases**.
 
 .. grid:: 1 1 2 2
     :gutter: 2 3 4 4
@@ -28,7 +28,7 @@ icesat2db Documentation
         **Getting Started**
         ^^^
 
-        New to icesat2db? Start here for a quick introduction to icesat2db’s core features, with examples to help you jump right in.
+        New to icesat2DB? Start here for a quick introduction to icesat2DB’s core features, with examples to help you jump right in.
 
         +++
 
@@ -46,7 +46,7 @@ icesat2db Documentation
         **User Guide**
         ^^^
 
-        Dive into the User Guide for detailed explanations of key concepts, workflows, and practical applications within icesat2db.
+        Dive into the User Guide for detailed explanations of key concepts, workflows, and practical applications within icesat2DB.
 
         +++
 
@@ -64,7 +64,7 @@ icesat2db Documentation
         **API Reference**
         ^^^
 
-        The reference guide contains a detailed description of the icesat2db API.
+        The reference guide contains a detailed description of the icesat2DB API.
         The reference describes how the methods work and which parameters can
         be used.
 
@@ -84,7 +84,7 @@ icesat2db Documentation
         **Contributor’s Guide**
         ^^^
 
-        Want to contribute to icesat2db? From code to documentation improvements, this guide shows you how to get involved.
+        Want to contribute to icesat2DB? From code to documentation improvements, this guide shows you how to get involved.
 
         +++
 

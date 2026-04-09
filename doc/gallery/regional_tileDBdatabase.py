@@ -27,7 +27,7 @@ We will:
 
 1. Modify the configuration file (`data_config.yml`) to define the Amazon spatial extent.
 2. Initialize the `IceSat2Processor` with the modified configuration.
-3. Process IceSat2 granules and store them in a **regional TileDB array**.
+3. Process ICESat-2 granules and store them in a **regional TileDB array**.
 
 """
 
@@ -71,7 +71,7 @@ with open(new_config_file, "w") as file:
 
 print(f"Updated configuration saved as '{new_config_file}'.")
 
-# Step 2: Run the IceSat2 Processor
+# Step 2: Run the ICESat-2 Processor
 # ------------------------------
 # Define additional parameters
 start_date = "2020-01-01"

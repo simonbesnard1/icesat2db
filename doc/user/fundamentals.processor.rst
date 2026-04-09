@@ -4,7 +4,7 @@
 Data Processing
 ###############
 
-The :py:class:`icesat2db.IceSat2Processor` class in icesat2db manages the entire workflow of downloading, processing, and storing IceSat2 data in either a local or s3-based tileDB. This section outlines the key functions of :py:class:`icesat2db.IceSat2Processor`, example usage, core functions, and customization options for efficient IceSat2 data handling.
+The :py:class:`icesat2db.IceSat2Processor` class in icesat2db manages the entire workflow of downloading, processing, and storing ICESat-2 data in either a local or s3-based tileDB. This section outlines the key functions of :py:class:`icesat2db.IceSat2Processor`, example usage, core functions, and customization options for efficient ICESat-2 data handling.
 
 Overview of IceSat2Processor workflow
 -------------------------------------
@@ -12,7 +12,7 @@ Overview of IceSat2Processor workflow
 The :py:class:`icesat2db.IceSat2Processor` class handles the following tasks:
 
 - **Initialization**: Sets up paths, configurations, and database connections.
-- **Granule downloading**: Automatically downloads `.h5` granule files for the IceSat2 ATL08 product.
+- **Granule downloading**: Automatically downloads `.h5` granule files for the ICESat-2 ATL08 product.
 - **Data processing**: Applies quality filtering and prepares data for storage.
 - **Database writing**: Stores processed data in a TileDB array with proper metadata for easy querying.
 
@@ -58,14 +58,14 @@ The :py:class:`compute()` method of :py:class:`icesat2db.IceSat2Processor` initi
 
    The granule downloading process consists of two main components:
 
-   - **CMR Data Querying**: The :py:class:`icesat2db.CMRDataDownloader` class queries NASA's CMR service for IceSat2 ATL08 granules within the specified spatial and temporal bounds. It retrieves granule metadata and implements a retry mechanism to handle transient API failures.
+   - **CMR Data Querying**: The :py:class:`icesat2db.CMRDataDownloader` class queries NASA's CMR service for ICESat-2 ATL08 granules within the specified spatial and temporal bounds. It retrieves granule metadata and implements a retry mechanism to handle transient API failures.
    - **Granule File Downloading**: The :py:class:`icesat2db.H5FileDownloader` class downloads `.h5` granule files using a robust, resumable process. It supports partial downloads with a temporary `.part` file and only renames files to `.h5` upon successful completion. The class also handles network failures and retries failed downloads to ensure reliability.
 
-   Granules are stored in structured directories, with each granule ID having separate subdirectories containing its corresponding IceSat2 product files.
+   Granules are stored in structured directories, with each granule ID having separate subdirectories containing its corresponding ICESat-2 product files.
 
 3. **Data processing**:
 
-   The processing pipeline efficiently handles IceSat2 granules by downloading, parsing, filtering, and merging data in parallel.
+   The processing pipeline efficiently handles ICESat-2 granules by downloading, parsing, filtering, and merging data in parallel.
 
    - **Parallel Processing**:
 
@@ -83,7 +83,7 @@ The :py:class:`compute()` method of :py:class:`icesat2db.IceSat2Processor` initi
 
 4. **Database writing**:
 
-   The processed IceSat2 data is written to a **TileDB database**, ensuring efficient storage and retrieval.
+   The processed ICESat-2 data is written to a **TileDB database**, ensuring efficient storage and retrieval.
 
    - **Data Storage**: Processed data is stored in either a local or S3-based TileDB database, distributed across different fragments.
    - **Spatial Chunking**: The data is partitioned into spatial chunks as defined in `data_config.yml`, with each chunk stored in a separate fragment.

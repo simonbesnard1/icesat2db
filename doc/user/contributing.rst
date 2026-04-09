@@ -1,7 +1,7 @@
 .. _devindex:
 
 *************************
-Contributing to icesat2db
+Contributing to icesat2DB
 *************************
 
 .. highlight:: shell
@@ -9,7 +9,7 @@ Contributing to icesat2db
 Overview
 ========
 
-We welcome your skills and enthusiasm at the icesat2db project!. There are numerous opportunities to
+We welcome your skills and enthusiasm at the icesat2DB project!. There are numerous opportunities to
 contribute beyond just writing code.
 All contributions, including bug reports, bug fixes, documentation improvements, enhancement suggestions,
 and other ideas are welcome.
@@ -48,8 +48,8 @@ and "help wanted" is open to whoever wants to implement it.
 Write Documentation
 ~~~~~~~~~~~~~~~~~~~
 
-icesat2db could always use more documentation, whether as part of the
-official icesat2db docs, in docstrings, or even on the web in blog posts,
+icesat2DB could always use more documentation, whether as part of the
+official icesat2DB docs, in docstrings, or even on the web in blog posts,
 articles, and such.  If something in the docs doesn't make sense to you, 
 updating the relevant section after you figure it out is a great way to 
 ensure it will help the next person.
@@ -72,7 +72,7 @@ Commit Changes
 How to
 ~~~~~~
 
-1. Fork the `icesat2db` repo on GitHub.
+1. Fork the `icesat2DB` repo on GitHub.
 2. Clone your fork locally::
 
     $ git clone git@github.com:simonbesnard1/icesat2db.git

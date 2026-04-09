@@ -5,14 +5,14 @@ TileDB Global Database for ICESat-2 ATL08 Data
 
 .. important::
 
-   If you use the database for your publications, please acknowledge that the dataset has been processed using `icesat2db`:
+   If you use the database for your publications, please acknowledge that the dataset has been processed using `icesat2DB`:
 
-   **Dombrowski, F., Besnard, S., Urbazaev, M., & Holcomb, A.** icesat2db [Computer software]. `https://github.com/simonbesnard1/icesat2db <https://github.com/simonbesnard1/icesat2db>`_.
+   **Dombrowski, F., Besnard, S., Urbazaev, M., & Holcomb, A.** icesat2DB [Computer software]. `https://github.com/simonbesnard1/icesat2db <https://github.com/simonbesnard1/icesat2db>`_.
 
 Overview
 --------
 
-The publicly available TileDB global database, managed by the `Global Land Monitoring group <https://www.gfz.de/en/section/remote-sensing-and-geoinformatics/topics/global-land-monitoring>`_ at GFZ-Potsdam, stores all processed ICESat-2 ATL08 version 7 data with a robust and scalable architecture. All granules for the ATL08 land and vegetation product have been ingested into the database, covering the full mission period from October 2018 onwards for all six ICESat-2 beams globally. The data is stored in a **Ceph object storage** managed by the GFZ data center. It enables efficient spatial, temporal, and attribute-based queries. This page provides an overview of the database setup, configuration, and access methods using the `icesat2db` package.
+The publicly available TileDB global database, managed by the `Global Land Monitoring group <https://www.gfz.de/en/section/remote-sensing-and-geoinformatics/topics/global-land-monitoring>`_ at GFZ-Potsdam, stores all processed ICESat-2 ATL08 version 7 data with a robust and scalable architecture. All granules for the ATL08 land and vegetation product have been ingested into the database, covering the full mission period from October 2018 onwards for all six ICESat-2 beams globally. The data is stored in a **Ceph object storage** managed by the GFZ data center. It enables efficient spatial, temporal, and attribute-based queries. This page provides an overview of the database setup, configuration, and access methods using the `icesat2DB` package.
 
 Ceph Object Storage Configuration
 ----------------------------------
@@ -25,7 +25,7 @@ The TileDB global database utilises a Ceph object storage backend to efficiently
 - **Access Control:** Public
 - **Query Support:** Optimized for spatial and temporal queries
 
-For users accessing the database programmatically, interactions with the Ceph bucket are abstracted by the `icesat2db` package, which retrieves data seamlessly from TileDB. Advanced users with direct access to the Ceph storage layer may utilise **S3-compatible tools** (such as ``aws s3api`` or ``rclone``) to interact with the data.
+For users accessing the database programmatically, interactions with the Ceph bucket are abstracted by the `icesat2DB` package, which retrieves data seamlessly from TileDB. Advanced users with direct access to the Ceph storage layer may utilise **S3-compatible tools** (such as ``aws s3api`` or ``rclone``) to interact with the data.
 
 TileDB Database Configuration
 ------------------------------
@@ -194,7 +194,7 @@ The database includes a wide range of variables from the ATL08 land and vegetati
 Accessing the database
 -----------------------
 
-The `icesat2db` Python package simplifies access to the TileDB global database. Below is an example workflow for querying data.
+The `icesat2DB` Python package simplifies access to the TileDB global database. Below is an example workflow for querying data.
 
 **Example Code**:
 
@@ -553,6 +553,6 @@ negative values indicate a decline.
 Resources
 ---------
 - `TileDB Documentation <https://tiledb.com/docs>`_
-- `icesat2db GitHub Repository <https://github.com/simonbesnard1/icesat2db>`_
+- `icesat2DB GitHub Repository <https://github.com/simonbesnard1/icesat2db>`_
 - `ICESat-2 ATL08 Product Overview <https://nsidc.org/data/atl08>`_
 - `ATL08 Algorithm Theoretical Basis Document <https://nsidc.org/sites/default/files/documents/technical-reference/icesat2_atl08_atbd_v006.pdf>`_

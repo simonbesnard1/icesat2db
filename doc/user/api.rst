@@ -32,7 +32,7 @@ Downloading functions
    EarthDataAuthenticator
    CMRQuery
    
-IceSat2 data processing functions
+ICESat-2 data processing functions
 =================================
 
 .. autosummary::
