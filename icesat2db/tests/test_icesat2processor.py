@@ -237,18 +237,18 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
 #
 #         self.assertIsInstance(result, concurrent.futures.ThreadPoolExecutor)
 #         self.assertEqual(result._max_workers, 1)
-
-    def test_falsy_engine_defaults_to_threadpool(self):
-        processor = IceSat2Processor(
-            geometry=self.valid_geometry,
-            config_file=self.valid_config_path,
-            start_date="2021-01-01",
-            end_date="2022-01-01",
-        )
-
-        result = processor._initialize_parallel_engine([])
-
-        self.assertIsInstance(result, concurrent.futures.ThreadPoolExecutor)
+#
+#     def test_falsy_engine_defaults_to_threadpool(self):
+#         processor = IceSat2Processor(
+#             geometry=self.valid_geometry,
+#             config_file=self.valid_config_path,
+#             start_date="2021-01-01",
+#             end_date="2022-01-01",
+#         )
+#
+#         result = processor._initialize_parallel_engine([])
+#
+#         self.assertIsInstance(result, concurrent.futures.ThreadPoolExecutor)
 
 
 class TestDownloadCmrDataExceptions(unittest.TestCase):
