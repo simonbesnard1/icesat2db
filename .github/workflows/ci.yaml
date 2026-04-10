@@ -94,7 +94,8 @@ jobs:
           echo "password $EARTHDATA_PASSWORD" >> ~/.netrc
           chmod 600 ~/.netrc
           
-          run: ls -la $HOME/.netrc
+          ls -la $HOME/.netrc
+          echo $HOME
         env:
           EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}
           EARTHDATA_PASSWORD: ${{ secrets.EARTHDATA_PASSWORD }}
