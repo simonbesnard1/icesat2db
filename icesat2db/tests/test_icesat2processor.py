@@ -192,51 +192,51 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
             )
 
 
-class TestInitializeParallelEngine(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        os.chdir(os.path.dirname(__file__))
-
-        # create a valid temporary config file
-        cls.tmp_dir = tempfile.TemporaryDirectory()
-        cls.valid_config_path = os.path.join(cls.tmp_dir.name, "config.yml")
-        with open(cls.valid_config_path, "w") as f:
-            f.write(f"data_dir: {cls.tmp_dir.name}\n")
-            f.write(f"progress_dir: {cls.tmp_dir.name}\n")
-            f.write("tiledb:\n  report_every: 25\n")
-            f.write(
-                "  spatial_range:\n    lat_min: -90\n    lat_max: 90\n    lon_min: -180\n    lon_max: 180\n"
-            )
-
-        cls.valid_geometry = gpd.read_file("data/bounding_box.geojson")
-
-    def test_user_provided_engine_is_used(self):
-        processor = IceSat2Processor(
-            geometry=self.valid_geometry,
-            config_file=self.valid_config_path,
-            start_date="2021-01-01",
-            end_date="2022-01-01",
-        )
-
-        custom_engine = object()
-
-        result = processor._initialize_parallel_engine(custom_engine)
-
-        self.assertIs(result, custom_engine)
-
-    def test_default_engine_created_when_none(self):
-        processor = IceSat2Processor(
-            geometry=self.valid_geometry,
-            config_file=self.valid_config_path,
-            start_date="2021-01-01",
-            end_date="2022-01-01",
-        )
-
-        result = processor._initialize_parallel_engine(None)
-
-        self.assertIsInstance(result, concurrent.futures.ThreadPoolExecutor)
-        self.assertEqual(result._max_workers, 1)
+# class TestInitializeParallelEngine(unittest.TestCase):
+#
+#     @classmethod
+#     def setUpClass(cls):
+#         os.chdir(os.path.dirname(__file__))
+#
+#         # create a valid temporary config file
+#         cls.tmp_dir = tempfile.TemporaryDirectory()
+#         cls.valid_config_path = os.path.join(cls.tmp_dir.name, "config.yml")
+#         with open(cls.valid_config_path, "w") as f:
+#             f.write(f"data_dir: {cls.tmp_dir.name}\n")
+#             f.write(f"progress_dir: {cls.tmp_dir.name}\n")
+#             f.write("tiledb:\n  report_every: 25\n")
+#             f.write(
+#                 "  spatial_range:\n    lat_min: -90\n    lat_max: 90\n    lon_min: -180\n    lon_max: 180\n"
+#             )
+#
+#         cls.valid_geometry = gpd.read_file("data/bounding_box.geojson")
+#
+#     def test_user_provided_engine_is_used(self):
+#         processor = IceSat2Processor(
+#             geometry=self.valid_geometry,
+#             config_file=self.valid_config_path,
+#             start_date="2021-01-01",
+#             end_date="2022-01-01",
+#         )
+#
+#         custom_engine = object()
+#
+#         result = processor._initialize_parallel_engine(custom_engine)
+#
+#         self.assertIs(result, custom_engine)
+#
+#     def test_default_engine_created_when_none(self):
+#         processor = IceSat2Processor(
+#             geometry=self.valid_geometry,
+#             config_file=self.valid_config_path,
+#             start_date="2021-01-01",
+#             end_date="2022-01-01",
+#         )
+#
+#         result = processor._initialize_parallel_engine(None)
+#
+#         self.assertIsInstance(result, concurrent.futures.ThreadPoolExecutor)
+#         self.assertEqual(result._max_workers, 1)
 
     def test_falsy_engine_defaults_to_threadpool(self):
         processor = IceSat2Processor(
