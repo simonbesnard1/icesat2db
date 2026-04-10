@@ -8,47 +8,51 @@
 Quality Filtering
 #################
 
-This guide details the quality filtering applied to ICESat-2 Level ATL08 data in the icesat2DB package. Each data product uses specific filters to ensure only high-quality data is processed, enhancing data reliability in analysis.
+This guide details the default quality filtering applied to ICESat-2 ATL08 data in the icesat2DB package during data ingestion.
 
 Overview
 --------
 
-In icesat2DB, we have implemented a **default quality filtering routine** based on community-recommended practices. These filters are automatically applied during data ingestion, reducing the dataset size by up to **30%** without compromising data quality. This streamlines your analysis pipeline, saving both time and computational resources.
+In icesat2DB, we have implemented a **default quality filtering routine** based on community-recommended practices. These filters are automatically applied during data ingestion to each 100 m land segment, reducing the dataset size while preserving scientifically reliable observations. This streamlines your analysis pipeline, saving both time and computational resources.
 
-The filters rely on quality-related variables present in the raw HDF5 files. While these variables are available, they are **not pre-applied** in the raw data, which can lead to the inclusion of low-quality data if not filtered. icesat2DB automates this process, applying filters consistently to ensure high data integrity.
+The filters rely on quality-related variables present in the raw ATL08 HDF5 files. While these variables are available in the raw data, they are **not pre-applied**, which can lead to the inclusion of low-quality segments if not filtered. icesat2DB automates this process, applying filters consistently across all six ICESat-2 beams to ensure high data integrity.
 
-Filtering and Product Merging
+ATL08 Default Quality Filters
 -----------------------------
 
-The filters are applied **sequentially** to each data product (L2A and L2B) before merging. This ensures that only data meeting high-quality standards across products is retained in the final dataset. The merging process uses `shot_number` as the key to join each product’s data into a cohesive DataFrame.
+The filters are defined in the :py:class:`icesat2db.ATL08Beam` class and are applied as a logical AND across all conditions — a segment is retained only if it passes every filter. Segments that fail any condition are dropped entirely.
 
-Key points:
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
 
-- **Product-Specific Filtering:** Each product’s data is automatically filtered using the respective beam class (`L2ABeam` and `L2BBeam`).
-- **Merging Logic:** An **inner join** on `shot_number` ensures that only records present in both L2A and L2B (after filtering) are included.
-- **Data Integrity:** Records missing in any product after filtering are excluded, maintaining consistency and reliability in the final dataset.
+   * - Variable
+     - Filter condition and rationale
+   * - ``h_te_uncertainty``
+     - Retained when value is below the HDF5 fill value (3.4028235×10³⁸) or above −999. Removes terrain height estimates flagged as invalid or missing.
+   * - ``h_te_best_fit``
+     - Retained when value is below the HDF5 fill value or above −999. Removes best-fit terrain elevation estimates flagged as invalid or missing.
+   * - ``h_te_median``
+     - Retained when value is below the HDF5 fill value or above −999. Removes median terrain height estimates flagged as invalid or missing.
+   * - ``h_canopy``
+     - Retained when value is below the HDF5 fill value (3.4028235×10³⁸). Removes canopy height estimates flagged as invalid.
+   * - ``h_canopy_uncertainty``
+     - Retained when value is below the HDF5 fill value. Removes segments where canopy height uncertainty is flagged as invalid.
+   * - ``urban_flag``
+     - Retained when ``urban_flag == 0`` (non-urban). Urban areas can introduce data artefacts due to complex surface returns and building interference.
+   * - ``segment_watermask``
+     - Retained when ``segment_watermask == 0`` (non-water). Water surfaces produce unreliable terrain and canopy retrievals.
+
+Sub-segment Fill Handling
+-------------------------
+
+For sub-segment (20 m resolution) fields, invalid values are replaced with ``NaN`` rather than dropping the entire 100 m parent segment. This preserves the parent segment while marking individual 20 m values that failed the validity check (fill value ≥ 3.4028235×10³⁸ or ≤ −999) as missing.
+
+The following fields are handled this way:
+
+- ``h_te_best_fit_20m`` — best-fit terrain height at 20 m resolution
+- ``h_canopy_20m`` — canopy height at 20 m resolution
 
 .. note::
 
-    Quality filters are only applied to the L2A and L2B products. No additional filters are applied to L4A and L4C products. However, because the merging relies on the filtered L2A and L2B data, any GEDI shots marked as low-quality in L2A or L2B will also be excluded from L4A and L4C. This approach assumes that if a shot is of poor quality in L2A/B, it is likely unreliable in L4A/C as well.
-
-
-L2A Product Quality Filtering
------------------------------
-
-The `L2ABeam` class applies several filters to ensure data quality for Level 2A data:
-
-- **`quality_flag`**: Retains data where `quality_flag` is `1`, ensuring high-quality measurements.
-- **`sensitivity_a0`**: Keeps data with `sensitivity_a0` between `0.9` and `1.0`.
-- **`sensitivity_a2`**: Selects data with `sensitivity_a2` between `0.95` and `1.0`.
-- **`degrade_flag`**: Excludes data with `degrade_flag` values indicating degraded data quality.
-- **`surface_flag`**: Retains data where `surface_flag` is `1`, indicating reliable surface measurements.
-- **`elevation_difference_tdx`**: Retains data where the difference between `elev_lowestmode` and `digital_elevation_model` is within `-150` to `150` meters.
-
-L2B Product Quality Filtering
------------------------------
-
-For Level 2B data, the `L2BBeam` class applies the following filters:
-
-- **`water_persistence`**: Retains data with `landsat_water_persistence` below `10`, reducing noise from persistent water bodies.
-- **`urban_proportion`**: Excludes data where `urban_proportion` exceeds `50%`, as urban areas can introduce data artifacts.
+   Additional quality filters (e.g. on ``night_flag``, ``layer_flag``, ``segment_landcover``, ``n_ca_photons``, ``n_te_photons``) can be applied at query time via the :py:class:`icesat2db.IceSat2Provider` interface without re-ingesting the data. See :ref:`fundamentals-provider` for details.
