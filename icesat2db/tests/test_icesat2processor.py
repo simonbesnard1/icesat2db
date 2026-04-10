@@ -66,6 +66,8 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
         cls.log_dir = os.path.join(cls.tmp_dir.name, "logs")
         cls.logger = logging.getLogger("test_logger")
         cls.logger.handlers = []
+        authenticator = icesat2db.downloader.authentication.EarthDataAuthenticator(strict=False)
+        authenticator._fetch_earthdata_cookies()
 
         cls.valid_config_path = os.path.join(cls.tmp_dir.name, "config.yml")
         with open(cls.valid_config_path, "w") as f:
