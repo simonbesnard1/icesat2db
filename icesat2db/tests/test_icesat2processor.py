@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import yaml
 
+import icesat2db.downloader.authentication
 from icesat2db.core.icesat2processor import IceSat2Processor
 
 
@@ -254,6 +255,9 @@ class TestDownloadCmrDataExceptions(unittest.TestCase):
             start_date="2021-01-01",
             end_date="2022-01-01",
         )
+
+        authenticator = icesat2db.downloader.authentication.EarthDataAuthenticator(strict=False)
+        authenticator._fetch_earthdata_cookies()
 
     @patch("icesat2db.icesat2processor.logger")  # adjust to actual module path
     def test_compute_raises_and_logs_exception(self, mock_logger):
