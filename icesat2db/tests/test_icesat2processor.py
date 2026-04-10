@@ -205,7 +205,9 @@ class TestInitializeParallelEngine(unittest.TestCase):
             f.write(f"data_dir: {cls.tmp_dir.name}\n")
             f.write(f"progress_dir: {cls.tmp_dir.name}\n")
             f.write("tiledb:\n  report_every: 25\n")
-            f.write("  spatial_range:\n    lat_min: -90\n    lat_max: 90\n    lon_min: -180\n    lon_max: 180\n")
+            f.write(
+                "  spatial_range:\n    lat_min: -90\n    lat_max: 90\n    lon_min: -180\n    lon_max: 180\n"
+            )
 
         cls.valid_geometry = gpd.read_file("data/bounding_box.geojson")
 
