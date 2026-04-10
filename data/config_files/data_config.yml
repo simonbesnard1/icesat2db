@@ -1,13 +1,11 @@
 # database parameters
 tiledb:
   storage_type: 'local'
-  #s3_bucket: "dog.icesat2db.icesat2-atl008-v007"      # TileDB URI for storing data
-  #url: "https://s3.gfz-potsdam.de"
   overwrite: true                                  # Whether to overwrite existing arrays
-  temporal_batching: "weekly"
+  temporal_batching: "annual"
   time_range:                                      # Global time range for data
     start_time: "2018-01-01"
-    end_time: "2030-12-31"
+    end_time: "2035-12-31"
   spatial_range:                                   # Global spatial range (bounding box)
     lat_min: -90.0
     lat_max: 90.0
@@ -19,7 +17,11 @@ tiledb:
    memory_budget: "150000000000"  # 150GB total memory budget
    memory_budget_var: "50000000000"  # 50GB for variable-sized attributes
   cell_order: "hilbert"
-  capacity: 100000
+  capacity: 200000
+  latitude_tile: 6           # 6° × 5 tiles_across_lat = 30° spatial blocks
+  longitude_tile: 6          # 6° × 5 tiles_across_lon = 30° spatial blocks
+  flush_every: 20000
+  
   # -----------------------------------------------------------------------
   # Compression trade-off
   # use_filters: false (default) — write-optimised: Zstd(1) only, no pre-
@@ -30,13 +32,13 @@ tiledb:
   # when use_filters: true, except default_zstd_level which sets the fast-
   # mode level too).
   # -----------------------------------------------------------------------
-  use_filters: false
-  # default_zstd_level: 1    # fast-mode level for all dtypes (default 1)
-  # float_zstd_level: 4      # full-mode float level  (default 4)
-  # int_zstd_level: 3        # full-mode narrow-int level (default 3)
-  # time_zstd_level: 3       # time dimension level (default 3 full / 1 fast)
-  # timestamp_zstd_level: 2  # timestamp_ns attr level (default 2 full / 1 fast)
-  # spatial_zstd_level: 3    # lat/lon dimension level (default 3 full / 1 fast)
+  use_filters: true
+  default_zstd_level: 1    # fast-mode level for all dtypes (default 1)
+  float_zstd_level: 1      # full-mode float level  (default 4)
+  int_zstd_level: 1        # full-mode narrow-int level (default 3)
+  time_zstd_level: 1       # time dimension level (default 3 full / 1 fast)
+  timestamp_zstd_level: 2  # timestamp_ns attr level (default 2 full / 1 fast)
+  spatial_zstd_level: 1    # lat/lon dimension level (default 3 full / 1 fast)
 
 # Data directory for downloading GEDI data
 data_dir: ''
@@ -48,6 +50,7 @@ earth_data_info:
  CMR_PRODUCT_IDS:
   ATL08: 'C3565574177-NSIDC_CPRD'
 
+# Variables list for each IceSat2 level product - SDS_Name is science dataset name the native h5 file retrieved from the NASA API
 # Variables list for each IceSat2 level product - SDS_Name is science dataset name the native h5 file retrieved from the NASA API
 level_atl08:
   variables:
@@ -92,6 +95,13 @@ level_atl08:
       description: "Number of noise photons calculated that fall within the canopy height for each 100 m segment based on ATL03 background rate parameters."
       long_name: "canopy noise rate"
       units: "count/meter"
+
+    can_quality_score:
+      SDS_Name: "land_segments/canopy/can_quality_score"
+      dtype: "int8"
+      description: "Canopy quality score based on coincident conditions."
+      long_name: "Canopy quality score"
+      units: "adimensional"
 
     canopy_h_metrics:
       SDS_Name: "land_segments/canopy/canopy_h_metrics"
@@ -436,6 +446,13 @@ level_atl08:
       long_name: "saturation flag"
       units: "adimensional"
 
+    sc_orient:
+      SDS_Name: "orbit_info/sc_orient"
+      dtype: "int8"
+      description: "This parameter tracks the spacecraft orientation between forward, backward and transitional flight modes. ICESat-2 is considered to be flying forward when the weak beams are leading the strong beams; and backward when the strong beams are leading the weak beams. ICESat-2 is considered to be in transition while it is maneuvering between the two orientations. Science quality is potentially degraded while in transition mode. (Source: POD/PPD); (Meanings: [0 1 2]) (Values: ['backward', 'forward', 'transition'])"
+      long_name: "Spacecraft Orientation"
+      units: "adimensional"
+
     segment_id_beg:
       SDS_Name: "land_segments/segment_id_beg"
       dtype: "int32"
@@ -645,6 +662,13 @@ level_atl08:
       is_subsegment: True
       subsegment_length: 5
 
+    te_quality_score:
+      SDS_Name: "land_segments/terrain/te_quality_score"
+      dtype: "int8"
+      description: "Quality score based on coincident conditions."
+      long_name: "Quality score terrain flag"
+      units: "adimensional"
+      
     terrain_slope:
       SDS_Name: "land_segments/terrain/terrain_slope"
       dtype: "float32"
@@ -666,8 +690,16 @@ level_atl08:
       long_name: "segment urban flag"
       units: "adimensional"
 
-    # additional parameter segment_id, constructed from the delta_time, latitude and longitude. This will be added as a reference information parameter.
     segment_id:
       SDS_Name: "segment_id"
       description: "Unique segment id"
+      long_name: "segment id"
       dtype: "int64"
+      units: "adimensional"
+
+    beam_id:
+      SDS_Name: "beam_id"
+      description: "Beam id (gt1l, gt2l, gt3l, gt1r, gt2r, gt3r)"
+      long_name: "beam id"
+      dtype: "U4"
+      units: "adimensional"

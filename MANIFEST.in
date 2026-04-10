@@ -6,8 +6,8 @@ include LICENSE
 include CITATION.cff
 
 # Exclude test
-exclude gedidb/tests/*
-exclude gedidb/tests/**/*.*
+exclude icesat2db/tests/*
+exclude icesat2db/tests/**/*.*
 
 # Exclude scripts
 exclude scripts

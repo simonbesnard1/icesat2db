@@ -341,7 +341,7 @@ texinfo_documents = [
         "icesat2db Documentation",
         _stdauthor,
         "icesat2db",
-        "icesat2db: A toolbox for processing and providing Ice, Cloud, and land Elevation Satellite 2 (IceSat2) ATL08 data",
+        "icesat2db: A toolbox for processing and providing Ice, Cloud, and land Elevation Satellite 2 (ICESat-2) ATL08 data",
         "Programming",
         1,
     ),

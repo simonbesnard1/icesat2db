@@ -7,6 +7,8 @@
 # SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
 
 
+import ctypes
+import gc
 import logging
 import os
 import traceback
@@ -37,6 +39,18 @@ logging.basicConfig(
 logging.getLogger("distributed").setLevel(logging.WARNING)
 logging.getLogger("tornado").setLevel(logging.WARNING)
 logger = logging.getLogger()
+
+
+def _release_memory() -> None:
+    """
+    Force Python GC and ask the C allocator to return freed pages to the OS.
+    The malloc_trim call is Linux-only; on other platforms it is silently skipped.
+    """
+    gc.collect()
+    try:
+        ctypes.cdll.LoadLibrary("libc.so.6").malloc_trim(0)
+    except Exception:
+        pass
 
 
 class IceSat2Processor:
@@ -177,6 +191,8 @@ class IceSat2Processor:
             os.path.join(self.data_info["progress_dir"], "progress")
         )
         self.report_every = int(self.data_info["tiledb"].get("report_every", 25))
+        flush_every = self.data_info["tiledb"].get("flush_every", None)
+        self.flush_every = int(flush_every) if flush_every is not None else None
 
         # Initialize database writer
         self.database_writer = self._initialize_database_writer(credentials)
@@ -360,12 +376,14 @@ class IceSat2Processor:
         fragment-friendly way: accumulate per spatial window and write once per window.
         """
         temporal_batching = self.data_info["tiledb"].get("temporal_batching", None)
-        if temporal_batching in ("daily", "weekly"):
+        if temporal_batching in ("daily", "weekly", "annual"):
             batches = _temporal_tiling(unprocessed_cmr_data, temporal_batching)
         elif temporal_batching is None:
             batches = {"all": unprocessed_cmr_data}
         else:
-            raise ValueError("Invalid temporal batching option.")
+            raise ValueError(
+                "Invalid temporal batching option. Choose 'daily', 'weekly', 'annual', or null."
+            )
 
         def _append_ledger_row(
             ledger,
@@ -399,17 +417,19 @@ class IceSat2Processor:
 
         def _flush_buffers(buffers, processed_ids, timeframe):
             """
-            Concatenate all buffered DataFrames and write everything — data and
-            granule-processed metadata — in a single TileDB open/close cycle.
+            Concatenate buffered DataFrames, split into spatial tiles, and write
+            one TileDB fragment per tile so consolidation preserves tile boundaries.
+            Granules are marked processed only after all tiles succeed.
             """
             if not buffers:
                 return
 
             try:
                 combined = pd.concat(buffers, ignore_index=True)
-                self.database_writer.write_granule(
-                    combined, mark_keys=processed_ids or None
-                )
+                for _, tile_df in self.database_writer.spatial_chunking(combined):
+                    self.database_writer.write_granule(tile_df)
+                if processed_ids:
+                    self.database_writer.mark_granules_as_processed_batch(processed_ids)
             except Exception as e:
                 logger.error(
                     f"Write phase failed for timeframe {timeframe}: {e}", exc_info=True
@@ -442,7 +462,9 @@ class IceSat2Processor:
                     counter = 0
 
                     for fut in as_completed(future_map):
-                        gid = future_map[fut]
+                        # Pop immediately so the future (and its result) can be
+                        # GC'd once we're done with its data below.
+                        gid = future_map.pop(fut)
                         started_ts = time.time()
                         try:
                             ids_, gdf, metrics = fut.result()
@@ -484,11 +506,25 @@ class IceSat2Processor:
 
                         finally:
                             counter += 1
+                            if (
+                                self.flush_every
+                                and counter % self.flush_every == 0
+                                and buffers
+                            ):
+                                try:
+                                    _flush_buffers(buffers, processed_ids, timeframe)
+                                    buffers.clear()
+                                    processed_ids.clear()
+                                    _release_memory()
+                                except Exception as flush_exc:
+                                    logger.error(
+                                        f"Periodic flush failed (will retry at next flush): {flush_exc}"
+                                    )
                             if counter % self.report_every == 0:
                                 ledger.write_status_md()
                                 ledger.write_html()
 
-                    # Flush to TileDB once per window
+                    # Final flush for remaining buffer
                     if buffers:
                         try:
                             _flush_buffers(buffers, processed_ids, timeframe)
@@ -498,6 +534,9 @@ class IceSat2Processor:
 
                     ledger.write_status_md()
                     ledger.write_html()
+                    # Return pages from this year's allocation back to the OS
+                    # before starting the next temporal batch.
+                    _release_memory()
             return
 
         # ---- Dask path ----
@@ -525,7 +564,7 @@ class IceSat2Processor:
 
                 # as_completed yields each future as it finishes — no serial blocking
                 for fut in dask_as_completed(future_map):
-                    gid = future_map[fut]
+                    gid = future_map.pop(fut)
                     started_ts = time.time()
                     try:
                         ids_, gdf, metrics = fut.result()
@@ -567,6 +606,20 @@ class IceSat2Processor:
 
                     finally:
                         counter += 1
+                        if (
+                            self.flush_every
+                            and counter % self.flush_every == 0
+                            and buffers
+                        ):
+                            try:
+                                _flush_buffers(buffers, processed_ids, timeframe)
+                                buffers.clear()
+                                processed_ids.clear()
+                                _release_memory()
+                            except Exception as flush_exc:
+                                logger.error(
+                                    f"Periodic flush failed (will retry at next flush): {flush_exc}"
+                                )
                         if counter % self.report_every == 0:
                             ledger.write_status_md()
                             ledger.write_html()
@@ -579,6 +632,7 @@ class IceSat2Processor:
 
                 ledger.write_status_md()
                 ledger.write_html()
+                _release_memory()
             return
 
         raise ValueError("Unsupported parallel engine.")

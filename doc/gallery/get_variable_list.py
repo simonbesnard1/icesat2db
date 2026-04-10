@@ -17,7 +17,7 @@ containing variable names, descriptions, and metadata.
 
 Prerequisites:
 --------------
-1. IceSat2 data must be processed and stored in TileDB arrays.
+1. ICESat-2 data must be processed and stored in TileDB arrays.
 2. Configure the TileDB storage backend (local or S3).
 
 Steps:

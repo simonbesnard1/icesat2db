@@ -10,7 +10,12 @@
 [![Pipelines](https://github.com/simonbesnard1/icesat2db/actions/workflows/ci.yaml/badge.svg)](https://github.com/simonbesnard1/icesat2db/actions?query=workflow%3ACI)
 [![Code coverage](https://codecov.io/gh/simonbesnard1/icesat2db/branch/main/graph/badge.svg?flag=unittests)](https://codecov.io/gh/simonbesnard1/icesat2db)
 [![Docs](https://readthedocs.org/projects/icesat2db/badge/?version=latest)](https://icesat2db.readthedocs.io/en/latest/)
+[![Available on PyPI](https://img.shields.io/pypi/v/icesat2db.svg)](https://pypi.python.org/pypi/icesat2db/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/icesat2db)](https://pypi.python.org/pypi/icesat2db/)
+[![PyPI Downloads](https://static.pepy.tech/badge/icesat2db)](https://pepy.tech/projects/icesat2db)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL--1.2-blue.svg)](https://opensource.org/licenses/EUPL-1.2)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19458654.svg)](https://doi.org/10.5281/zenodo.19458654)
 
 **icesat2DB** is an open-source Python package designed to streamline the processing, analysis, and management of ICESat-2 ATL08 data. This toolbox enables efficient and flexible data querying and management of large ICESat-2 datasets stored with [TileDB](https://tiledb.com/), a high-performance, multi-dimensional array database.
 
@@ -68,9 +73,9 @@ You can find information about contributing to icesat2DB on our
 
 Felix Dombrowski is a Bachelor’s student in Computer Science at the University of Potsdam and a research intern in the Global Land Monitoring Group at GFZ Helmholtz Centre Potsdam. At GFZ, his work has focused on developing toolboxes to process Earth Observation data efficiently.
 
-Mikhail Urbazaev is a Research Associate at the Helmholtz Centre for Geosciences (GFZ). His research focuses on the synergetic use of lidar, synthetic aperture radar, and optical remote sensing data for estimation of aboveground biomass and vegetation structural parameters across different biomes.
-
 Simon Besnard, a senior researcher in the Global Land Monitoring Group at GFZ Helmholtz Centre Potsdam, studies terrestrial ecosystems' dynamics and their feedback on environmental conditions. He specializes in developing methods to analyze large EO and climate datasets to understand ecosystem functioning in a changing climate. His current research focuses on forest structure changes over the past decade and their links to the carbon cycle. 
+
+Mikhail Urbazaev is a Research Associate at the Helmholtz Centre for Geosciences (GFZ). His research focuses on the synergetic use of lidar, synthetic aperture radar, and optical remote sensing data for estimation of aboveground biomass and vegetation structural parameters across different biomes.
 
 Amelia Holcomb is a Postdoc at the University of Maryland, researching remote sensing of tropical forest degradation and recovery. She completed her PhD in Computer Science at the University of Cambridge, where she studied remote sensing and machine learning for carbon sequestration and forest regrowth. Previously, she worked as a site reliability engineer at Google on Bigtable. She holds an MMath from the University of Waterloo and a B.A. in Mathematics from Yale.
 
@@ -78,8 +83,8 @@ Amelia Holcomb is a Postdoc at the University of Maryland, researching remote se
 
 For any questions or inquiries, please contact:
 - Felix Dombrowski (felixd@gfz.de)
-- Mikhail Urbazaev (urbazaev@gfz.de)
 - Simon Besnard (besnard@gfz.de)
+- Mikhail Urbazaev (urbazaev@gfz.de)
 - Amelia Holcomb (amelia.holcomb@gmail.com)
 
 ## Acknowledgments

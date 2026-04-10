@@ -4,14 +4,14 @@
 Configuration files
 *******************
 
-To maximize the functionality of icesat2db, it’s essential to configure key settings using the `data_config.yml` file. These files specify important parameters, ensuring efficient data handling, database connection, and alignment with your processing needs.
+To maximize the functionality of icesat2DB, it’s essential to configure key settings using the `data_config.yml` file. These files specify important parameters, ensuring efficient data handling, database connection, and alignment with your processing needs.
 
 The `data_config.yml` file is the main configuration file for settings related to data retrieval, database connectivity, and file management. Key configurations include:
 
- - **Database Connection Details**: Define database connection variables like `storage_type`, `dimensions`, `temporal_tiling`, and `consolidation_settings`.
- - **File Paths**: Specify directories for storing downloaded IceSat2 data, processed files, and metadata.
+ - **Database Connection Details**: Define database connection variables like `storage_type`, `dimensions`, `temporal_batching`, and `consolidation_settings`.
+ - **File Paths**: Specify directories for storing downloaded ICESat-2 data, processed files, and metadata.
  - **Environment Settings**: Configure parameters for parallel processing and resource allocation.
- - **Data Extraction Settings**: Control which variables to extract from IceSat2 `.h5` files to streamline storage and improve processing efficiency.
+ - **Data Extraction Settings**: Control which variables to extract from ICESat-2 `.h5` files to streamline storage and improve processing efficiency.
 
 A default data configuration file (`data_config.yml`) can be downloaded here:
 
@@ -19,9 +19,9 @@ A default data configuration file (`data_config.yml`) can be downloaded here:
 
 **Extracted data from .h5 Files**
 
-IceSat2 `.h5` files contain extensive data, but icesat2db allows you to specify only the essential variables you need. This configuration not only reduces storage requirements but also speeds up data processing.
+ICESat-2 `.h5` files contain extensive data, but icesat2DB allows you to specify only the essential variables you need. This configuration not only reduces storage requirements but also speeds up data processing.
 
-For instance, each IceSat2 product, like **Level ATL08**, can have a dedicated configuration section, allowing tailored data extraction. Below is an example specifying selected variables for **Level ATL08**:
+For instance, each ICESat-2 product, like **Level ATL08**, can have a dedicated configuration section, allowing tailored data extraction. Below is an example specifying selected variables for **Level ATL08**:
 
 .. code-block:: yaml
 
@@ -41,7 +41,7 @@ For instance, each IceSat2 product, like **Level ATL08**, can have a dedicated c
 
 **Spatial and Temporal Parameters**
 
-Define **spatial** and **temporal** parameters to set boundaries for the data queries. These settings specify which IceSat2 granules to retrieve, based on the region and time range of interest.
+Define **spatial** and **temporal** parameters to set boundaries for the data queries. These settings specify which ICESat-2 granules to retrieve, based on the region and time range of interest.
 
 .. code-block:: yaml
 
@@ -94,23 +94,25 @@ The `data_config.yml` file also includes settings for configuring the database c
       storage_type: 'local'                             # either local or s3
       local_path: ''                                    # TileDB URI for storing data
       overwrite: true                                   # Whether to overwrite existing arrays
-      temporal_tiling: "weekly"                         # either daily or weekly
-      chunk_size: 25                                    # chunk siz ein degrees for spatial chunks
+      temporal_batching: "weekly"                       # either daily, weekly, or annual
+      latitude_tile: 6                                  # spatial tile size in degrees (latitude)
+      longitude_tile: 6                                 # spatial tile size in degrees (longitude)
+      flush_every: 20000                                # flush buffers every N granules to bound memory
       time_range:                                       # Global time range for data
-        start_time: "2018-01"                           # Global start time for data
+        start_time: "2018-01-01"                        # Global start time for data
         end_time: "2030-12-31"                          # Global end time for data
       spatial_range:                                    # Global spatial range (bounding box)
-        lat_min: -56.0
-        lat_max: 56.0
+        lat_min: -90.0
+        lat_max: 90.0
         lon_min: -180.0
         lon_max: 180.0
       dimensions: ['latitude', 'longitude', 'time']     # Dimensions for the TileDB array
       consolidation_settings:
-       fragment_size: 200_000_000_000                   # 100GB fragment size
+       fragment_size: 200000000000                      # 200GB fragment size
        memory_budget: "150000000000"                    # 150GB total memory budget
        memory_budget_var: "50000000000"                 # 50GB for variable-sized attributes
       cell_order: "hilbert"
       capacity: 100000
 
-Users are free to modify these settings to suit their specific requirements, such as changing the `storage_type` to `s3` for cloud storage or adjusting the `temporal_tiling` to `daily` for more granular temporal data.
+Users are free to modify these settings to suit their specific requirements, such as changing the `storage_type` to `s3` for cloud storage or adjusting the `temporal_batching` to `daily` or `annual` for different temporal granularity.
 Be aware that modifying these settings are for advanced users and may require additional knowledge of the TileDB library.

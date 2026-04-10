@@ -8,7 +8,7 @@
 
 import logging
 import os
-from functools import lru_cache
+from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -86,11 +86,11 @@ class TileDBProvider:
             "vfs.s3.endpoint_override": url,
             "vfs.s3.region": region,
             "vfs.s3.scheme": "https",
-            "vfs.s3.use_virtual_addressing": "true",
+            "vfs.s3.use_virtual_addressing": "false",
             # Parallel S3 I/O
             "vfs.s3.max_parallel_ops": str(max_s3_ops),
-            # Reasonable default part size for reads
-            "vfs.s3.multipart_part_size": str(64 * 1024**2),  # 64 MB
+            # Larger part size reduces S3 GET count for big spatial tiles
+            "vfs.s3.multipart_part_size": str(128 * 1024**2),  # 128 MB
             # Timeouts
             "vfs.s3.connect_timeout_ms": "60000",  # 60 s
             "vfs.s3.request_timeout_ms": "600000",  # 10 min
@@ -99,8 +99,13 @@ class TileDBProvider:
             "sm.io_concurrency_level": str(max_reader_threads),
             "sm.num_reader_threads": str(max_reader_threads),
             "sm.num_tiledb_threads": str(max_reader_threads),
+            # Memory budgets — larger values allow TileDB to plan bigger
+            # single-pass reads instead of breaking them into smaller chunks.
+            "sm.memory_budget": str(10 * 1024**3),  # 10 GB
+            "sm.memory_budget_var": str(4 * 1024**3),  # 4 GB
+            "sm.mem.total_budget": str(16 * 1024**3),  # 16 GB
             # Caches
-            "py.init_buffer_bytes": str(2 * 1024**3),  # 1 GiB,
+            "py.init_buffer_bytes": str(2 * 1024**3),  # 2 GiB
             "sm.tile_cache_size": str(8 * 1024**3),  # 8 GB
             # Misc
             "sm.enable_signal_handlers": "false",
@@ -137,7 +142,18 @@ class TileDBProvider:
             }
         )
 
-    @lru_cache(maxsize=1)
+    def _get_array(self) -> tiledb.Array:
+        """
+        Return a persistently open read handle to the scalar array.
+        Opening a TileDB array on S3 requires multiple metadata round-trips;
+        reusing the same handle across calls eliminates that overhead.
+        """
+        if self._array_handle is None or not self._array_handle.isopen:
+            self._array_handle = tiledb.open(
+                self.scalar_array_uri, mode="r", ctx=self.ctx
+            )
+        return self._array_handle
+
     def get_available_variables(self) -> pd.DataFrame:
         """
         Retrieve metadata for available variables in the scalar TileDB array.
@@ -146,28 +162,23 @@ class TileDBProvider:
             return self._metadata_cache
 
         try:
-            with tiledb.open(
-                self.scalar_array_uri, mode="r", ctx=self.ctx
-            ) as scalar_array:
-                metadata = {
-                    k: scalar_array.meta[k]
-                    for k in scalar_array.meta
-                    if not k.startswith("granule_") and "array_type" not in k
-                }
+            # Reuse the persistent handle — avoids a second S3 open/close.
+            scalar_array = self._get_array()
+            metadata = {
+                k: scalar_array.meta[k]
+                for k in scalar_array.meta
+                if not k.startswith("granule_") and "array_type" not in k
+            }
 
-                from collections import defaultdict
+            organized_metadata = defaultdict(dict)
+            for key, value in metadata.items():
+                if "." in key:
+                    var_name, attr_type = key.split(".", 1)
+                    organized_metadata[var_name][attr_type] = value
 
-                organized_metadata = defaultdict(dict)
-                for key, value in metadata.items():
-                    if "." in key:
-                        var_name, attr_type = key.split(".", 1)
-                        organized_metadata[var_name][attr_type] = value
-
-                result = pd.DataFrame.from_dict(
-                    dict(organized_metadata), orient="index"
-                )
-                self._metadata_cache = result
-                return result
+            result = pd.DataFrame.from_dict(dict(organized_metadata), orient="index")
+            self._metadata_cache = result
+            return result
 
         except Exception as e:
             logger.error(f"Failed to retrieve variables from TileDB: {e}")
@@ -224,6 +235,11 @@ class TileDBProvider:
     def _build_condition_string(self, filters: Dict[str, str]) -> Optional[str]:
         """
         Build optimized TileDB query condition string from filter dictionary.
+
+        Supported syntax per filter value:
+        - Simple comparison:  ``">= 5"``
+        - Compound AND:       ``">= 5 and <= 60"``
+        - Membership list:    ``"in [111, 112, 113]"`` — expands to OR-joined equalities
         """
         if not filters:
             return None
@@ -235,8 +251,15 @@ class TileDBProvider:
         for key, condition in filters.items():
             condition = condition.strip()
 
-            # Handle compound conditions (AND/OR)
-            if " and " in condition.lower():
+            # Handle membership list: "in [v1, v2, ...]"
+            if condition.lower().startswith("in "):
+                inner = condition[3:].strip().strip("[]")
+                values = [v.strip() for v in inner.split(",")]
+                or_parts = " or ".join(f"{key} == {v}" for v in values)
+                cond_list.append(f"({or_parts})")
+
+            # Handle compound conditions (AND)
+            elif " and " in condition.lower():
                 parts = condition.lower().split(" and ")
                 for part in parts:
                     part = part.strip()
@@ -291,8 +314,13 @@ class TileDBProvider:
         lons = data["longitude"]
         lats = data["latitude"]
 
-        # Get the geometry (handle MultiPolygon or single Polygon)
-        geom = geometry.unary_union if len(geometry) > 1 else geometry.geometry.iloc[0]
+        # Resolve to a single shapely geometry (caller may pass a precomputed union)
+        if hasattr(geometry, "union_all"):
+            geom = (
+                geometry.union_all() if len(geometry) > 1 else geometry.geometry.iloc[0]
+            )
+        else:
+            geom = geometry  # already a shapely geometry
 
         # Vectorized point-in-polygon test (MUCH faster than iterating)
         mask = contains_xy(geom, lons, lats)
@@ -328,41 +356,34 @@ class TileDBProvider:
         Execute a query on a TileDB array with spatial, temporal, and additional filters.
         """
         try:
-            with tiledb.open(self.scalar_array_uri, mode="r", ctx=self.ctx) as array:
-                # Build attribute list and profile variables (cached metadata)
-                attr_list, profile_vars, subsegment_vars = self._build_profile_attrs(
-                    variables, array.meta
-                )
+            array = self._get_array()
 
-                # Build condition string
-                cond_string = self._build_condition_string(filters)
+            attr_list, profile_vars, subsegment_vars = self._build_profile_attrs(
+                variables, array.meta
+            )
 
-                # Execute query with optimized settings
-                query = array.query(
-                    attrs=attr_list,
-                    cond=cond_string,
-                    coords=return_coords,
-                    return_incomplete=False,
-                )
+            cond_string = self._build_condition_string(filters)
 
-                # Use multi_index for efficient spatial-temporal slicing
-                data = query.multi_index[
-                    lat_min:lat_max, lon_min:lon_max, start_time:end_time
-                ]
+            query = array.query(
+                attrs=attr_list,
+                cond=cond_string,
+                coords=return_coords,
+                return_incomplete=False,
+            )
 
-                # Early return if no data
-                if not data or len(data.get("segment_id", [])) == 0:
+            data = query.multi_index[
+                lat_min:lat_max, lon_min:lon_max, start_time:end_time
+            ]
+
+            if not data or len(data.get("segment_id", [])) == 0:
+                return None, profile_vars, subsegment_vars
+
+            if use_polygon_filter and geometry is not None:
+                data = self._filter_by_polygon(data, geometry)
+                if len(data.get("segment_id", [])) == 0:
                     return None, profile_vars, subsegment_vars
 
-                # Apply polygon filter if requested
-                if use_polygon_filter and geometry is not None:
-                    data = self._filter_by_polygon(data, geometry)
-
-                    # Check again after polygon filter
-                    if len(data.get("segment_id", [])) == 0:
-                        return None, profile_vars, subsegment_vars
-
-                return data, profile_vars, subsegment_vars
+            return data, profile_vars, subsegment_vars
 
         except Exception as e:
             logger.error(f"Error querying TileDB array '{self.scalar_array_uri}': {e}")
@@ -380,10 +401,10 @@ class TileDBProvider:
         if self._schema_cache is not None:
             return self._schema_cache
 
-        with tiledb.open(self.scalar_array_uri, mode="r", ctx=self.ctx) as array:
-            domain = array.schema.domain
-            min_lon, max_lon = domain.dim(1).domain
-            min_lat, max_lat = domain.dim(0).domain
+        array = self._get_array()
+        domain = array.schema.domain
+        min_lon, max_lon = domain.dim(1).domain
+        min_lat, max_lat = domain.dim(0).domain
 
         result = (min_lon, max_lon, min_lat, max_lat)
         self._schema_cache = result
@@ -452,8 +473,10 @@ class TileDBProvider:
         return df
 
     def close(self):
-        """Clean up resources."""
+        """Close the persistent array handle and clear caches."""
         self._schema_cache = None
         self._metadata_cache = None
         if self._array_handle is not None:
+            if self._array_handle.isopen:
+                self._array_handle.close()
             self._array_handle = None

@@ -8,20 +8,20 @@
 
 
 """
-Querying Processed IceSat2 Data from TileDB
-===========================================
+Querying Processed ICESat-2 Data from TileDB
+============================================
 
-This example demonstrates how to use the `IceSat2Provider` class to query and retrieve IceSat2 data stored in TileDB arrays.
+This example demonstrates how to use the `IceSat2Provider` class to query and retrieve ICESat-2 data stored in TileDB arrays.
 We will:
 
 1. Set up the `IceSat2Provider` with a TileDB storage backend.
 2. Query data using spatial and temporal filters.
 3. Retrieve data in both `xarray.Dataset` and `pandas.DataFrame` formats.
-4. Perform nearest-shot queries to retrieve IceSat2 data closest to a given point.
+4. Perform nearest-shot queries to retrieve ICESat-2 data closest to a given point.
 
 Before running this example:
 
-- Ensure that the IceSat2 data has been processed and stored in TileDB arrays.
+- Ensure that the ICESat-2 data has been processed and stored in TileDB arrays.
 - Configure the TileDB storage settings (local or S3) based on your data location.
 
 """
@@ -58,7 +58,7 @@ end_time = "2020-12-31"
 # Section 1: Bounding Box Query
 # -----------------------------------------------------------------
 print("=== Bounding Box Query ===")
-print("Querying IceSat2 data within a specified spatial and temporal range.")
+print("Querying ICESat-2 data within a specified spatial and temporal range.")
 
 # Query data within the bounding box and time range, and retrieve it as an `xarray.Dataset`
 data_xarray = provider.get_data(
@@ -79,13 +79,13 @@ print(data_xarray)
 # Section 2: Nearest Shot Query
 # -----------------------------------------------------------------
 print("\n=== Nearest Shot Query ===")
-print("Querying IceSat2 data for the nearest shots to a specific point.")
+print("Querying ICESat-2 data for the nearest shots to a specific point.")
 
 # Specify a geographic point (longitude, latitude) and the number of nearest shots
 point = (-55.0, -10.0)  # Example longitude and latitude
 num_shots = 5  # Retrieve the 5 nearest shots
 
-# Query data for the nearest IceSat2 shots
+# Query data for the nearest ICESat-2 shots
 nearest_data = provider.get_data(
     variables=variables,
     point=point,
@@ -94,8 +94,8 @@ nearest_data = provider.get_data(
     return_type="xarray",
 )
 
-# Print the nearest IceSat2 shots
-print("Retrieved nearest IceSat2 shots as an xarray.Dataset:")
+# Print the nearest ICESat-2 shots
+print("Retrieved nearest ICESat-2 shots as an xarray.Dataset:")
 print(nearest_data)
 
 ##############################################################
@@ -103,7 +103,7 @@ print(nearest_data)
 # Section 3: Data Format Options
 # -----------------------------------------------------------------
 print("\n=== Data Format Options ===")
-print("Retrieving IceSat2 data as a pandas.DataFrame for easier tabular analysis.")
+print("Retrieving ICESat-2 data as a pandas.DataFrame for easier tabular analysis.")
 
 # Query the data within the bounding box and retrieve it as a `pandas.DataFrame`
 data_dataframe = provider.get_data(

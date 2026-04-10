@@ -151,5 +151,86 @@ class TestIceSat2Database(unittest.TestCase):
                 "Segment_id mismatch",
             )
 
+    def test_check_granules_status_returns_false_when_unprocessed(self):
+        statuses = self.icesat2_db.check_granules_status(["fake_id_aaa", "fake_id_bbb"])
+        self.assertFalse(statuses["fake_id_aaa"])
+        self.assertFalse(statuses["fake_id_bbb"])
+
+    def test_mark_granules_as_processed_batch_and_check(self):
+        keys = ["batch_granule_001", "batch_granule_002"]
+        # Initially unprocessed
+        self.assertTrue(
+            all(not v for v in self.icesat2_db.check_granules_status(keys).values())
+        )
+        self.icesat2_db.mark_granules_as_processed_batch(keys)
+        statuses = self.icesat2_db.check_granules_status(keys)
+        self.assertTrue(all(statuses.values()))
+
+    def test_mark_granule_as_processed_single(self):
+        key = "single_granule_001"
+        self.icesat2_db.mark_granule_as_processed(key)
+        self.assertTrue(self.icesat2_db.check_granules_status([key])[key])
+
+    def test_mark_granules_as_processed_batch_empty_list(self):
+        """Empty batch should not raise."""
+        self.icesat2_db.mark_granules_as_processed_batch([])
+
+    def test_spatial_chunking_splits_into_tiles(self):
+        df = pd.DataFrame(
+            {
+                "latitude": [0.5, 1.5, 30.5, -30.5],
+                "longitude": [0.5, 50.5, -100.5, 100.5],
+            }
+        )
+        chunks = list(self.icesat2_db.spatial_chunking(df))
+        self.assertGreater(len(chunks), 0)
+        total = sum(len(tile_df) for _, tile_df in chunks)
+        self.assertEqual(total, len(df))
+
+    def test_spatial_chunking_empty_dataframe_yields_nothing(self):
+        df = pd.DataFrame(
+            {
+                "latitude": pd.Series([], dtype=float),
+                "longitude": pd.Series([], dtype=float),
+            }
+        )
+        self.assertEqual(list(self.icesat2_db.spatial_chunking(df)), [])
+
+    def test_spatial_chunking_missing_columns_raises(self):
+        with self.assertRaises(ValueError):
+            list(self.icesat2_db.spatial_chunking(pd.DataFrame({"latitude": [1.0]})))
+
+    def test_validate_granule_data_raises_on_missing_dimension(self):
+        df_bad = pd.DataFrame({"latitude": [1.0]})  # longitude and time missing
+        with self.assertRaises(ValueError):
+            self.icesat2_db._validate_granule_data(df_bad)
+
+    def test_validate_granule_data_passes_when_all_dims_present(self):
+        df = pd.read_csv(self.data_dir / "example_data.csv")
+        # Should not raise
+        self.icesat2_db._validate_granule_data(df)
+
+    def test_write_granule_out_of_domain_rows_are_silently_dropped(self):
+        """Rows outside ±90/±180 are filtered; write should not raise."""
+        df = pd.read_csv(self.data_dir / "example_data.csv").copy()
+        df["latitude"] = 999.0  # clearly outside domain
+        self.icesat2_db.write_granule(df)  # should not raise
+
+    def test_coerce_series_to_float32(self):
+        s = pd.Series([1.0, 2.0, 3.0], dtype=np.float64)
+        result = IceSat2Database._coerce_series("v", s, np.dtype(np.float32))
+        self.assertEqual(result.dtype, np.float32)
+
+    def test_coerce_series_to_string(self):
+        s = pd.Series([1, None, 3])
+        result = IceSat2Database._coerce_series("v", s, np.dtype("U10"))
+        self.assertTrue(np.issubdtype(result.dtype, np.str_))
+
+    def test_schema_cache_is_populated_after_first_write(self):
+        """_get_schema_cache should return non-empty dicts."""
+        cache = self.icesat2_db._get_schema_cache()
+        self.assertIn("dim_names", cache)
+        self.assertIn("latitude", cache["dim_names"])
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(TestIceSat2Database)
