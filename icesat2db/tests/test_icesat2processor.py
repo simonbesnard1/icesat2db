@@ -66,7 +66,9 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
         cls.log_dir = os.path.join(cls.tmp_dir.name, "logs")
         cls.logger = logging.getLogger("test_logger")
         cls.logger.handlers = []
-        authenticator = icesat2db.downloader.authentication.EarthDataAuthenticator(strict=False)
+        authenticator = icesat2db.downloader.authentication.EarthDataAuthenticator(
+            strict=False
+        )
         authenticator._fetch_earthdata_cookies()
 
         cls.valid_config_path = os.path.join(cls.tmp_dir.name, "config.yml")
@@ -249,7 +251,9 @@ class TestDownloadCmrDataExceptions(unittest.TestCase):
 
         # create a valid temporary config file
         cls.tmp_dir = tempfile.TemporaryDirectory()
-        authenticator = icesat2db.downloader.authentication.EarthDataAuthenticator(strict=False)
+        authenticator = icesat2db.downloader.authentication.EarthDataAuthenticator(
+            strict=False
+        )
         authenticator._fetch_earthdata_cookies()
         cls.valid_geometry = gpd.read_file("data/bounding_box.geojson")
         cls.processor = IceSat2Processor(
@@ -258,8 +262,6 @@ class TestDownloadCmrDataExceptions(unittest.TestCase):
             start_date="2021-01-01",
             end_date="2022-01-01",
         )
-
-
 
     @patch("icesat2db.icesat2processor.logger")  # adjust to actual module path
     def test_compute_raises_and_logs_exception(self, mock_logger):
