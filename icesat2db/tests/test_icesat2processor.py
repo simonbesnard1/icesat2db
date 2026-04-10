@@ -228,7 +228,7 @@ class TestInitializeParallelEngine(unittest.TestCase):
     def test_default_engine_created_when_none(self):
         processor = IceSat2Processor(
             geometry=self.valid_geometry,
-            config_file="data/data_config.yml",
+            config_file=self.valid_config_path,
             start_date="2021-01-01",
             end_date="2022-01-01",
         )
@@ -241,7 +241,7 @@ class TestInitializeParallelEngine(unittest.TestCase):
     def test_falsy_engine_defaults_to_threadpool(self):
         processor = IceSat2Processor(
             geometry=self.valid_geometry,
-            config_file="data/data_config.yml",
+            config_file=self.valid_config_path,
             start_date="2021-01-01",
             end_date="2022-01-01",
         )
