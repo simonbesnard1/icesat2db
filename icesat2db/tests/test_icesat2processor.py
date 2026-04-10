@@ -247,7 +247,8 @@ class TestDownloadCmrDataExceptions(unittest.TestCase):
 
         # create a valid temporary config file
         cls.tmp_dir = tempfile.TemporaryDirectory()
-
+        authenticator = icesat2db.downloader.authentication.EarthDataAuthenticator(strict=False)
+        authenticator._fetch_earthdata_cookies()
         cls.valid_geometry = gpd.read_file("data/bounding_box.geojson")
         cls.processor = IceSat2Processor(
             geometry=cls.valid_geometry,
@@ -256,8 +257,7 @@ class TestDownloadCmrDataExceptions(unittest.TestCase):
             end_date="2022-01-01",
         )
 
-        authenticator = icesat2db.downloader.authentication.EarthDataAuthenticator(strict=False)
-        authenticator._fetch_earthdata_cookies()
+
 
     @patch("icesat2db.icesat2processor.logger")  # adjust to actual module path
     def test_compute_raises_and_logs_exception(self, mock_logger):
