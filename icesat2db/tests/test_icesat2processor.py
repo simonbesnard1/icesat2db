@@ -52,6 +52,7 @@ class TestValidateAndParseDate(unittest.TestCase):
             IceSat2Processor._validate_and_parse_date("bad", "end_date")
         self.assertIn("end_date", str(ctx.exception))
 
+
 class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
     """Unit tests for IceSat2Processor.__init__ config_file handling."""
 
@@ -74,9 +75,11 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
             f.write(f"progress_dir: {cls.tmp_dir.name}\n")
         cls.logger_config_path = os.path.join(cls.tmp_dir.name, "logger_config.yml")
         with open(cls.logger_config_path, "w") as f:
-            f.write("data_dir: {}\nprogress_dir: {}\n".format(
-                cls.tmp_dir.name, cls.tmp_dir.name
-            ))
+            f.write(
+                "data_dir: {}\nprogress_dir: {}\n".format(
+                    cls.tmp_dir.name, cls.tmp_dir.name
+                )
+            )
 
         # minimal valid geometry placeholder
         cls.valid_geometry = gpd.read_file("data/bounding_box.geojson")
@@ -90,17 +93,11 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
     # ------------------------
     def test_config_file_none(self):
         with self.assertRaises(ValueError):
-            IceSat2Processor(
-                geometry=self.valid_geometry,
-                config_file=None
-            )
+            IceSat2Processor(geometry=self.valid_geometry, config_file=None)
 
     def test_config_file_not_string(self):
         with self.assertRaises(ValueError):
-            IceSat2Processor(
-                geometry=self.valid_geometry,
-                config_file=123
-            )
+            IceSat2Processor(geometry=self.valid_geometry, config_file=123)
 
     def test_config_file_wrong_extension(self):
         wrong_path = os.path.join(self.tmp_dir.name, "config.txt")
@@ -108,19 +105,13 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
             f.write("dummy")
 
         with self.assertRaises(ValueError):
-            IceSat2Processor(
-                geometry=self.valid_geometry,
-                config_file=wrong_path
-            )
+            IceSat2Processor(geometry=self.valid_geometry, config_file=wrong_path)
 
     def test_config_file_not_existing(self):
         missing_path = os.path.join(self.tmp_dir.name, "missing.yml")
 
         with self.assertRaises(FileNotFoundError):
-            IceSat2Processor(
-                geometry=self.valid_geometry,
-                config_file=missing_path
-            )
+            IceSat2Processor(geometry=self.valid_geometry, config_file=missing_path)
 
     # ------------------------
     # credentials validation
@@ -130,7 +121,7 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
             IceSat2Processor(
                 geometry=self.valid_geometry,
                 config_file=self.valid_config_path,
-                credentials="not_a_dict"
+                credentials="not_a_dict",
             )
 
     # ------------------------
@@ -141,7 +132,7 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
             IceSat2Processor(
                 geometry=self.valid_geometry,
                 config_file=self.valid_config_path,
-                parallel_engine="invalid"
+                parallel_engine="invalid",
             )
 
     # ------------------------
@@ -153,7 +144,7 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
             IceSat2Processor(
                 geometry=self.valid_geometry,
                 config_file=self.valid_config_path,
-                log_dir=123
+                log_dir=123,
             )
 
     # ------------------------
@@ -161,10 +152,7 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
     # ------------------------
     def test_geometry_none(self):
         with self.assertRaises(ValueError):
-            IceSat2Processor(
-                geometry=None,
-                config_file=self.valid_config_path
-            )
+            IceSat2Processor(geometry=None, config_file=self.valid_config_path)
 
     # ------------------------
     # date validation
@@ -175,7 +163,7 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
                 geometry=self.valid_geometry,
                 config_file=self.valid_config_path,
                 start_date="2020-01-01",
-                end_date=None
+                end_date=None,
             )
 
     def test_start_after_end(self):
@@ -184,7 +172,7 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
                 geometry=self.valid_geometry,
                 config_file=self.valid_config_path,
                 start_date="2021-01-01",
-                end_date="2020-01-01"
+                end_date="2020-01-01",
             )
 
     def test_report_every(self):
@@ -195,8 +183,9 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
                 log_dir=self.log_dir,
                 # earth_data_dir=self.tmp_dir.name,
                 start_date="2021-01-01",
-                end_date="2022-01-01"
+                end_date="2022-01-01",
             )
+
 
 class TestInitializeParallelEngine(unittest.TestCase):
 
@@ -214,7 +203,7 @@ class TestInitializeParallelEngine(unittest.TestCase):
             geometry=self.valid_geometry,
             config_file="data/data_config.yml",
             start_date="2021-01-01",
-            end_date="2022-01-01"
+            end_date="2022-01-01",
         )
 
         custom_engine = object()
@@ -227,8 +216,8 @@ class TestInitializeParallelEngine(unittest.TestCase):
         processor = IceSat2Processor(
             geometry=self.valid_geometry,
             config_file="data/data_config.yml",
-            start_date = "2021-01-01",
-            end_date = "2022-01-01"
+            start_date="2021-01-01",
+            end_date="2022-01-01",
         )
 
         result = processor._initialize_parallel_engine(None)
@@ -241,12 +230,13 @@ class TestInitializeParallelEngine(unittest.TestCase):
             geometry=self.valid_geometry,
             config_file="data/data_config.yml",
             start_date="2021-01-01",
-            end_date="2022-01-01"
+            end_date="2022-01-01",
         )
 
         result = processor._initialize_parallel_engine([])
 
         self.assertIsInstance(result, concurrent.futures.ThreadPoolExecutor)
+
 
 class TestDownloadCmrDataExceptions(unittest.TestCase):
 
@@ -262,9 +252,8 @@ class TestDownloadCmrDataExceptions(unittest.TestCase):
             geometry=cls.valid_geometry,
             config_file="data/data_config.yml",
             start_date="2021-01-01",
-            end_date="2022-01-01"
+            end_date="2022-01-01",
         )
-
 
     @patch("icesat2db.icesat2processor.logger")  # adjust to actual module path
     def test_compute_raises_and_logs_exception(self, mock_logger):
@@ -284,9 +273,8 @@ class TestDownloadCmrDataExceptions(unittest.TestCase):
 
         # Verify logging happened
         mock_logger.error.assert_any_call("An error occurred: %s", context.exception)
-        mock_logger.error.assert_any_call(
-            "Traceback: %s", unittest.mock.ANY
-        )
+        mock_logger.error.assert_any_call("Traceback: %s", unittest.mock.ANY)
+
 
 class TestEnsureDirectory(unittest.TestCase):
     """Unit tests for IceSat2Processor._ensure_directory (static method)."""
