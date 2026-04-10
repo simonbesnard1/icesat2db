@@ -19,7 +19,7 @@ Ceph Object Storage Configuration
 
 The TileDB global database utilises a Ceph object storage backend to efficiently manage and distribute ICESat-2 ATL08 data. Below are the key characteristics of the Ceph bucket:
 
-- **Bucket Name:** ``dog.icesat2db.icesat2-atl08-v007``
+- **Bucket Name:** ``dog-ext.icesat2db.icesat2-atl08-v007``
 - **Access Endpoint:** ``https://s3.gfz-potsdam.de``
 - **Region:** ``eu-central-1``
 - **Access Control:** Public
@@ -39,7 +39,7 @@ Below is the structure of the configuration file used to build the TileDB databa
    # database parameters
    tiledb:
      storage_type: 's3'
-     s3_bucket: "dog.icesat2db.icesat2-atl08-v007"
+     s3_bucket: "dog-ext.icesat2db.icesat2-atl08-v007"
      url: "https://s3.gfz-potsdam.de"
      overwrite: false
      temporal_batching: "annual"
@@ -206,7 +206,7 @@ The `icesat2DB` Python package simplifies access to the TileDB global database. 
    # Instantiate the IceSat2Provider
    provider = isdb.IceSat2Provider(
        storage_type='s3',
-       s3_bucket="dog.icesat2db.icesat2-atl08-v007",
+       s3_bucket="dog-ext.icesat2db.icesat2-atl08-v007",
        url="https://s3.gfz-potsdam.de"
    )
 
@@ -348,7 +348,7 @@ The key steps are:
     # ── Provider ───────────────────────────────────────────────────────────────────
     provider = idb.IceSat2Provider(
         storage_type='s3',
-        s3_bucket="dog.icesat2db.icesat2-atl08-v007",
+        s3_bucket="dog-ext.icesat2db.icesat2-atl08-v007",
         url="https://s3.gfz-potsdam.de"
     )
 
