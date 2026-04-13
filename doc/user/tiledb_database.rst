@@ -95,6 +95,20 @@ List of the available variables
 
 The database includes a wide range of variables from the ATL08 land and vegetation product, covering terrain elevation, canopy height metrics, quality flags, and ancillary data. Profile variables (e.g., ``canopy_h_metrics``) store multi-element arrays per 100 m segment, expanded into indexed columns in the database. Sub-segment variables (e.g., ``h_canopy_20m``) store values at 20 m resolution within each 100 m segment (5 values per segment).
 
+.. note::
+
+   Profile variables ``canopy_h_metrics`` and ``canopy_h_metrics_abs`` contain 18 values per segment
+   (indices 0-17), each corresponding to a fixed percentile of the canopy height distribution:
+
+   +-------+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+   | Index |  0 |  1 |  2 |  3 |  4 |  5 |  6 |  7 |  8 |  9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 |
+   +-------+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+   | %ile  | 10 | 15 | 20 | 25 | 30 | 35 | 40 | 45 | 50 | 55 | 60 | 65 | 70 | 75 | 80 | 85 | 90 | 95 |
+   +-------+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+
+   After rebuilding the database, these indices will be replaced by named ``percentile`` coordinates
+   (10, 15, …, 95), enabling selections such as ``ds.canopy_h_metrics.sel(percentile=50)``.
+
 .. csv-table:: Variable Descriptions
    :header: "Variable Name", "Description", "Units", "Category"
    :widths: 25, 55, 12, 10

@@ -346,6 +346,14 @@ class IceSat2Database:
                         array.meta[f"{var_name}.profile_length"] = var_info.get(
                             "profile_length", 0
                         )
+                        if "profile_labels" in var_info:
+                            array.meta[f"{var_name}.profile_labels"] = ",".join(
+                                str(v) for v in var_info["profile_labels"]
+                            )
+                        if "profile_label_name" in var_info:
+                            array.meta[f"{var_name}.profile_label_name"] = var_info[
+                                "profile_label_name"
+                            ]
                     if var_info.get("is_subsegment", False):
                         array.meta[f"{var_name}.subsegment_length"] = var_info.get(
                             "subsegment_length", 0

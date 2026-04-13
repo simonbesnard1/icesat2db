@@ -146,20 +146,22 @@ class IceSat2Provider(TileDBProvider):
         lon_min, lat_min = point[0] - radius, point[1] - radius
         lon_max, lat_max = point[0] + radius, point[1] + radius
 
-        scalar_data_subset, profile_vars, subsegment_vars = self._query_array(
-            scalar_vars,
-            lat_min,
-            lat_max,
-            lon_min,
-            lon_max,
-            start_time,
-            end_time,
-            **quality_filters,
+        scalar_data_subset, profile_vars, subsegment_vars, label_info = (
+            self._query_array(
+                scalar_vars,
+                lat_min,
+                lat_max,
+                lon_min,
+                lon_max,
+                start_time,
+                end_time,
+                **quality_filters,
+            )
         )
 
         if not scalar_data_subset:
             logger.info("No points found in the bounding box.")
-            return {}, {}, {}
+            return {}, {}, {}, {}
 
         longitudes, latitudes = (
             scalar_data_subset["longitude"],
@@ -169,7 +171,7 @@ class IceSat2Provider(TileDBProvider):
             logger.warning(
                 "No points found within the bounding box for nearest shot query."
             )
-            return {}, {}, {}
+            return {}, {}, {}, {}
 
         # Efficient KD-tree search
         tree = cKDTree(np.column_stack((longitudes, latitudes)))
@@ -180,7 +182,7 @@ class IceSat2Provider(TileDBProvider):
 
         scalar_data = {k: v[indices] for k, v in scalar_data_subset.items()}
 
-        return scalar_data, profile_vars, subsegment_vars
+        return scalar_data, profile_vars, subsegment_vars, label_info
 
     def query_data(
         self,
@@ -254,7 +256,7 @@ class IceSat2Provider(TileDBProvider):
         # Query with optimized filtering — pass the precomputed shapely geometry
         # so _filter_by_polygon skips the union_all() call it would otherwise make.
         scalar_vars = variables + DEFAULT_DIMS
-        scalar_data, profile_vars, subsegment_vars = self._query_array(
+        scalar_data, profile_vars, subsegment_vars, label_info = self._query_array(
             scalar_vars,
             lat_min,
             lat_max,
@@ -267,7 +269,7 @@ class IceSat2Provider(TileDBProvider):
             **quality_filters,
         )
 
-        return scalar_data, profile_vars, subsegment_vars
+        return scalar_data, profile_vars, subsegment_vars, label_info
 
     def get_data(
         self,
@@ -367,18 +369,20 @@ class IceSat2Provider(TileDBProvider):
 
         # Execute query
         if query_type == "nearest":
-            scalar_data, profile_vars, subsegment_vars = self.query_nearest_shots(
-                variables,
-                point,
-                num_shots,
-                radius,
-                start_time,
-                end_time,
-                **quality_filters,
+            scalar_data, profile_vars, subsegment_vars, label_info = (
+                self.query_nearest_shots(
+                    variables,
+                    point,
+                    num_shots,
+                    radius,
+                    start_time,
+                    end_time,
+                    **quality_filters,
+                )
             )
 
         elif query_type == "bounding_box":
-            scalar_data, profile_vars, subsegment_vars = self.query_data(
+            scalar_data, profile_vars, subsegment_vars, label_info = self.query_data(
                 variables,
                 geometry,
                 start_time,
@@ -394,15 +398,20 @@ class IceSat2Provider(TileDBProvider):
         # Return in requested format
         if return_type == "xarray":
             metadata = self.get_available_variables()
-            return self.to_xarray(scalar_data, metadata, profile_vars, subsegment_vars)
+            return self.to_xarray(
+                scalar_data, metadata, profile_vars, subsegment_vars, label_info
+            )
         elif return_type == "dataframe":
-            return self.to_dataframe(scalar_data, profile_vars, subsegment_vars)
+            return self.to_dataframe(
+                scalar_data, profile_vars, subsegment_vars, label_info
+            )
 
     def to_dataframe(
         self,
         scalar_data: Dict[str, np.ndarray],
         profile_vars: Dict[str, List[str]] = None,
         subsegment_vars: Dict[str, List[str]] = None,
+        label_info: Dict[str, dict] = None,
     ) -> pd.DataFrame:
         """
         Convert scalar and profile data dictionaries into a unified pandas DataFrame.
@@ -443,11 +452,21 @@ class IceSat2Provider(TileDBProvider):
 
         # Reconstruct profile variables if present
         if profile_vars:
+            label_info = label_info or {}
             for var_name, profile_cols in profile_vars.items():
                 if all(col in scalar_df.columns for col in profile_cols):
-                    # Vectorized list creation
-                    scalar_df[var_name] = scalar_df[profile_cols].values.tolist()
-                    scalar_df = scalar_df.drop(columns=profile_cols)
+                    info = label_info.get(var_name)
+                    if info:
+                        # Rename _1…_N columns to _{label} (e.g. _p10…_p95)
+                        rename_map = {
+                            col: f"{var_name}_p{label}"
+                            for col, label in zip(profile_cols, info["labels"])
+                        }
+                        scalar_df = scalar_df.rename(columns=rename_map)
+                    else:
+                        # Fallback: collapse into a list column
+                        scalar_df[var_name] = scalar_df[profile_cols].values.tolist()
+                        scalar_df = scalar_df.drop(columns=profile_cols)
 
         return scalar_df
 
@@ -457,6 +476,7 @@ class IceSat2Provider(TileDBProvider):
         metadata: pd.DataFrame,
         profile_vars: Dict[str, List[str]],
         subsegment_vars: Dict[str, List[str]],
+        label_info: Dict[str, dict] = None,
     ) -> xr.Dataset:
         """
         Convert scalar, profile, and sub-segment data to an Xarray Dataset.
@@ -468,20 +488,27 @@ class IceSat2Provider(TileDBProvider):
         metadata : pd.DataFrame
             Variable metadata (descriptions, units, …). Index matches variable names.
         profile_vars : Dict[str, List[str]]
-            Base name → expanded column list for profile variables
-            (dimension: ``profile_point``).
+            Base name → expanded column list for profile variables.
         subsegment_vars : Dict[str, List[str]]
             Base name → expanded column list for sub-segment variables
             (dimension: ``subsegment_point``).
+        label_info : Dict[str, dict], optional
+            Per-profile-variable label metadata from ``_build_profile_attrs``.
+            Keys are base variable names; values are dicts with ``"labels"``
+            (list of coordinate values) and ``"dim_name"`` (coordinate name,
+            e.g. ``"percentile"``).  When present, the profile dimension is
+            named and coordinated accordingly instead of using ``profile_point``.
 
         Returns
         -------
         xr.Dataset
             Dataset indexed by ``segment_id`` for scalars, ``(segment_id,
-            profile_point)`` for profile variables, and ``(segment_id,
-            subsegment_point)`` for sub-segment variables.
+            <dim_name>)`` for labelled profile variables, ``(segment_id,
+            profile_point)`` for unlabelled profile variables, and
+            ``(segment_id, subsegment_point)`` for sub-segment variables.
         """
         time_coord = _timestamp_to_datetime(scalar_data["time"])
+        label_info = label_info or {}
 
         # Collect all expanded column names to exclude from scalar list
         profile_components = {col for cols in profile_vars.values() for col in cols}
@@ -497,21 +524,25 @@ class IceSat2Provider(TileDBProvider):
         ]
 
         data_vars = {}
+        extra_coords = {}
 
         # ── Scalar variables ──────────────────────────────────────────────────
-        # Use (dims, data) tuples to skip per-variable xr.DataArray construction.
         for var in scalar_var_names:
             data_vars[var] = (["segment_id"], scalar_data[var])
 
-        # ── Profile variables  (dim: profile_point) ───────────────────────────
+        # ── Profile variables ─────────────────────────────────────────────────
         for base_var, components in profile_vars.items():
             profile_data = np.stack(
                 [scalar_data[comp] for comp in components], axis=-1
             ).astype(np.float32, copy=False)
-            data_vars[base_var] = (
-                ["segment_id", "profile_point"],
-                profile_data,
-            )
+
+            info = label_info.get(base_var)
+            if info:
+                dim_name = info["dim_name"]
+                data_vars[base_var] = (["segment_id", dim_name], profile_data)
+                extra_coords[dim_name] = np.array(info["labels"], dtype=np.int32)
+            else:
+                data_vars[base_var] = (["segment_id", "profile_point"], profile_data)
 
         # ── Sub-segment variables  (dim: subsegment_point) ────────────────────
         for base_var, components in subsegment_vars.items():
@@ -531,6 +562,7 @@ class IceSat2Provider(TileDBProvider):
                 "latitude": ("segment_id", scalar_data["latitude"]),
                 "longitude": ("segment_id", scalar_data["longitude"]),
                 "time": ("segment_id", time_coord),
+                **extra_coords,
             },
         )
 

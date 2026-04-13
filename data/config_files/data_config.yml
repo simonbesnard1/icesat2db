@@ -111,6 +111,8 @@ level_atl08:
       units: "meters"
       is_profile: True
       profile_length: 18
+      profile_labels: [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95]
+      profile_label_name: "percentile"
 
     canopy_h_metrics_abs:
       SDS_Name: "land_segments/canopy/canopy_h_metrics_abs"
@@ -120,6 +122,8 @@ level_atl08:
       units: "meters"
       is_profile: True
       profile_length: 18
+      profile_labels: [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95]
+      profile_label_name: "percentile"
 
     canopy_openness:
       SDS_Name: "land_segments/canopy/canopy_openness"

@@ -189,7 +189,7 @@ class TileDBProvider:
         self,
         variables: List[str],
         array_meta,
-    ) -> Tuple[List[str], Dict[str, List[str]], Dict[str, List[str]]]:
+    ) -> Tuple[List[str], Dict[str, List[str]], Dict[str, List[str]], Dict[str, dict]]:
         """
         Build attribute list and per-variable column mappings for profile and
         sub-segment variables.
@@ -207,10 +207,14 @@ class TileDBProvider:
             profile variables.
         subsegment_vars : Dict[str, List[str]]
             Same mapping for sub-segment variables.
+        label_info : Dict[str, dict]
+            Mapping of profile variable name → ``{"labels": [...], "dim_name": str}``.
+            Present only for profile variables that have label metadata stored.
         """
         attr_list: List[str] = []
         profile_vars: Dict[str, List[str]] = {}
         subsegment_vars: Dict[str, List[str]] = {}
+        label_info: Dict[str, dict] = {}
 
         for var in variables:
             profile_key = f"{var}.profile_length"
@@ -220,6 +224,14 @@ class TileDBProvider:
                 expanded = [f"{var}_{i}" for i in range(1, array_meta[profile_key] + 1)]
                 attr_list.extend(expanded)
                 profile_vars[var] = expanded
+
+                labels_raw = array_meta.get(f"{var}.profile_labels")
+                dim_name = array_meta.get(f"{var}.profile_label_name")
+                if labels_raw and dim_name:
+                    label_info[var] = {
+                        "labels": [int(v) for v in labels_raw.split(",")],
+                        "dim_name": dim_name,
+                    }
 
             elif subsegment_key in array_meta:
                 expanded = [
@@ -231,7 +243,7 @@ class TileDBProvider:
             else:
                 attr_list.append(var)
 
-        return attr_list, profile_vars, subsegment_vars
+        return attr_list, profile_vars, subsegment_vars, label_info
 
     def _build_condition_string(self, filters: Dict[str, str]) -> Optional[str]:
         """
@@ -351,7 +363,10 @@ class TileDBProvider:
         quantization_factor: float = 1e6,
         **filters: Dict[str, str],
     ) -> Tuple[
-        Optional[Dict[str, np.ndarray]], Dict[str, List[str]], Dict[str, List[str]]
+        Optional[Dict[str, np.ndarray]],
+        Dict[str, List[str]],
+        Dict[str, List[str]],
+        Dict[str, dict],
     ]:
         """
         Execute a query on a TileDB array with spatial, temporal, and additional filters.
@@ -359,8 +374,8 @@ class TileDBProvider:
         try:
             array = self._get_array()
 
-            attr_list, profile_vars, subsegment_vars = self._build_profile_attrs(
-                variables, array.meta
+            attr_list, profile_vars, subsegment_vars, label_info = (
+                self._build_profile_attrs(variables, array.meta)
             )
 
             cond_string = self._build_condition_string(filters)
@@ -377,14 +392,14 @@ class TileDBProvider:
             ]
 
             if not data or len(data.get("segment_id", [])) == 0:
-                return None, profile_vars, subsegment_vars
+                return None, profile_vars, subsegment_vars, label_info
 
             if use_polygon_filter and geometry is not None:
                 data = self._filter_by_polygon(data, geometry)
                 if len(data.get("segment_id", [])) == 0:
-                    return None, profile_vars, subsegment_vars
+                    return None, profile_vars, subsegment_vars, label_info
 
-            return data, profile_vars, subsegment_vars
+            return data, profile_vars, subsegment_vars, label_info
 
         except Exception as e:
             error_str = str(e)
@@ -459,7 +474,7 @@ class TileDBProvider:
         Optional[pd.DataFrame]
             Query results or None if no data found
         """
-        data, profile_vars, subsegment_vars = self._query_array(
+        data, profile_vars, subsegment_vars, _label_info = self._query_array(
             variables,
             lat_min,
             lat_max,

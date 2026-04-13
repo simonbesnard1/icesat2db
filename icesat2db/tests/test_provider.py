@@ -224,28 +224,46 @@ class TestTileDBProviderLowLevel(unittest.TestCase):
     # ── _build_profile_attrs ──────────────────────────────────────────────────
 
     def test_build_profile_attrs_scalar_variable(self):
-        attr_list, profile_vars, subsegment_vars = self.provider._build_profile_attrs(
-            ["h_canopy_quad"], {}
+        attr_list, profile_vars, subsegment_vars, label_info = (
+            self.provider._build_profile_attrs(["h_canopy_quad"], {})
         )
         self.assertIn("h_canopy_quad", attr_list)
         self.assertNotIn("h_canopy_quad", profile_vars)
         self.assertNotIn("h_canopy_quad", subsegment_vars)
+        self.assertNotIn("h_canopy_quad", label_info)
 
     def test_build_profile_attrs_profile_variable_expands(self):
         meta = {"canopy_h_metrics.profile_length": 18}
-        attr_list, profile_vars, subsegment_vars = self.provider._build_profile_attrs(
-            ["canopy_h_metrics"], meta
+        attr_list, profile_vars, subsegment_vars, label_info = (
+            self.provider._build_profile_attrs(["canopy_h_metrics"], meta)
         )
         self.assertEqual(len(attr_list), 18)
         self.assertIn("canopy_h_metrics", profile_vars)
         self.assertEqual(len(profile_vars["canopy_h_metrics"]), 18)
         self.assertEqual(attr_list[0], "canopy_h_metrics_1")
         self.assertEqual(attr_list[-1], "canopy_h_metrics_18")
+        self.assertNotIn("canopy_h_metrics", label_info)
+
+    def test_build_profile_attrs_profile_variable_with_labels(self):
+        meta = {
+            "canopy_h_metrics.profile_length": 18,
+            "canopy_h_metrics.profile_labels": "10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95",
+            "canopy_h_metrics.profile_label_name": "percentile",
+        }
+        attr_list, profile_vars, subsegment_vars, label_info = (
+            self.provider._build_profile_attrs(["canopy_h_metrics"], meta)
+        )
+        self.assertIn("canopy_h_metrics", label_info)
+        self.assertEqual(label_info["canopy_h_metrics"]["dim_name"], "percentile")
+        self.assertEqual(
+            label_info["canopy_h_metrics"]["labels"],
+            [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95],
+        )
 
     def test_build_profile_attrs_subsegment_variable_expands(self):
         meta = {"h_canopy_20m.subsegment_length": 5}
-        attr_list, profile_vars, subsegment_vars = self.provider._build_profile_attrs(
-            ["h_canopy_20m"], meta
+        attr_list, profile_vars, subsegment_vars, label_info = (
+            self.provider._build_profile_attrs(["h_canopy_20m"], meta)
         )
         self.assertEqual(len(attr_list), 5)
         self.assertIn("h_canopy_20m", subsegment_vars)
