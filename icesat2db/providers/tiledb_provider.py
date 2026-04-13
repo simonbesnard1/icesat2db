@@ -8,6 +8,7 @@
 
 import logging
 import os
+import re
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
@@ -386,6 +387,18 @@ class TileDBProvider:
             return data, profile_vars, subsegment_vars
 
         except Exception as e:
+            error_str = str(e)
+            if "dimension 'time'" in error_str and "out of domain bounds" in error_str:
+                match = re.search(r"domain bounds \[(\d+), (\d+)\]", error_str)
+                if match:
+                    epoch = np.datetime64("1970-01-01", "D")
+                    t_min = str(epoch + np.timedelta64(int(match.group(1)), "D"))[:10]
+                    t_max = str(epoch + np.timedelta64(int(match.group(2)), "D"))[:10]
+                    raise ValueError(
+                        f"Requested time range is outside the database bounds. "
+                        f"Please provide a start_time and end_time within "
+                        f"[{t_min}, {t_max}]."
+                    ) from e
             logger.error(f"Error querying TileDB array '{self.scalar_array_uri}': {e}")
             raise
 
