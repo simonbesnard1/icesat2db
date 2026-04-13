@@ -76,7 +76,7 @@ jobs:
     runs-on: ubuntu-latest
 
     environment:
-      name: pypi
+      name: testpypi
       url: https://test.pypi.org/p/icesat2db
     permissions:
       id-token: write
