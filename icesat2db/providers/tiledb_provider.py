@@ -240,6 +240,14 @@ class TileDBProvider:
                 attr_list.extend(expanded)
                 subsegment_vars[var] = expanded
 
+                labels_raw = array_meta.get(f"{var}.subsegment_labels")
+                dim_name = array_meta.get(f"{var}.subsegment_label_name")
+                if labels_raw and dim_name:
+                    label_info[var] = {
+                        "labels": [int(v) for v in labels_raw.split(",")],
+                        "dim_name": dim_name,
+                    }
+
             else:
                 attr_list.append(var)
 

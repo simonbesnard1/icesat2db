@@ -358,6 +358,14 @@ class IceSat2Database:
                         array.meta[f"{var_name}.subsegment_length"] = var_info.get(
                             "subsegment_length", 0
                         )
+                        if "subsegment_labels" in var_info:
+                            array.meta[f"{var_name}.subsegment_labels"] = ",".join(
+                                str(v) for v in var_info["subsegment_labels"]
+                            )
+                        if "subsegment_label_name" in var_info:
+                            array.meta[f"{var_name}.subsegment_label_name"] = var_info[
+                                "subsegment_label_name"
+                            ]
         except tiledb.TileDBError as e:
             logger.error(f"Error adding metadata: {e}")
             raise

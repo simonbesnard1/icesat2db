@@ -450,23 +450,37 @@ class IceSat2Provider(TileDBProvider):
             {**scalar_data, "time": _timestamp_to_datetime(scalar_data["time"])}
         )
 
+        label_info = label_info or {}
+
         # Reconstruct profile variables if present
         if profile_vars:
-            label_info = label_info or {}
             for var_name, profile_cols in profile_vars.items():
                 if all(col in scalar_df.columns for col in profile_cols):
                     info = label_info.get(var_name)
                     if info:
-                        # Rename _1…_N columns to _{label} (e.g. _p10…_p95)
                         rename_map = {
                             col: f"{var_name}_p{label}"
                             for col, label in zip(profile_cols, info["labels"])
                         }
                         scalar_df = scalar_df.rename(columns=rename_map)
                     else:
-                        # Fallback: collapse into a list column
                         scalar_df[var_name] = scalar_df[profile_cols].values.tolist()
                         scalar_df = scalar_df.drop(columns=profile_cols)
+
+        # Reconstruct subsegment variables if present
+        if subsegment_vars:
+            for var_name, subseg_cols in subsegment_vars.items():
+                if all(col in scalar_df.columns for col in subseg_cols):
+                    info = label_info.get(var_name)
+                    if info:
+                        rename_map = {
+                            col: f"{var_name}_{label}m"
+                            for col, label in zip(subseg_cols, info["labels"])
+                        }
+                        scalar_df = scalar_df.rename(columns=rename_map)
+                    else:
+                        scalar_df[var_name] = scalar_df[subseg_cols].values.tolist()
+                        scalar_df = scalar_df.drop(columns=subseg_cols)
 
         return scalar_df
 
@@ -544,15 +558,17 @@ class IceSat2Provider(TileDBProvider):
             else:
                 data_vars[base_var] = (["segment_id", "profile_point"], profile_data)
 
-        # ── Sub-segment variables  (dim: subsegment_point) ────────────────────
+        # ── Sub-segment variables ─────────────────────────────────────────────
         for base_var, components in subsegment_vars.items():
             subsegment_data = np.stack(
                 [scalar_data[comp] for comp in components], axis=-1
             ).astype(np.float32, copy=False)
-            data_vars[base_var] = (
-                ["segment_id", "subsegment_point"],
-                subsegment_data,
-            )
+
+            info = label_info.get(base_var)
+            dim_name = info["dim_name"] if info else "subsegment_point"
+            if info:
+                extra_coords[dim_name] = np.array(info["labels"], dtype=np.int32)
+            data_vars[base_var] = (["segment_id", dim_name], subsegment_data)
 
         # ── Assemble dataset ──────────────────────────────────────────────────
         dataset = xr.Dataset(

@@ -161,6 +161,8 @@ level_atl08:
       units: "meters"
       is_subsegment: True
       subsegment_length: 5
+      subsegment_labels: [10, 30, 50, 70, 90]
+      subsegment_label_name: "along_track_offset_m"
 
     h_canopy_abs:
       SDS_Name: "land_segments/canopy/h_canopy_abs"
@@ -289,6 +291,8 @@ level_atl08:
       units: "adimensional"
       is_subsegment: True
       subsegment_length: 5
+      subsegment_labels: [10, 30, 50, 70, 90]
+      subsegment_label_name: "along_track_offset_m"
 
     toc_roughness:
       SDS_Name: "land_segments/canopy/toc_roughness"
@@ -377,6 +381,8 @@ level_atl08:
       units: "degree"
       is_subsegment: True
       subsegment_length: 5
+      subsegment_labels: [10, 30, 50, 70, 90]
+      subsegment_label_name: "along_track_offset_m"
 
     layer_flag:
       SDS_Name: "land_segments/layer_flag"
@@ -393,6 +399,8 @@ level_atl08:
       units: "degree"
       is_subsegment: True
       subsegment_length: 5
+      subsegment_labels: [10, 30, 50, 70, 90]
+      subsegment_label_name: "along_track_offset_m"
 
     msw_flag:
       SDS_Name: "land_segments/msw_flag"
@@ -572,6 +580,8 @@ level_atl08:
       units: "meters"
       is_subsegment: True
       subsegment_length: 5
+      subsegment_labels: [10, 30, 50, 70, 90]
+      subsegment_label_name: "along_track_offset_m"
 
     h_te_interp:
       SDS_Name: "land_segments/terrain/h_te_interp"
@@ -665,6 +675,8 @@ level_atl08:
       units: "adimensional"
       is_subsegment: True
       subsegment_length: 5
+      subsegment_labels: [10, 30, 50, 70, 90]
+      subsegment_label_name: "along_track_offset_m"
 
     te_quality_score:
       SDS_Name: "land_segments/terrain/te_quality_score"
