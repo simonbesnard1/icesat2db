@@ -97,7 +97,8 @@ The database includes a wide range of variables from the ATL08 land and vegetati
 
 .. note::
 
-   **Profile variables** — ``canopy_h_metrics`` and ``canopy_h_metrics_abs`` contain 18 values per
+   **Profile variables**
+   ``canopy_h_metrics`` and ``canopy_h_metrics_abs`` contain 18 values per
    segment, each corresponding to a fixed percentile of the canopy height distribution. When queried,
    these are exposed as a named ``percentile`` coordinate:
 
@@ -117,7 +118,8 @@ The database includes a wide range of variables from the ATL08 land and vegetati
       ds = provider.get_data(variables=["canopy_h_metrics:50"], ...)
       df = provider.get_data(variables=["canopy_h_metrics:50"], return_type="dataframe", ...)
 
-   **Sub-segment variables** — ``h_canopy_20m``, ``h_te_best_fit_20m``, ``latitude_20m``,
+   **Sub-segment variables**
+   ``h_canopy_20m``, ``h_te_best_fit_20m``, ``latitude_20m``,
    ``longitude_20m``, ``subset_can_flag``, and ``subset_te_flag`` contain 5 values per segment,
    one per 20 m sub-segment. These are exposed as a named ``along_track_offset_m`` coordinate
    representing the midpoint of each 20 m bin within the 100 m segment:
