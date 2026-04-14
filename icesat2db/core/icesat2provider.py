@@ -33,6 +33,8 @@ DEFAULT_DIMS = ["segment_id"]
 
 # Precompiled once — matches profile/subsegment expanded column names like h_canopy_20m_1
 _INDEX_SUFFIX_RE = re.compile(r"^(.+)_(\d+)$")
+# Matches friendly single-label renames: _p50 (profile) or _50m (subsegment)
+_FRIENDLY_SUFFIX_RE = re.compile(r"^(.+)_(?:p\d+|\d+m)$")
 
 
 class IceSat2Provider(TileDBProvider):
@@ -626,6 +628,7 @@ class IceSat2Provider(TileDBProvider):
         # expanded column such as h_canopy_20m_1 lands in the dataset directly
         # (e.g. the user requested it as a scalar), fall back to the base
         # variable's metadata entry by stripping the trailing _<index> suffix.
+        # For friendly single-label renames (_p50 / _50m), strip that suffix too.
         for var in dataset.variables:
             var_metadata = metadata_dict.get(var)
             if var_metadata is None:
@@ -639,4 +642,10 @@ class IceSat2Provider(TileDBProvider):
                         var_metadata["description"] = (
                             f"{desc} (index {idx})" if desc else f"index {idx}"
                         )
+            if var_metadata is None:
+                match = _FRIENDLY_SUFFIX_RE.match(var)
+                if match:
+                    base_meta = metadata_dict.get(match.group(1))
+                    if base_meta:
+                        var_metadata = base_meta.copy()
             dataset[var].attrs.update(var_metadata or default_metadata)
