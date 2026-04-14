@@ -1,10 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=Open+Sans:ital,wght@0,400;0,600;1,400;1,600&display=swap');
 
-.navbar-brand img {
-   height: 90px;
+.navbar-brand img,
+.navbar-brand .logo__image {
+   height: 60px !important;
+   max-height: 60px !important;
+   width: auto !important;
 }
 .navbar-brand {
-   height: 90px;
+   height: 60px;
+   padding-top: 0;
+   padding-bottom: 0;
 }
 
 body {
@@ -16,7 +21,7 @@ body {
    Reduces the space between the top-left logo and the navbar section titles */
 
 .col-lg-3 {
-  width: 15%;
+  width: 20%;
 }
 
 /* Version switcher colors from PyData Sphinx Theme */
