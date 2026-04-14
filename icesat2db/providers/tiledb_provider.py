@@ -189,7 +189,13 @@ class TileDBProvider:
         self,
         variables: List[str],
         array_meta,
-    ) -> Tuple[List[str], Dict[str, List[str]], Dict[str, List[str]], Dict[str, dict], Dict[str, str]]:
+    ) -> Tuple[
+        List[str],
+        Dict[str, List[str]],
+        Dict[str, List[str]],
+        Dict[str, dict],
+        Dict[str, str],
+    ]:
         """
         Build attribute list and per-variable column mappings for profile and
         sub-segment variables.
@@ -247,7 +253,7 @@ class TileDBProvider:
                         f"Label '{label_val}' not found in '{base_var}'. "
                         f"Available labels: {labels}."
                     )
-                idx = labels.index(label_val) + 1   # TileDB attrs are 1-indexed
+                idx = labels.index(label_val) + 1  # TileDB attrs are 1-indexed
                 tiledb_attr = f"{base_var}_{idx}"
                 attr_list.append(tiledb_attr)
                 if profile_labels_raw:
@@ -526,17 +532,19 @@ class TileDBProvider:
         Optional[pd.DataFrame]
             Query results or None if no data found
         """
-        data, profile_vars, subsegment_vars, _label_info = self._query_array(  # noqa: F841
-            variables,
-            lat_min,
-            lat_max,
-            lon_min,
-            lon_max,
-            start_time,
-            end_time,
-            geometry=geometry,
-            use_polygon_filter=use_polygon_filter,
-            **filters,
+        data, profile_vars, subsegment_vars, _label_info = (
+            self._query_array(  # noqa: F841
+                variables,
+                lat_min,
+                lat_max,
+                lon_min,
+                lon_max,
+                start_time,
+                end_time,
+                geometry=geometry,
+                use_polygon_filter=use_polygon_filter,
+                **filters,
+            )
         )
 
         if data is None:

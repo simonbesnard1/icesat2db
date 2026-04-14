@@ -284,7 +284,9 @@ class TestTileDBProviderLowLevel(unittest.TestCase):
         # It should not appear in profile_vars (not a multi-column profile)
         self.assertNotIn("canopy_h_metrics", profile_vars)
         # The rename dict maps TileDB attr name to friendly name
-        self.assertEqual(scalar_renames.get("canopy_h_metrics_9"), "canopy_h_metrics_p50")
+        self.assertEqual(
+            scalar_renames.get("canopy_h_metrics_9"), "canopy_h_metrics_p50"
+        )
 
     def test_build_profile_attrs_single_label_invalid_raises(self):
         meta = {
