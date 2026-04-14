@@ -97,17 +97,44 @@ The database includes a wide range of variables from the ATL08 land and vegetati
 
 .. note::
 
-   Profile variables ``canopy_h_metrics`` and ``canopy_h_metrics_abs`` contain 18 values per segment
-   (indices 0-17), each corresponding to a fixed percentile of the canopy height distribution:
+   **Profile variables** — ``canopy_h_metrics`` and ``canopy_h_metrics_abs`` contain 18 values per
+   segment, each corresponding to a fixed percentile of the canopy height distribution. When queried,
+   these are exposed as a named ``percentile`` coordinate:
 
-   +-------+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
-   | Index |  0 |  1 |  2 |  3 |  4 |  5 |  6 |  7 |  8 |  9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 |
-   +-------+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
-   | %ile  | 10 | 15 | 20 | 25 | 30 | 35 | 40 | 45 | 50 | 55 | 60 | 65 | 70 | 75 | 80 | 85 | 90 | 95 |
-   +-------+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+   .. code-block:: python
 
-   After rebuilding the database, these indices will be replaced by named ``percentile`` coordinates
-   (10, 15, …, 95), enabling selections such as ``ds.canopy_h_metrics.sel(percentile=50)``.
+      ds.canopy_h_metrics.sel(percentile=50)   # median canopy height
+      ds.canopy_h_metrics.sel(percentile=95)   # 95th-percentile canopy height
+
+   The 18 percentile values are: **10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95**.
+
+   To fetch only a single percentile at query time (saving bandwidth by reading one column instead
+   of all 18), use the ``variable:label`` syntax when calling :py:meth:`~icesat2db.IceSat2Provider.get_data`:
+
+   .. code-block:: python
+
+      # Returns only the 50th-percentile column, renamed to 'canopy_h_metrics_p50'
+      ds = provider.get_data(variables=["canopy_h_metrics:50"], ...)
+      df = provider.get_data(variables=["canopy_h_metrics:50"], return_type="dataframe", ...)
+
+   **Sub-segment variables** — ``h_canopy_20m``, ``h_te_best_fit_20m``, ``latitude_20m``,
+   ``longitude_20m``, ``subset_can_flag``, and ``subset_te_flag`` contain 5 values per segment,
+   one per 20 m sub-segment. These are exposed as a named ``along_track_offset_m`` coordinate
+   representing the midpoint of each 20 m bin within the 100 m segment:
+
+   .. code-block:: python
+
+      ds.h_canopy_20m.sel(along_track_offset_m=50)   # centre 20 m bin of the 100 m segment
+      ds.h_canopy_20m.sel(along_track_offset_m=10)   # first 20 m bin
+
+   The 5 along-track offsets are: **10, 30, 50, 70, 90** metres.
+
+   The same single-label syntax applies to sub-segment variables:
+
+   .. code-block:: python
+
+      # Returns only the centre 20 m bin, renamed to 'h_canopy_20m_50m'
+      ds = provider.get_data(variables=["h_canopy_20m:50"], ...)
 
 .. csv-table:: Variable Descriptions
    :header: "Variable Name", "Description", "Units", "Category"
@@ -562,6 +589,134 @@ negative values indicate a decline.
    aggregated on a custom equal-area hexagonal grid (~100 km diameter per cell,
    Equal Earth projection EPSG:8857). Only cells with at least 100 ATL08
    segments in both periods are shown.
+
+
+Query Performance Benchmark
+----------------------------
+
+The following script measures how query time scales with bounding box area by running 20 queries of
+increasing spatial extent centred on the same point, plus a full global archive query.
+Each query is repeated three times and the median wall-clock time is recorded.
+
+.. code-block:: python
+
+    import time
+    import geopandas as gpd
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from shapely.geometry import box
+    import icesat2db as idb
+
+    CENTER_LON, CENTER_LAT = 10.0, 51.0
+    START_TIME, END_TIME   = "2020-01-01", "2020-12-31"
+    HALF_SIDES = np.linspace(0.25, 20.0, 20)   # degrees
+    N_REPEATS  = 3
+
+    provider = idb.IceSat2Provider(
+        storage_type="s3",
+        s3_bucket="dog-ext.icesat2db.icesat2-atl08-v007",
+        url="https://s3.gfz-potsdam.de",
+    )
+
+    areas_km2, times_s, n_shots = [], [], []
+
+    for half in HALF_SIDES:
+        geom = gpd.GeoDataFrame(
+            geometry=[box(CENTER_LON - half, CENTER_LAT - half,
+                          CENTER_LON + half, CENTER_LAT + half)],
+            crs="EPSG:4326",
+        )
+        area_km2 = (2 * half) ** 2 * 111.0 * (111.0 * np.cos(np.radians(CENTER_LAT)))
+
+        repeat_times, n = [], None
+        for _ in range(N_REPEATS):
+            t0 = time.perf_counter()
+            result = provider.get_data(
+                variables=["h_canopy"],
+                query_type="bounding_box",
+                geometry=geom,
+                start_time=START_TIME,
+                end_time=END_TIME,
+                return_type="dataframe",
+                use_polygon_filter=False,
+            )
+            repeat_times.append(time.perf_counter() - t0)
+            if result is not None and n is None:
+                n = len(result)
+
+        areas_km2.append(area_km2)
+        times_s.append(float(np.median(repeat_times)))
+        n_shots.append(n or 0)
+
+    # Global archive query
+    GLOBAL_BBOX = gpd.GeoDataFrame(
+        geometry=[box(-179.9, -60, 179.9, 80)], crs="EPSG:4326"
+    )
+    GLOBAL_AREA_KM2 = 150_000_000
+
+    global_times = []
+    for _ in range(N_REPEATS):
+        t0 = time.perf_counter()
+        provider.get_data(
+            variables=["h_canopy"],
+            query_type="bounding_box",
+            geometry=GLOBAL_BBOX,
+            start_time=START_TIME,
+            end_time=END_TIME,
+            return_type="dataframe",
+            use_polygon_filter=False,
+        )
+        global_times.append(time.perf_counter() - t0)
+    GLOBAL_TIME_S = float(np.median(global_times))
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.scatter(areas_km2, times_s, color="steelblue", zorder=3)
+    ax.plot(areas_km2, times_s, color="steelblue", linewidth=1.2, alpha=0.6)
+
+    # Dashed break lines between regional and global points
+    x_break = (areas_km2[-1] * GLOBAL_AREA_KM2) ** 0.5
+    y_break = (times_s[-1]   * GLOBAL_TIME_S)   ** 0.5
+    ax.axvline(x_break, color="grey", linestyle=(0, (4, 4)), linewidth=0.8, alpha=0.7)
+    ax.axhline(y_break, color="grey", linestyle=(0, (4, 4)), linewidth=0.8, alpha=0.7)
+
+    # Global archive point
+    ax.scatter(GLOBAL_AREA_KM2, GLOBAL_TIME_S,
+               color="tomato", marker="*", s=180, zorder=4)
+    ax.annotate("Global archive\n(~150 M km²)",
+                xy=(GLOBAL_AREA_KM2, GLOBAL_TIME_S),
+                xytext=(-90, 8), textcoords="offset points",
+                fontsize=8, color="tomato",
+                arrowprops=dict(arrowstyle="->", color="tomato", lw=0.8))
+
+    ax.set_xlabel("Bounding box area (km²)")
+    ax.set_ylabel("Query time (s)")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_yticks([1, 5, 10, 60, 300])
+    ax.set_yticklabels(["1 s", "5 s", "10 s", "1 min", "5 min"])
+    ax.grid(True, which="both", linestyle="--", linewidth=0.4, alpha=0.6)
+    plt.tight_layout()
+    plt.savefig("benchmark_query_scaling.png", dpi=150, bbox_inches="tight")
+
+The figure below shows two complementary views of the benchmark results. Two regimes are visible
+in the absolute query time (left panel): for small extents (< ~3 M km²) time is nearly flat,
+dominated by S3 tile-open latency; above that threshold it scales roughly linearly with data
+volume. Regional queries up to ~12 M km² complete in under 5 seconds, and the full global archive
+(~150 M km²) returns in just over 1 minute.
+
+The efficiency panel (right) confirms that larger queries are significantly cheaper per km²:
+the cost per unit area decreases by roughly three orders of magnitude from a small regional query
+to the full global archive, demonstrating that batching data access into large spatial extents
+is far more efficient than issuing many small queries.
+
+.. figure:: /_static/images/benchmark_query_scaling.png
+   :width: 100%
+   :align: center
+
+   **Figure**: icesat2DB query scaling for ``h_canopy`` over 2020, centred at 51°N 10°E.
+   Left: absolute query time vs bounding box area. Right: query time normalised by area
+   (s / km²) — lower is better. The red star marks the full global archive query (~67 s).
 
 
 Resources

@@ -73,7 +73,10 @@ Basic query example
 Parameters for ``get_data()``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
- - **variables**: List of variables (columns) to retrieve from the database.
+ - **variables**: List of variables (columns) to retrieve from the database. Profile and sub-segment
+   variables (e.g. ``canopy_h_metrics``, ``h_canopy_20m``) return all values per segment by default.
+   To fetch a single element by label and save bandwidth, use the ``"variable:label"`` syntax, e.g.
+   ``"canopy_h_metrics:50"`` (50th-percentile only) or ``"h_canopy_20m:50"`` (centre 20 m bin only).
  - **geometry**: (Optional) GeoPandas geometry for spatial filtering.
  - **start_time**: (Optional) Start date for temporal filtering (format: "YYYY-MM-DD").
  - **end_time**: (Optional) End date for temporal filtering (format: "YYYY-MM-DD").
@@ -137,20 +140,21 @@ Below is an example of how the dataset looks in the :py:class:`xarray.Dataset` f
 .. code-block:: python
 
     <xarray.Dataset>
-    Dimensions:          (segment_id: 284305, profile_point: 18)
+    Dimensions:          (segment_id: 284305, percentile: 18)
     Coordinates:
       * segment_id       (segment_id) int64 2MB 131271604800 ... 131271952640
+      * percentile       (percentile) int32 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95
         latitude         (segment_id) float32 1MB 51.23 51.24 ... 47.89 47.90
         longitude        (segment_id) float32 1MB 10.45 10.45 ... 14.12 14.13
         time             (segment_id) datetime64[ns] 2MB 2021-06-15 ... 2021-06-15
     Data variables:
         h_canopy         (segment_id) float32 1MB 18.4 22.1 ... 5.3 7.8
         h_te_best_fit    (segment_id) float32 1MB 312.1 315.6 ... 198.4 201.2
-        canopy_h_metrics (segment_id, profile_point) float32 20MB 4.2 ... 17.9
+        canopy_h_metrics (segment_id, percentile) float32 20MB 4.2 ... 17.9
 
 The dataset includes multiple dimensions and variables:
 
-- **Dimensions**: ``segment_id`` (unique ID for each 100 m land segment) and ``profile_point`` (index into profile arrays such as ``canopy_h_metrics``).
+- **Dimensions**: ``segment_id`` (unique ID for each 100 m land segment) and ``percentile`` (coordinate axis for profile variables such as ``canopy_h_metrics``, with values 10–95). Sub-segment variables use ``along_track_offset_m`` (values 10, 30, 50, 70, 90 m).
 - **Coordinates**: ``time``, ``latitude``, and ``longitude`` describing each segment's spatial and temporal context.
 - **Data Variables**: Variables such as ``h_canopy`` (98th percentile canopy height above terrain) and ``h_te_best_fit`` (best-fit terrain elevation).
 

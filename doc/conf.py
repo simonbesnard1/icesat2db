@@ -187,8 +187,8 @@ def setup(app):
 html_theme = "pydata_sphinx_theme"
 html_theme_options = {
     "logo": {
-        "image_light": "_static/logos/gediDB_logo.svg",
-        "image_dark": "_static/logos/gediDB_logo.svg",
+        "image_light": "_static/logos/icesat2db_logo.svg",
+        "image_dark": "_static/logos/icesat2db_logo.svg",
     },
     "gitlab_url": "https://github.com/simonbesnard1/icesat2db",
     "collapse_navigation": True,

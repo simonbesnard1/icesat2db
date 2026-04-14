@@ -189,7 +189,7 @@ class TileDBProvider:
         self,
         variables: List[str],
         array_meta,
-    ) -> Tuple[List[str], Dict[str, List[str]], Dict[str, List[str]], Dict[str, dict]]:
+    ) -> Tuple[List[str], Dict[str, List[str]], Dict[str, List[str]], Dict[str, dict], Dict[str, str]]:
         """
         Build attribute list and per-variable column mappings for profile and
         sub-segment variables.
@@ -197,6 +197,11 @@ class TileDBProvider:
         Profile variables are stored as ``{var}_1 … {var}_N`` where N comes from
         ``{var}.profile_length`` in the array metadata.  Sub-segment variables
         follow the same layout but use ``{var}.subsegment_length`` instead.
+
+        A single label can be selected by using the ``"var:label"`` syntax in
+        ``variables`` (e.g. ``"canopy_h_metrics:50"``).  Only the matching
+        TileDB attribute is fetched; the result is returned as a scalar column
+        named ``{var}_p{label}`` (e.g. ``canopy_h_metrics_p50``).
 
         Returns
         -------
@@ -210,13 +215,48 @@ class TileDBProvider:
         label_info : Dict[str, dict]
             Mapping of profile variable name → ``{"labels": [...], "dim_name": str}``.
             Present only for profile variables that have label metadata stored.
+        scalar_renames : Dict[str, str]
+            Mapping of raw TileDB attribute name → user-facing column name for
+            single-label selections. Profile variables use a ``_p{label}`` suffix
+            (e.g. ``canopy_h_metrics_9`` → ``canopy_h_metrics_p50``); sub-segment
+            variables use a ``_{label}m`` suffix
+            (e.g. ``h_canopy_20m_3`` → ``h_canopy_20m_50m``).
         """
         attr_list: List[str] = []
         profile_vars: Dict[str, List[str]] = {}
         subsegment_vars: Dict[str, List[str]] = {}
         label_info: Dict[str, dict] = {}
+        scalar_renames: Dict[str, str] = {}
 
         for var in variables:
+            # ── Single-label selection: "canopy_h_metrics:50" ─────────────────
+            if ":" in var:
+                base_var, label_str = var.split(":", 1)
+                label_val = int(label_str)
+                profile_labels_raw = array_meta.get(f"{base_var}.profile_labels")
+                subsegment_labels_raw = array_meta.get(f"{base_var}.subsegment_labels")
+                labels_raw = profile_labels_raw or subsegment_labels_raw
+                if labels_raw is None:
+                    raise ValueError(
+                        f"Variable '{base_var}' has no label metadata. "
+                        f"Cannot select by label '{label_val}'."
+                    )
+                labels = [int(v) for v in labels_raw.split(",")]
+                if label_val not in labels:
+                    raise ValueError(
+                        f"Label '{label_val}' not found in '{base_var}'. "
+                        f"Available labels: {labels}."
+                    )
+                idx = labels.index(label_val) + 1   # TileDB attrs are 1-indexed
+                tiledb_attr = f"{base_var}_{idx}"
+                attr_list.append(tiledb_attr)
+                if profile_labels_raw:
+                    friendly = f"{base_var}_p{label_val}"
+                else:
+                    friendly = f"{base_var}_{label_val}m"
+                scalar_renames[tiledb_attr] = friendly
+                continue
+
             profile_key = f"{var}.profile_length"
             subsegment_key = f"{var}.subsegment_length"
 
@@ -251,7 +291,7 @@ class TileDBProvider:
             else:
                 attr_list.append(var)
 
-        return attr_list, profile_vars, subsegment_vars, label_info
+        return attr_list, profile_vars, subsegment_vars, label_info, scalar_renames
 
     def _build_condition_string(self, filters: Dict[str, str]) -> Optional[str]:
         """
@@ -382,7 +422,7 @@ class TileDBProvider:
         try:
             array = self._get_array()
 
-            attr_list, profile_vars, subsegment_vars, label_info = (
+            attr_list, profile_vars, subsegment_vars, label_info, scalar_renames = (
                 self._build_profile_attrs(variables, array.meta)
             )
 
@@ -406,6 +446,10 @@ class TileDBProvider:
                 data = self._filter_by_polygon(data, geometry)
                 if len(data.get("segment_id", [])) == 0:
                     return None, profile_vars, subsegment_vars, label_info
+
+            # Apply single-label renames (e.g. canopy_h_metrics_9 → canopy_h_metrics_p50)
+            if scalar_renames:
+                data = {scalar_renames.get(k, k): v for k, v in data.items()}
 
             return data, profile_vars, subsegment_vars, label_info
 
@@ -482,7 +526,7 @@ class TileDBProvider:
         Optional[pd.DataFrame]
             Query results or None if no data found
         """
-        data, profile_vars, subsegment_vars, _label_info = self._query_array(
+        data, profile_vars, subsegment_vars, _label_info = self._query_array(  # noqa: F841
             variables,
             lat_min,
             lat_max,

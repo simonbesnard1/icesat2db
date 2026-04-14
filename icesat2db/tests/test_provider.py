@@ -224,17 +224,18 @@ class TestTileDBProviderLowLevel(unittest.TestCase):
     # ── _build_profile_attrs ──────────────────────────────────────────────────
 
     def test_build_profile_attrs_scalar_variable(self):
-        attr_list, profile_vars, subsegment_vars, label_info = (
+        attr_list, profile_vars, subsegment_vars, label_info, scalar_renames = (
             self.provider._build_profile_attrs(["h_canopy_quad"], {})
         )
         self.assertIn("h_canopy_quad", attr_list)
         self.assertNotIn("h_canopy_quad", profile_vars)
         self.assertNotIn("h_canopy_quad", subsegment_vars)
         self.assertNotIn("h_canopy_quad", label_info)
+        self.assertEqual(scalar_renames, {})
 
     def test_build_profile_attrs_profile_variable_expands(self):
         meta = {"canopy_h_metrics.profile_length": 18}
-        attr_list, profile_vars, subsegment_vars, label_info = (
+        attr_list, profile_vars, subsegment_vars, label_info, scalar_renames = (
             self.provider._build_profile_attrs(["canopy_h_metrics"], meta)
         )
         self.assertEqual(len(attr_list), 18)
@@ -250,7 +251,7 @@ class TestTileDBProviderLowLevel(unittest.TestCase):
             "canopy_h_metrics.profile_labels": "10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95",
             "canopy_h_metrics.profile_label_name": "percentile",
         }
-        attr_list, profile_vars, subsegment_vars, label_info = (
+        attr_list, profile_vars, subsegment_vars, label_info, scalar_renames = (
             self.provider._build_profile_attrs(["canopy_h_metrics"], meta)
         )
         self.assertIn("canopy_h_metrics", label_info)
@@ -262,11 +263,52 @@ class TestTileDBProviderLowLevel(unittest.TestCase):
 
     def test_build_profile_attrs_subsegment_variable_expands(self):
         meta = {"h_canopy_20m.subsegment_length": 5}
-        attr_list, profile_vars, subsegment_vars, label_info = (
+        attr_list, profile_vars, subsegment_vars, label_info, scalar_renames = (
             self.provider._build_profile_attrs(["h_canopy_20m"], meta)
         )
         self.assertEqual(len(attr_list), 5)
         self.assertIn("h_canopy_20m", subsegment_vars)
+
+    def test_build_profile_attrs_single_label_selection(self):
+        meta = {
+            "canopy_h_metrics.profile_length": 18,
+            "canopy_h_metrics.profile_labels": "10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95",
+            "canopy_h_metrics.profile_label_name": "percentile",
+        }
+        attr_list, profile_vars, subsegment_vars, label_info, scalar_renames = (
+            self.provider._build_profile_attrs(["canopy_h_metrics:50"], meta)
+        )
+        # Only one attribute should be fetched (index 9, 1-based)
+        self.assertEqual(len(attr_list), 1)
+        self.assertEqual(attr_list[0], "canopy_h_metrics_9")
+        # It should not appear in profile_vars (not a multi-column profile)
+        self.assertNotIn("canopy_h_metrics", profile_vars)
+        # The rename dict maps TileDB attr name to friendly name
+        self.assertEqual(scalar_renames.get("canopy_h_metrics_9"), "canopy_h_metrics_p50")
+
+    def test_build_profile_attrs_single_label_invalid_raises(self):
+        meta = {
+            "canopy_h_metrics.profile_length": 18,
+            "canopy_h_metrics.profile_labels": "10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95",
+        }
+        with self.assertRaises(ValueError):
+            self.provider._build_profile_attrs(["canopy_h_metrics:99"], meta)
+
+    def test_build_profile_attrs_subsegment_single_label_selection(self):
+        meta = {
+            "h_canopy_20m.subsegment_length": 5,
+            "h_canopy_20m.subsegment_labels": "10,30,50,70,90",
+            "h_canopy_20m.subsegment_label_name": "along_track_offset_m",
+        }
+        attr_list, profile_vars, subsegment_vars, label_info, scalar_renames = (
+            self.provider._build_profile_attrs(["h_canopy_20m:50"], meta)
+        )
+        # Centre bin is index 3 (1-based)
+        self.assertEqual(len(attr_list), 1)
+        self.assertEqual(attr_list[0], "h_canopy_20m_3")
+        self.assertNotIn("h_canopy_20m", subsegment_vars)
+        # Sub-segment labels use _<offset>m suffix, not _p<label>
+        self.assertEqual(scalar_renames.get("h_canopy_20m_3"), "h_canopy_20m_50m")
 
     # ── _filter_by_polygon ────────────────────────────────────────────────────
 
