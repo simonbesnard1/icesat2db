@@ -14,6 +14,7 @@ import pandas as pd
 
 from icesat2db.beam.Beam import beam_handler
 from icesat2db.granule.Granule import granule_handler
+from icesat2db.utils.segment_id import BEAM_ID_MAP, pack_segment_id
 
 
 class ATL08Beam(beam_handler):
@@ -73,28 +74,14 @@ class ATL08Beam(beam_handler):
     def construct_segment_id(self) -> np.ndarray:
         """
         Construct a globally unique segment ID for ATL08 land segments.
-        Encodes: RGT (14 bits) | cycle (8 bits) | beam (3 bits) | segment_id_beg (32 bits)
-
-        Bit layout (int64):
-          [63..43] RGT (1–1387)
-          [42..35] cycle
-          [34..32] beam (0–5)
-          [31..0]  segment_id_beg
+        See :func:`icesat2db.utils.segment_id.pack_segment_id` for the bit layout.
         """
         rgt = int(self.parent_granule["orbit_info/rgt"][0])
         cycle = int(self.parent_granule["orbit_info/cycle_number"][0])
-        beam_map = {"gt1l": 0, "gt1r": 1, "gt2l": 2, "gt2r": 3, "gt3l": 4, "gt3r": 5}
-        beam_id = beam_map[self.beam_name]
-        seg_ids = self["land_segments/segment_id_beg"][()].astype(
-            np.int64
-        )  # int32 → int64 before shifting
+        beam_id = BEAM_ID_MAP[self.beam_name]
+        seg_ids = self["land_segments/segment_id_beg"][()]
 
-        return (
-            (np.int64(rgt) << 43)
-            | (np.int64(cycle) << 35)
-            | (np.int64(beam_id) << 32)
-            | seg_ids
-        )
+        return pack_segment_id(rgt, cycle, beam_id, seg_ids)
 
     def _get_main_data(self) -> Optional[Dict[str, np.ndarray]]:
         """

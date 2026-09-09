@@ -49,8 +49,8 @@ earth_data_info:
  CMR_URL: "https://cmr.earthdata.nasa.gov/search/granules.json"
  CMR_PRODUCT_IDS:
   ATL08: 'C3565574177-NSIDC_CPRD'
+  ATL03: 'C3326974349-NSIDC_CPRD'
 
-# Variables list for each IceSat2 level product - SDS_Name is science dataset name the native h5 file retrieved from the NASA API
 # Variables list for each IceSat2 level product - SDS_Name is science dataset name the native h5 file retrieved from the NASA API
 level_atl08:
   variables:
@@ -709,6 +709,56 @@ level_atl08:
     segment_id:
       SDS_Name: "segment_id"
       description: "Unique segment id"
+      long_name: "segment id"
+      dtype: "int64"
+      units: "adimensional"
+
+    beam_id:
+      SDS_Name: "beam_id"
+      description: "Beam id (gt1l, gt2l, gt3l, gt1r, gt2r, gt3r)"
+      long_name: "beam id"
+      dtype: "U4"
+      units: "adimensional"
+
+level_atl03:
+  confidence_column: 0
+  confidence_threshold: 3
+  variables:
+    h_ph:
+      SDS_Name: "heights/h_ph"
+      dtype: "float32"
+      description: "Height of each received photon, relative to the reference ellipsoid, with the geoid, tides and inverted barometer effects removed."
+      long_name: "photon height"
+      units: "meters"
+
+    dist_ph_along:
+      SDS_Name: "heights/dist_ph_along"
+      dtype: "float32"
+      description: "Along-track distance of each received photon, from the start of the segment, based on geolocation of the reference photon."
+      long_name: "along-track photon distance"
+      units: "meters"
+
+    quality_ph:
+      SDS_Name: "heights/quality_ph"
+      dtype: "int8"
+      description: "Indicates the quality of the associated photon. 0=nominal, 1=possible afterpulse, 2=possible impulse response effect, 3=possible TEP."
+      long_name: "photon quality flag"
+      units: "adimensional"
+
+    signal_conf_ph:
+      SDS_Name: "heights/signal_conf_ph"
+      dtype: "int8"
+      description: "Confidence level associated with each photon, for each of the five surface types (land, ocean, sea ice, land ice, inland water). Values: -1=events not classified, 0=noise, 1=buffer, 2=low, 3=medium, 4=high confidence."
+      long_name: "photon signal confidence"
+      units: "adimensional"
+      is_profile: True
+      profile_length: 5
+      profile_labels: [0, 1, 2, 3, 4]
+      profile_label_name: "surface_type"
+
+    segment_id:
+      SDS_Name: "segment_id"
+      description: "Unique segment id (geolocation segment this photon belongs to, packed with RGT/cycle/beam)"
       long_name: "segment id"
       dtype: "int64"
       units: "adimensional"

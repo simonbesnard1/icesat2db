@@ -120,31 +120,44 @@ class TestIceSat2Granule(unittest.TestCase):
     def tearDownClass(cls):
         cls.temp_dir.cleanup()
 
-    # ── _join_dfs ─────────────────────────────────────────────────────────────
+    # ── _validate_dfs ─────────────────────────────────────────────────────────
+    # Each product is validated independently and written to its own TileDB
+    # array — there's no cross-product join, just a per-product sanity check.
 
-    def test_join_dfs_returns_none_when_atl08_key_missing(self):
-        """Empty dict → no ATL08 entry → None."""
-        self.assertIsNone(IceSat2Granule._join_dfs({}, "key"))
+    def test_validate_dfs_returns_empty_dict_for_empty_input(self):
+        self.assertEqual(IceSat2Granule._validate_dfs({}, "key"), {})
 
-    def test_join_dfs_returns_none_for_empty_dataframe(self):
-        self.assertIsNone(
-            IceSat2Granule._join_dfs(
-                {IceSat2Product.ATL08.value: pd.DataFrame()}, "key"
-            )
+    def test_validate_dfs_drops_empty_dataframe(self):
+        result = IceSat2Granule._validate_dfs(
+            {IceSat2Product.ATL08.value: pd.DataFrame()}, "key"
         )
+        self.assertEqual(result, {})
 
-    def test_join_dfs_returns_none_when_segment_id_missing(self):
+    def test_validate_dfs_drops_dataframe_missing_segment_id(self):
         df = pd.DataFrame({"latitude": [1.0, 2.0], "longitude": [-50.0, -51.0]})
-        self.assertIsNone(
-            IceSat2Granule._join_dfs({IceSat2Product.ATL08.value: df}, "key")
-        )
+        result = IceSat2Granule._validate_dfs({IceSat2Product.ATL08.value: df}, "key")
+        self.assertEqual(result, {})
 
-    def test_join_dfs_returns_dataframe_when_valid(self):
+    def test_validate_dfs_keeps_valid_dataframe(self):
         df = pd.DataFrame({"segment_id": [1, 2], "latitude": [1.0, 2.0]})
-        result = IceSat2Granule._join_dfs({IceSat2Product.ATL08.value: df}, "key")
-        self.assertIsNotNone(result)
-        self.assertEqual(len(result), 2)
-        self.assertIn("segment_id", result.columns)
+        result = IceSat2Granule._validate_dfs({IceSat2Product.ATL08.value: df}, "key")
+        self.assertIn(IceSat2Product.ATL08.value, result)
+        self.assertEqual(len(result[IceSat2Product.ATL08.value]), 2)
+        self.assertIn("segment_id", result[IceSat2Product.ATL08.value].columns)
+
+    def test_validate_dfs_keeps_only_valid_products(self):
+        """A dict with one valid and one invalid product keeps only the valid one."""
+        valid_df = pd.DataFrame({"segment_id": [1, 2], "latitude": [1.0, 2.0]})
+        invalid_df = pd.DataFrame({"latitude": [1.0]})  # missing segment_id
+        result = IceSat2Granule._validate_dfs(
+            {
+                IceSat2Product.ATL08.value: valid_df,
+                IceSat2Product.ATL03.value: invalid_df,
+            },
+            "key",
+        )
+        self.assertIn(IceSat2Product.ATL08.value, result)
+        self.assertNotIn(IceSat2Product.ATL03.value, result)
 
     # ── parse_granules ────────────────────────────────────────────────────────
 
@@ -176,8 +189,10 @@ class TestIceSat2Granule(unittest.TestCase):
         granule_id, result = self.granule.process_granule(row)
         self.assertIsNotNone(granule_id)
         self.assertIsNotNone(result)
-        self.assertFalse(result.empty)
-        self.assertIn("segment_id", result.columns)
+        self.assertIn(IceSat2Product.ATL08.value, result)
+        df = result[IceSat2Product.ATL08.value]
+        self.assertFalse(df.empty)
+        self.assertIn("segment_id", df.columns)
 
     def test_process_granule_bad_file_returns_none_dataframe(self):
         """An unreadable file path causes parse failure → (granule_key, None).

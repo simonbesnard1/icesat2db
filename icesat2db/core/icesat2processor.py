@@ -12,9 +12,10 @@ import gc
 import logging
 import os
 import traceback
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 import time
 
 import geopandas as gpd
@@ -28,7 +29,7 @@ from icesat2db.core.icesat2database import IceSat2Database
 from icesat2db.core.icesat2granule import IceSat2Granule
 from icesat2db.downloader.authentication import EarthDataAuthenticator
 from icesat2db.downloader.data_downloader import CMRDataDownloader, H5FileDownloader
-from icesat2db.utils.constants import IceSat2Product
+from icesat2db.utils.constants import IceSat2Product, configured_products
 from icesat2db.utils.geo_processing import _temporal_tiling, check_and_format_shape
 from icesat2db.utils.progress_ledger import ProgressLedger, Row
 
@@ -194,11 +195,25 @@ class IceSat2Processor:
         flush_every = self.data_info["tiledb"].get("flush_every", None)
         self.flush_every = int(flush_every) if flush_every is not None else None
 
-        # Initialize database writer
-        self.database_writer = self._initialize_database_writer(credentials)
+        # Determine which products are configured for ingestion (a
+        # 'level_<product>' block present in data_info) — drives both the
+        # downloader's required products and which TileDB writers/arrays get
+        # created. Products are independent: a config with only 'level_atl08'
+        # behaves exactly as before.
+        self.products = configured_products(self.data_info)
+        if not self.products:
+            raise ValueError(
+                "No IceSat2 product is configured: 'data_info' must contain at "
+                "least one 'level_<product>' block (e.g. 'level_atl08')."
+            )
 
-        # Create the database schema
-        self.database_writer._create_arrays()
+        # Initialize one database writer per configured product (each writes
+        # to its own TileDB array — see IceSat2Database's 'product' parameter).
+        self.database_writers = self._initialize_database_writers(credentials)
+
+        # Create the database schema for each product
+        for writer in self.database_writers.values():
+            writer._create_arrays()
 
         # Set the parallel engine
         self.parallel_engine = self._initialize_parallel_engine(parallel_engine)
@@ -251,11 +266,18 @@ class IceSat2Processor:
         except ValueError:
             raise ValueError(f"Invalid format for {date_type}. Expected 'YYYY-MM-DD'.")
 
-    def _initialize_database_writer(self, credentials: Optional[dict]):
+    def _initialize_database_writers(
+        self, credentials: Optional[dict]
+    ) -> Dict[str, IceSat2Database]:
         """
-        Initialize and return the IceSat2Database instance.
+        Initialize and return one IceSat2Database instance per configured product.
         """
-        return IceSat2Database(config=self.data_info, credentials=credentials)
+        return {
+            product.value: IceSat2Database(
+                config=self.data_info, credentials=credentials, product=product.value
+            )
+            for product in self.products
+        }
 
     def _initialize_parallel_engine(self, parallel_engine: Optional[object]):
         """
@@ -312,10 +334,11 @@ class IceSat2Processor:
             if not unprocessed_cmr_data:
                 logger.info("All requested granules are already processed.")
                 if consolidate:
-                    self.database_writer.consolidate_fragments(
-                        consolidation_type=consolidation_type,
-                        parallel_engine=None,
-                    )
+                    for writer in self.database_writers.values():
+                        writer.consolidate_fragments(
+                            consolidation_type=consolidation_type,
+                            parallel_engine=None,
+                        )
                 return
 
             # Process unprocessed granules
@@ -324,9 +347,10 @@ class IceSat2Processor:
 
             # Consolidate fragments if required
             if consolidate:
-                self.database_writer.consolidate_fragments(
-                    consolidation_type=consolidation_type, parallel_engine=None
-                )
+                for writer in self.database_writers.values():
+                    writer.consolidate_fragments(
+                        consolidation_type=consolidation_type, parallel_engine=None
+                    )
             logger.info("IceSat2 granule processing completed successfully.")
         except Exception as e:
             # Log the exception with traceback
@@ -341,12 +365,19 @@ class IceSat2Processor:
             self.start_date,
             self.end_date,
             self.data_info["earth_data_info"],
+            required_products=self.products,
         )
         return downloader.download()
 
     def _filter_unprocessed_granules(self, cmr_data: dict) -> dict:
         """
-        Filter out granules that have already been processed.
+        Filter out (granule_id, product) work that has already been processed.
+
+        A granule's product list is narrowed to only the products not yet
+        marked processed in their respective writer — a granule that's
+        partially done (e.g. ATL08 written, ATL03 still pending) is not
+        re-written for the product(s) already completed, since TileDB arrays
+        allow duplicate rows and a redundant re-write would duplicate data.
 
         Parameters:
         ----------
@@ -356,24 +387,38 @@ class IceSat2Processor:
         Returns:
         --------
         dict
-            A dictionary of unprocessed granules from the input `cmr_data`.
+            A dictionary of unprocessed (granule_id -> product_info) work.
         """
-        granule_ids = list(cmr_data.keys())
-        processed_granules = self.database_writer.check_granules_status(granule_ids)
+        ids_by_product: Dict[str, list] = defaultdict(list)
+        for granule_id, product_info in cmr_data.items():
+            for _, product, _, _ in product_info:
+                ids_by_product[product].append(granule_id)
 
-        # Filter to include only granules that have not been processed
-        unprocessed_granules = {
-            granule_id: product_info
-            for granule_id, product_info in cmr_data.items()
-            if not processed_granules.get(granule_id, False)  # Keep if not processed
-        }
+        processed_by_product: Dict[str, dict] = {}
+        for product, writer in self.database_writers.items():
+            ids_for_product = ids_by_product.get(product, [])
+            if ids_for_product:
+                processed_by_product[product] = writer.check_granules_status(
+                    ids_for_product
+                )
+
+        unprocessed_granules = {}
+        for granule_id, product_info in cmr_data.items():
+            remaining = [
+                entry
+                for entry in product_info
+                if not processed_by_product.get(entry[1], {}).get(granule_id, False)
+            ]
+            if remaining:
+                unprocessed_granules[granule_id] = remaining
 
         return unprocessed_granules
 
     def _process_granules(self, unprocessed_cmr_data: dict):
         """
         Process unprocessed granules in parallel, then write to TileDB in a
-        fragment-friendly way: accumulate per spatial window and write once per window.
+        fragment-friendly way: accumulate per spatial window and write once per
+        window, per product (each product has its own TileDB array/writer).
         """
         temporal_batching = self.data_info["tiledb"].get("temporal_batching", None)
         if temporal_batching in ("daily", "weekly", "annual"):
@@ -415,26 +460,67 @@ class IceSat2Processor:
             )
             ledger.append(row)
 
-        def _flush_buffers(buffers, processed_ids, timeframe):
+        def _flush_buffers(buffers_by_product, processed_ids_by_product, timeframe):
             """
-            Concatenate buffered DataFrames, split into spatial tiles, and write
-            one TileDB fragment per tile so consolidation preserves tile boundaries.
-            Granules are marked processed only after all tiles succeed.
+            Concatenate buffered DataFrames per product, split into spatial
+            tiles, and write one TileDB fragment per tile per product-writer.
+            Granule ids are marked processed only for the writer(s) they
+            actually contributed to in this flush window.
             """
-            if not buffers:
-                return
+            for product, buffers in buffers_by_product.items():
+                if not buffers:
+                    continue
+                writer = self.database_writers[product]
+                try:
+                    combined = pd.concat(buffers, ignore_index=True)
+                    for _, tile_df in writer.spatial_chunking(combined):
+                        writer.write_granule(tile_df)
+                    ids_for_product = processed_ids_by_product.get(product)
+                    if ids_for_product:
+                        writer.mark_granules_as_processed_batch(ids_for_product)
+                except Exception as e:
+                    logger.error(
+                        f"Write phase failed for timeframe {timeframe}, product {product}: {e}",
+                        exc_info=True,
+                    )
+                    raise
 
-            try:
-                combined = pd.concat(buffers, ignore_index=True)
-                for _, tile_df in self.database_writer.spatial_chunking(combined):
-                    self.database_writer.write_granule(tile_df)
-                if processed_ids:
-                    self.database_writer.mark_granules_as_processed_batch(processed_ids)
-            except Exception as e:
-                logger.error(
-                    f"Write phase failed for timeframe {timeframe}: {e}", exc_info=True
-                )
-                raise
+        def _handle_result(
+            gid,
+            started_ts,
+            finished_ts,
+            ids_,
+            gdf_dict,
+            metrics,
+            ledger,
+            timeframe,
+            buffers_by_product,
+            processed_ids_by_product,
+        ):
+            ok = ids_ is not None
+
+            # Mark every product that was attempted for this granule as
+            # processed, even if its resulting DataFrame was empty — avoids
+            # retrying forever a granule with zero valid segments/photons.
+            if ok:
+                for product in metrics.get("products", []):
+                    processed_ids_by_product[product].append(ids_)
+
+            if gdf_dict:
+                for product, df in gdf_dict.items():
+                    if df is not None and not df.empty:
+                        buffers_by_product[product].append(df)
+
+            _append_ledger_row(
+                ledger,
+                gid,
+                timeframe,
+                started_ts,
+                finished_ts,
+                status="ok" if ok else "fail",
+                metrics=metrics,
+                error_msg=None,
+            )
 
         # ---- Executor path ----
         if isinstance(self.parallel_engine, concurrent.futures.Executor):
@@ -457,8 +543,8 @@ class IceSat2Processor:
                         )
                         future_map[fut] = gid
 
-                    buffers = []
-                    processed_ids = []
+                    buffers_by_product = defaultdict(list)
+                    processed_ids_by_product = defaultdict(list)
                     counter = 0
 
                     for fut in as_completed(future_map):
@@ -467,25 +553,19 @@ class IceSat2Processor:
                         gid = future_map.pop(fut)
                         started_ts = time.time()
                         try:
-                            ids_, gdf, metrics = fut.result()
+                            ids_, gdf_dict, metrics = fut.result()
                             finished_ts = time.time()
-                            ok = ids_ is not None
-
-                            if ok:
-                                processed_ids.append(ids_)
-
-                            if gdf is not None and not gdf.empty:
-                                buffers.append(gdf)
-
-                            _append_ledger_row(
-                                ledger,
+                            _handle_result(
                                 gid,
-                                timeframe,
                                 started_ts,
                                 finished_ts,
-                                status="ok" if ok else "fail",
-                                metrics=metrics,
-                                error_msg=None,
+                                ids_,
+                                gdf_dict,
+                                metrics,
+                                ledger,
+                                timeframe,
+                                buffers_by_product,
+                                processed_ids_by_product,
                             )
 
                         except Exception as e:
@@ -509,12 +589,16 @@ class IceSat2Processor:
                             if (
                                 self.flush_every
                                 and counter % self.flush_every == 0
-                                and buffers
+                                and any(buffers_by_product.values())
                             ):
                                 try:
-                                    _flush_buffers(buffers, processed_ids, timeframe)
-                                    buffers.clear()
-                                    processed_ids.clear()
+                                    _flush_buffers(
+                                        buffers_by_product,
+                                        processed_ids_by_product,
+                                        timeframe,
+                                    )
+                                    buffers_by_product.clear()
+                                    processed_ids_by_product.clear()
                                     _release_memory()
                                 except Exception as flush_exc:
                                     logger.error(
@@ -525,9 +609,11 @@ class IceSat2Processor:
                                 ledger.write_html()
 
                     # Final flush for remaining buffer
-                    if buffers:
+                    if any(buffers_by_product.values()):
                         try:
-                            _flush_buffers(buffers, processed_ids, timeframe)
+                            _flush_buffers(
+                                buffers_by_product, processed_ids_by_product, timeframe
+                            )
                         except Exception:
                             # already logged; keep ledger finalization
                             pass
@@ -558,8 +644,8 @@ class IceSat2Processor:
                     )
                     future_map[fut] = gid
 
-                buffers = []
-                processed_ids = []
+                buffers_by_product = defaultdict(list)
+                processed_ids_by_product = defaultdict(list)
                 counter = 0
 
                 # as_completed yields each future as it finishes — no serial blocking
@@ -567,25 +653,19 @@ class IceSat2Processor:
                     gid = future_map.pop(fut)
                     started_ts = time.time()
                     try:
-                        ids_, gdf, metrics = fut.result()
+                        ids_, gdf_dict, metrics = fut.result()
                         finished_ts = time.time()
-                        ok = ids_ is not None
-
-                        if ok:
-                            processed_ids.append(ids_)
-
-                        if gdf is not None and not gdf.empty:
-                            buffers.append(gdf)
-
-                        _append_ledger_row(
-                            ledger,
+                        _handle_result(
                             gid,
-                            timeframe,
                             started_ts,
                             finished_ts,
-                            status="ok" if ok else "fail",
-                            metrics=metrics,
-                            error_msg=None,
+                            ids_,
+                            gdf_dict,
+                            metrics,
+                            ledger,
+                            timeframe,
+                            buffers_by_product,
+                            processed_ids_by_product,
                         )
 
                     except Exception as e:
@@ -609,12 +689,16 @@ class IceSat2Processor:
                         if (
                             self.flush_every
                             and counter % self.flush_every == 0
-                            and buffers
+                            and any(buffers_by_product.values())
                         ):
                             try:
-                                _flush_buffers(buffers, processed_ids, timeframe)
-                                buffers.clear()
-                                processed_ids.clear()
+                                _flush_buffers(
+                                    buffers_by_product,
+                                    processed_ids_by_product,
+                                    timeframe,
+                                )
+                                buffers_by_product.clear()
+                                processed_ids_by_product.clear()
                                 _release_memory()
                             except Exception as flush_exc:
                                 logger.error(
@@ -624,9 +708,11 @@ class IceSat2Processor:
                             ledger.write_status_md()
                             ledger.write_html()
 
-                if buffers:
+                if any(buffers_by_product.values()):
                     try:
-                        _flush_buffers(buffers, processed_ids, timeframe)
+                        _flush_buffers(
+                            buffers_by_product, processed_ids_by_product, timeframe
+                        )
                     except Exception:
                         pass
 
@@ -656,7 +742,7 @@ class IceSat2Processor:
         Returns:
         --------
         tuple
-            A tuple containing the granule ID and the processed granule data.
+            A tuple of (granule_id, {product: DataFrame} or None, metrics).
         """
 
         started_ts = time.time()
@@ -675,8 +761,8 @@ class IceSat2Processor:
             download_results.append(res)
 
         granule_processor = IceSat2Granule(download_path, data_info)
-        ids_, gdf = granule_processor.process_granule(download_results)
-        n_records = int(gdf.shape[0]) if gdf is not None else None
+        ids_, gdf_dict = granule_processor.process_granule(download_results)
+        n_records = sum(df.shape[0] for df in gdf_dict.values()) if gdf_dict else None
 
         metrics = {
             "started_ts": started_ts,
@@ -684,7 +770,7 @@ class IceSat2Processor:
             "products": prods,
             "n_records": n_records,
         }
-        return ids_, gdf, metrics
+        return ids_, gdf_dict, metrics
 
     def close(self):
         """Close the parallelization engine if applicable."""

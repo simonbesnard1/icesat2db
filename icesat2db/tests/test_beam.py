@@ -8,6 +8,7 @@
 
 import os
 import pathlib
+import tempfile
 import unittest
 import warnings
 
@@ -16,7 +17,9 @@ import numpy as np
 import pandas as pd
 
 from icesat2db.beam.Beam import beam_handler
+from icesat2db.beam.atl03_beam import ATL03Beam
 from icesat2db.beam.atl08_beam import ATL08Beam
+from icesat2db.utils.segment_id import pack_segment_id
 
 # Resolve path to the test H5 file (same pattern as test_icesat2_granules.py)
 THIS_DIR = pathlib.Path(__file__).parent
@@ -258,6 +261,188 @@ class TestATL08BeamSegmentIdEncoding(unittest.TestCase):
             seg_ids = beam.construct_segment_id()
             low_bits = int(seg_ids[0]) & 0xFFFFFFFF  # lower 32 bits
             self.assertEqual(low_bits, seg_id_beg)
+
+
+# ---------------------------------------------------------------------------
+# ATL03Beam — no real ATL03 fixture is available in tests/data, so build a
+# small synthetic granule with h5py: 2 geolocation segments (segment_ph_cnt
+# [3, 2]) covering 5 photons, exercising the segment_ph_cnt repeat-expansion
+# and the signal-confidence filter.
+# ---------------------------------------------------------------------------
+
+ATL03_MINIMAL_FIELD_MAPPING = {
+    "h_ph": {"SDS_Name": "heights/h_ph"},
+    "dist_ph_along": {"SDS_Name": "heights/dist_ph_along"},
+    "quality_ph": {"SDS_Name": "heights/quality_ph"},
+    "signal_conf_ph": {"SDS_Name": "heights/signal_conf_ph"},
+}
+
+
+def _build_synthetic_atl03_h5(path, rgt=500, cycle=3):
+    """
+    Build a minimal synthetic ATL03-shaped HDF5 file at `path`.
+
+    5 photons split across 2 geolocation segments (segment_ph_cnt [3, 2]).
+    signal_conf_ph column 0 (land) is >=3 (medium/high) for photon indices
+    [0, 2, 4]; column 1 (ocean) is >=3 for indices [3, 4] — deliberately
+    different sets so confidence_column/threshold tests are distinguishable.
+    """
+    with h5py.File(path, "w") as f:
+        beam_grp = f.create_group("gt1l")
+        beam_grp.attrs["description"] = "Strong beam"
+
+        heights = beam_grp.create_group("heights")
+        heights.create_dataset("lat_ph", data=np.array([10.0, 10.1, 10.2, 10.3, 10.4]))
+        heights.create_dataset("lon_ph", data=np.array([20.0, 20.1, 20.2, 20.3, 20.4]))
+        heights.create_dataset("h_ph", data=np.array([1.0, 2.0, 3.0, 4.0, 5.0]))
+        heights.create_dataset("delta_time", data=np.array([0.0, 0.1, 0.2, 0.3, 0.4]))
+        heights.create_dataset(
+            "dist_ph_along", data=np.array([0.0, 0.7, 1.4, 0.0, 0.7])
+        )
+        heights.create_dataset(
+            "quality_ph", data=np.array([0, 0, 0, 1, 0], dtype=np.int8)
+        )
+        signal_conf = np.array(
+            [
+                [4, 1, -1, -1, -1],
+                [2, 1, -1, -1, -1],
+                [3, 1, -1, -1, -1],
+                [0, 4, -1, -1, -1],
+                [4, 4, -1, -1, -1],
+            ],
+            dtype=np.int8,
+        )
+        heights.create_dataset("signal_conf_ph", data=signal_conf)
+
+        geolocation = beam_grp.create_group("geolocation")
+        geolocation.create_dataset("segment_id", data=np.array([100, 101]))
+        geolocation.create_dataset("segment_ph_cnt", data=np.array([3, 2]))
+
+        f.create_group("orbit_info")
+        f["orbit_info"].create_dataset("rgt", data=np.array([rgt]))
+        f["orbit_info"].create_dataset("cycle_number", data=np.array([cycle]))
+
+
+class TestATL03Beam(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp:
+            cls.h5_path = tmp.name
+        _build_synthetic_atl03_h5(cls.h5_path)
+
+    @classmethod
+    def tearDownClass(cls):
+        os.unlink(cls.h5_path)
+
+    def test_default_confidence_filter_keeps_land_signal_photons(self):
+        with h5py.File(self.h5_path, "r") as f:
+            beam = ATL03Beam(f, "gt1l", ATL03_MINIMAL_FIELD_MAPPING)
+            data = beam._get_main_data()
+
+        # column 0 (land) >= 3 (default threshold) at indices [0, 2, 4]
+        self.assertEqual(len(data["latitude"]), 3)
+        np.testing.assert_allclose(data["h_ph"], [1.0, 3.0, 5.0])
+        np.testing.assert_allclose(data["latitude"], [10.0, 10.2, 10.4])
+
+    def test_custom_confidence_column_and_threshold(self):
+        with h5py.File(self.h5_path, "r") as f:
+            beam = ATL03Beam(
+                f,
+                "gt1l",
+                ATL03_MINIMAL_FIELD_MAPPING,
+                confidence_column=1,
+                confidence_threshold=3,
+            )
+            data = beam._get_main_data()
+
+        # column 1 (ocean) >= 3 at indices [3, 4]
+        self.assertEqual(len(data["latitude"]), 2)
+        np.testing.assert_allclose(data["h_ph"], [4.0, 5.0])
+
+    def test_segment_id_expands_via_segment_ph_cnt_and_matches_pack_segment_id(self):
+        with h5py.File(self.h5_path, "r") as f:
+            beam = ATL03Beam(f, "gt1l", ATL03_MINIMAL_FIELD_MAPPING)
+            data = beam._get_main_data()
+
+        # Kept photon indices [0, 2, 4] fall in segments [100, 100, 101]
+        # (segment_ph_cnt [3, 2] repeated across 5 photons: 100,100,100,101,101)
+        expected = pack_segment_id(
+            rgt=500, cycle=3, beam_id=0, segment_id_beg=np.array([100, 100, 101])
+        )
+        np.testing.assert_array_equal(data["segment_id"], expected)
+
+    def test_time_derived_from_delta_time(self):
+        with h5py.File(self.h5_path, "r") as f:
+            beam = ATL03Beam(f, "gt1l", ATL03_MINIMAL_FIELD_MAPPING)
+            data = beam._get_main_data()
+
+        expected_start = pd.to_datetime("2018-01-01T00:00:00.000000Z")
+        # kept indices [0, 2, 4] -> delta_time [0.0, 0.2, 0.4]
+        expected = expected_start + pd.to_timedelta([0.0, 0.2, 0.4], unit="seconds")
+        pd.testing.assert_index_equal(
+            pd.DatetimeIndex(data["time"]), pd.DatetimeIndex(expected)
+        )
+
+    def test_beam_id_column(self):
+        with h5py.File(self.h5_path, "r") as f:
+            beam = ATL03Beam(f, "gt1l", ATL03_MINIMAL_FIELD_MAPPING)
+            data = beam._get_main_data()
+        self.assertTrue((data["beam_id"] == "gt1l").all())
+
+    def test_main_data_flattens_signal_conf_ph_into_five_columns(self):
+        """The 2D signal_conf_ph field flattens via beam_handler.main_data,
+        the same generic mechanism ATL08's profile variables use."""
+        with h5py.File(self.h5_path, "r") as f:
+            beam = ATL03Beam(f, "gt1l", ATL03_MINIMAL_FIELD_MAPPING)
+            df = beam.main_data
+        for i in range(1, 6):
+            self.assertIn(f"signal_conf_ph_{i}", df.columns)
+
+    def test_missing_heights_group_returns_none(self):
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            with h5py.File(tmp_path, "w") as f:
+                beam_grp = f.create_group("gt1l")
+                beam_grp.attrs["description"] = "Strong beam"
+                f.create_group("orbit_info")
+                f["orbit_info"].create_dataset("rgt", data=np.array([235]))
+                f["orbit_info"].create_dataset("cycle_number", data=np.array([1]))
+
+            with h5py.File(tmp_path, "r") as f:
+                beam = ATL03Beam(f, "gt1l", ATL03_MINIMAL_FIELD_MAPPING)
+                result = beam._get_main_data()
+            self.assertIsNone(result)
+        finally:
+            os.unlink(tmp_path)
+
+    def test_empty_photon_array_returns_none(self):
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            with h5py.File(tmp_path, "w") as f:
+                beam_grp = f.create_group("gt1l")
+                beam_grp.attrs["description"] = "Strong beam"
+                heights = beam_grp.create_group("heights")
+                heights.create_dataset("delta_time", data=np.array([], dtype=float))
+                heights.create_dataset("lat_ph", data=np.array([], dtype=float))
+                heights.create_dataset("lon_ph", data=np.array([], dtype=float))
+                geolocation = beam_grp.create_group("geolocation")
+                geolocation.create_dataset("segment_id", data=np.array([], dtype=int))
+                geolocation.create_dataset(
+                    "segment_ph_cnt", data=np.array([], dtype=int)
+                )
+                f.create_group("orbit_info")
+                f["orbit_info"].create_dataset("rgt", data=np.array([235]))
+                f["orbit_info"].create_dataset("cycle_number", data=np.array([1]))
+
+            with h5py.File(tmp_path, "r") as f:
+                beam = ATL03Beam(f, "gt1l", ATL03_MINIMAL_FIELD_MAPPING)
+                result = beam._get_main_data()
+            self.assertIsNone(result)
+        finally:
+            os.unlink(tmp_path)
 
 
 if __name__ == "__main__":

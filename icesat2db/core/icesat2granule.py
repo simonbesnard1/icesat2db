@@ -16,7 +16,6 @@ import numpy as np
 import pandas as pd
 
 from icesat2db.granule import granule_parser
-from icesat2db.utils.constants import IceSat2Product
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -51,9 +50,9 @@ class IceSat2Granule:
 
     def process_granule(
         self, row: Tuple[Tuple[str, str], List[Tuple[str, str]]]
-    ) -> Tuple[str, Optional[pd.DataFrame]]:
+    ) -> Tuple[str, Optional[Dict[str, pd.DataFrame]]]:
         """
-        Process a granule by parsing, joining, and saving it to TileDB.
+        Process a granule by parsing and validating each of its products.
 
         Parameters:
         -----------
@@ -62,8 +61,9 @@ class IceSat2Granule:
 
         Returns:
         -------
-        Tuple[str, Optional[pd.DataFrame]]
-            Tuple containing the granule key and the joined DataFrame, or None if processing fails.
+        Tuple[str, Optional[Dict[str, pd.DataFrame]]]
+            Tuple containing the granule key and a dict of {product: DataFrame}
+            for each product present in this granule, or None if processing fails.
         """
 
         granule_key = row[0][0]
@@ -82,12 +82,12 @@ class IceSat2Granule:
             if not gdf_dict:
                 return granule_key, None
 
-            gdf = self._join_dfs(gdf_dict, granule_key)
+            validated_dfs = self._validate_dfs(gdf_dict, granule_key)
 
-            if gdf is None:
+            if not validated_dfs:
                 return granule_key, None
 
-            return granule_key, gdf
+            return granule_key, validated_dfs
         except Exception as e:
             logger.error(
                 f"Granule {granule_key} was not processed: Processing failed with error: {e}"
@@ -131,22 +131,24 @@ class IceSat2Granule:
         return {k: v for k, v in data_dict.items() if "segment_id" in v}
 
     @staticmethod
-    def _join_dfs(
+    def _validate_dfs(
         df_dict: Dict[str, pd.DataFrame], granule_key: str
-    ) -> Optional[pd.DataFrame]:
+    ) -> Dict[str, pd.DataFrame]:
         """
-        Validate and return the ATL08 DataFrame.
+        Validate each product's parsed DataFrame independently and return the
+        subset that passes. Each product is written to its own TileDB array
+        (see IceSat2Database's ``product`` parameter), so there is no
+        cross-product join here — just a per-product sanity check.
         """
-        atl08_key = IceSat2Product.ATL08.value
-        df = df_dict.get(atl08_key)
+        validated = {}
+        for product, df in df_dict.items():
+            if df is None or df.empty:
+                continue
+            if "segment_id" not in df.columns:
+                logger.error(
+                    f"[{granule_key}] {product} DataFrame missing 'segment_id' column."
+                )
+                continue
+            validated[product] = df
 
-        if df is None or df.empty:
-            return None
-
-        if "segment_id" not in df.columns:
-            logger.error(
-                f"[{granule_key}] ATL08 DataFrame missing 'segment_id' column."
-            )
-            return None
-
-        return df
+        return validated

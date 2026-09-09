@@ -8,6 +8,7 @@
 
 
 from enum import Enum
+from typing import Any, Dict, List
 
 
 class IceSat2Product(Enum):
@@ -16,10 +17,11 @@ class IceSat2Product(Enum):
 
     Attributes:
         ATL08 (str): Represents the ATL08 land/vegetation product.
+        ATL03 (str): Represents the ATL03 per-photon geolocated product.
     """
 
     ATL08 = "atl08"
-    # ATL03 = "atl03"
+    ATL03 = "atl03"
 
     @classmethod
     def list_products(cls):
@@ -29,6 +31,21 @@ class IceSat2Product(Enum):
         :return: List of product names as strings.
         """
         return [product.value for product in cls]
+
+
+def configured_products(data_info: Dict[str, Any]) -> List[IceSat2Product]:
+    """
+    Return the IceSat2 products actually configured for ingestion, i.e. those
+    with a ``level_<product>`` block present in ``data_info``.
+
+    Products are independent: a config with only ``level_atl08`` requires and
+    downloads only ATL08 (today's default behavior), while adding
+    ``level_atl03`` opts into ATL03 as well, without forcing every granule to
+    have both.
+    """
+    return [
+        product for product in IceSat2Product if f"level_{product.value}" in data_info
+    ]
 
 
 # Constant for the WGS84 coordinate reference system (CRS)

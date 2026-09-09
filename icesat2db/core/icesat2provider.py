@@ -68,6 +68,7 @@ class IceSat2Provider(TileDBProvider):
         url: Optional[str] = None,
         region: Optional[str] = "eu-central-1",
         credentials: Optional[dict] = None,
+        product: str = "atl08",
     ):
         """
         Initialize IceSat2Provider with URIs for scalar and profile data arrays, configured based on storage type.
@@ -84,12 +85,25 @@ class IceSat2Provider(TileDBProvider):
             Custom endpoint URL for S3-compatible object stores (e.g., MinIO).
         region : str, optional
             AWS region for S3 access. Defaults to 'eu-central-1'.
+        product : str, default 'atl08'
+            IceSat2 product array to query (e.g. 'atl08', 'atl03'). See
+            TileDBProvider for the array naming convention. Each product's
+            array is independent — querying ATL03 alongside ATL08 requires
+            two separate IceSat2Provider instances.
 
         Notes
         -----
         Supports both S3 and local storage configurations based on `storage_type`.
         """
-        super().__init__(storage_type, s3_bucket, local_path, url, region, credentials)
+        super().__init__(
+            storage_type,
+            s3_bucket,
+            local_path,
+            url,
+            region,
+            credentials,
+            product=product,
+        )
 
     def query_nearest_shots(
         self,

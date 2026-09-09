@@ -350,60 +350,87 @@ class TestFilterUnprocessedGranules(unittest.TestCase):
     """
     Unit tests for IceSat2Processor._filter_unprocessed_granules.
 
-    The method is an instance method that calls self.database_writer.check_granules_status.
-    We bypass __init__ entirely and inject a mock database_writer.
+    The method is an instance method that calls each writer's
+    check_granules_status. We bypass __init__ entirely and inject mock
+    database_writers, one per product. cmr entries are lists of
+    (url, product, start_time, size_mb) tuples, as produced by
+    CMRDataDownloader.
     """
 
-    def _make_processor(self, processed_map: dict) -> IceSat2Processor:
+    @staticmethod
+    def _entry(product="atl08", url="url1", start_time="2020-01-01", size=1.0):
+        return (url, product, start_time, size)
+
+    def _make_processor(self, processed_by_product: dict) -> IceSat2Processor:
         """
-        Return a bare IceSat2Processor with a mock database_writer whose
-        check_granules_status returns `processed_map`.
+        Return a bare IceSat2Processor with mock database_writers, one per
+        product in `processed_by_product`, each returning that product's
+        processed-status map from check_granules_status.
         """
         obj = object.__new__(IceSat2Processor)
-        mock_writer = MagicMock()
-        mock_writer.check_granules_status.return_value = processed_map
-        obj.database_writer = mock_writer
+        writers = {}
+        for product, processed_map in processed_by_product.items():
+            mock_writer = MagicMock()
+            mock_writer.check_granules_status.return_value = processed_map
+            writers[product] = mock_writer
+        obj.database_writers = writers
         return obj
 
     def test_all_unprocessed_returns_full_dict(self):
-        cmr = {"g1": ("ATL08", "url1"), "g2": ("ATL08", "url2")}
-        proc = self._make_processor({"g1": False, "g2": False})
+        cmr = {"g1": [self._entry()], "g2": [self._entry()]}
+        proc = self._make_processor({"atl08": {"g1": False, "g2": False}})
         result = proc._filter_unprocessed_granules(cmr)
         self.assertEqual(result, cmr)
 
     def test_all_processed_returns_empty_dict(self):
-        cmr = {"g1": ("ATL08", "url1"), "g2": ("ATL08", "url2")}
-        proc = self._make_processor({"g1": True, "g2": True})
+        cmr = {"g1": [self._entry()], "g2": [self._entry()]}
+        proc = self._make_processor({"atl08": {"g1": True, "g2": True}})
         result = proc._filter_unprocessed_granules(cmr)
         self.assertEqual(result, {})
 
     def test_mixed_returns_only_unprocessed(self):
         cmr = {
-            "g1": ("ATL08", "url1"),
-            "g2": ("ATL08", "url2"),
-            "g3": ("ATL08", "url3"),
+            "g1": [self._entry()],
+            "g2": [self._entry()],
+            "g3": [self._entry()],
         }
-        proc = self._make_processor({"g1": True, "g2": False, "g3": True})
+        proc = self._make_processor({"atl08": {"g1": True, "g2": False, "g3": True}})
         result = proc._filter_unprocessed_granules(cmr)
         self.assertNotIn("g1", result)
         self.assertIn("g2", result)
         self.assertNotIn("g3", result)
 
     def test_empty_cmr_returns_empty(self):
-        proc = self._make_processor({})
+        proc = self._make_processor({"atl08": {}})
         result = proc._filter_unprocessed_granules({})
         self.assertEqual(result, {})
 
-    def test_check_granules_status_called_with_all_ids(self):
-        cmr = {"g1": "info1", "g2": "info2"}
-        proc = self._make_processor({"g1": False, "g2": False})
+    def test_check_granules_status_called_with_relevant_ids(self):
+        cmr = {"g1": [self._entry()], "g2": [self._entry()]}
+        proc = self._make_processor({"atl08": {"g1": False, "g2": False}})
         proc._filter_unprocessed_granules(cmr)
-        called_ids = proc.database_writer.check_granules_status.call_args[0][0]
+        called_ids = proc.database_writers["atl08"].check_granules_status.call_args[0][
+            0
+        ]
         self.assertCountEqual(called_ids, ["g1", "g2"])
 
     def test_unknown_granule_id_treated_as_unprocessed(self):
         """If check_granules_status doesn't return a key, default is False (unprocessed)."""
-        cmr = {"g_new": "info"}
-        proc = self._make_processor({})  # empty map — granule not present
+        cmr = {"g_new": [self._entry()]}
+        proc = self._make_processor({"atl08": {}})  # empty map — granule not present
         result = proc._filter_unprocessed_granules(cmr)
         self.assertIn("g_new", result)
+
+    def test_partial_product_processed_narrows_product_info(self):
+        """
+        A granule with atl08+atl03 where atl08 is already processed but atl03
+        isn't should be kept, but with only the atl03 entry — reprocessing
+        must not re-write the already-completed product (TileDB arrays allow
+        duplicate rows, so a redundant re-write would duplicate data).
+        """
+        cmr = {"g1": [self._entry(product="atl08"), self._entry(product="atl03")]}
+        proc = self._make_processor({"atl08": {"g1": True}, "atl03": {"g1": False}})
+        result = proc._filter_unprocessed_granules(cmr)
+        self.assertIn("g1", result)
+        remaining_products = {entry[1] for entry in result["g1"]}
+        self.assertEqual(remaining_products, {"atl03"})

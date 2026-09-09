@@ -64,7 +64,12 @@ class IceSat2Database:
       1000 (yielding microseconds), which broke nanosecond-precision deduplication.
     """
 
-    def __init__(self, config: Dict[str, Any], credentials: Optional[dict] = None):
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        credentials: Optional[dict] = None,
+        product: str = "atl08",
+    ):
         """
         Initialise IceSat2Database.
 
@@ -74,9 +79,17 @@ class IceSat2Database:
             Configuration dictionary.
         credentials : dict, optional
             AWS/S3 credentials. Required when storage_type == 's3'.
+        product : str, default 'atl08'
+            IceSat2 product this instance writes/reads (e.g. 'atl08', 'atl03').
+            Variables are loaded from ``config['level_<product>']``. The array
+            URI is ``array_uri`` for the default 'atl08' (unchanged, for
+            backward compatibility with existing on-disk archives) and
+            ``array_uri_<product>`` for any other product, so each product
+            gets its own array.
         """
         self.config = config
-        self.variables_config = self._load_variables_config(config)
+        self.product = product
+        self.variables_config = self._load_variables_config(config, product)
 
         cfg_td = config["tiledb"]
         storage_type = cfg_td.get("storage_type", "local").lower()
@@ -90,12 +103,13 @@ class IceSat2Database:
         # ------------------------------------------------------------------ #
         # Array URI
         # ------------------------------------------------------------------ #
+        array_name = "array_uri" if product == "atl08" else f"array_uri_{product}"
         if storage_type == "s3":
             bucket = cfg_td["s3_bucket"]
-            self.array_uri = os.path.join(f"s3://{bucket}", "array_uri")
+            self.array_uri = os.path.join(f"s3://{bucket}", array_name)
         else:
             base_path = cfg_td.get("local_path", "./")
-            self.array_uri = os.path.join(base_path, "array_uri")
+            self.array_uri = os.path.join(base_path, array_name)
 
         self.overwrite = cfg_td.get("overwrite", False)
 
@@ -810,11 +824,11 @@ class IceSat2Database:
     # ---------------------------------------------------------------------- #
 
     @staticmethod
-    def _load_variables_config(config: dict) -> dict:
+    def _load_variables_config(config: dict, product: str) -> dict:
+        """Load variable definitions from ``config['level_<product>']['variables']``."""
         variables_config = {}
-        for level in ["level_atl08"]:
-            for var_name, var_info in (
-                config.get(level, {}).get("variables", {}).items()
-            ):
-                variables_config[var_name] = var_info
+        for var_name, var_info in (
+            config.get(f"level_{product}", {}).get("variables", {}).items()
+        ):
+            variables_config[var_name] = var_info
         return variables_config

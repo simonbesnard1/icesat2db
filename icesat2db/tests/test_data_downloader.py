@@ -112,17 +112,17 @@ class TestIceSat2Downloader(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# CMRDataDownloader._filter_granules_with_all_products
+# CMRDataDownloader._dedupe_products / required_products
+#
+# Products are independent (no all-products intersection): a granule is kept
+# as soon as it has at least one configured product, listing only what it has.
 # ---------------------------------------------------------------------------
 
 
 class TestCMRDataDownloaderFilter(unittest.TestCase):
 
-    def _product_values(self):
-        return {p.value for p in IceSat2Product}
-
     def _make_granules_with_all_products(self, granule_id="G001"):
-        """Build a granule dict that has every required product."""
+        """Build a granule dict that has every IceSat2Product."""
         entries = [
             (
                 f"http://example.com/{granule_id}/{p.value}.h5",
@@ -134,31 +134,36 @@ class TestCMRDataDownloaderFilter(unittest.TestCase):
         ]
         return {granule_id: entries}
 
-    def _make_downloader(self):
+    def _make_downloader(self, required_products=None):
         mock_geom = MagicMock()
         mock_geom.total_bounds = np.array([-10, -10, 10, 10])
-        return CMRDataDownloader(geom=mock_geom)
+        return CMRDataDownloader(geom=mock_geom, required_products=required_products)
+
+    def test_required_products_defaults_to_full_enum(self):
+        downloader = self._make_downloader()
+        self.assertEqual(downloader.required_products, list(IceSat2Product))
+
+    def test_required_products_honors_explicit_list(self):
+        downloader = self._make_downloader(required_products=[IceSat2Product.ATL08])
+        self.assertEqual(downloader.required_products, [IceSat2Product.ATL08])
 
     def test_keeps_granule_with_all_products(self):
         downloader = self._make_downloader()
         granules = self._make_granules_with_all_products("G001")
-        result = downloader._filter_granules_with_all_products(granules)
+        result = downloader._dedupe_products(granules)
         self.assertIn("G001", result)
 
-    def test_drops_granule_missing_a_product(self):
+    def test_keeps_granule_with_only_one_product(self):
+        # A granule missing a product is no longer dropped — it's kept with
+        # only the product(s) it actually has.
         downloader = self._make_downloader()
-        # Patch IceSat2Product to temporarily require two products so we can
-        # test the "missing product" branch without changing production code.
-        from enum import Enum
-
-        FakeProduct = Enum("FakeProduct", {"ATL08": "atl08", "ATL03": "atl03"})
-        with patch("icesat2db.downloader.data_downloader.IceSat2Product", FakeProduct):
-            granules = {
-                "G002": [("http://example.com/file.h5", "atl08", "2020-01-01", 1.0)]
-                # "atl03" is absent → should be dropped
-            }
-            result = downloader._filter_granules_with_all_products(granules)
-        self.assertNotIn("G002", result)
+        granules = {
+            "G002": [("http://example.com/file.h5", "atl08", "2020-01-01", 1.0)]
+        }
+        result = downloader._dedupe_products(granules)
+        self.assertIn("G002", result)
+        products_present = {_normalize_entry(e)[1] for e in result["G002"]}
+        self.assertEqual(products_present, {"atl08"})
 
     def test_deduplicates_duplicate_product_entries(self):
         downloader = self._make_downloader()
@@ -168,10 +173,8 @@ class TestCMRDataDownloaderFilter(unittest.TestCase):
             ("http://example.com/dup2.h5", "atl08", "2020-01-02", 2.0),
         ]
         granules = {"G003": entries}
-        result = downloader._filter_granules_with_all_products(granules)
-        # G003 should be kept (ATL08 is the only required product)
+        result = downloader._dedupe_products(granules)
         self.assertIn("G003", result)
-        # Only one entry per product
         product_counts = {}
         for entry in result["G003"]:
             _, prod, _, _ = _normalize_entry(entry)
@@ -181,26 +184,26 @@ class TestCMRDataDownloaderFilter(unittest.TestCase):
 
     def test_empty_granules_returns_empty(self):
         downloader = self._make_downloader()
-        result = downloader._filter_granules_with_all_products({})
+        result = downloader._dedupe_products({})
         self.assertEqual(result, {})
 
-    def test_multiple_granules_filtered_correctly(self):
+    def test_multiple_granules_kept_independently(self):
         downloader = self._make_downloader()
-        from enum import Enum
-
-        FakeProduct = Enum("FakeProduct", {"ATL08": "atl08", "ATL03": "atl03"})
-        with patch("icesat2db.downloader.data_downloader.IceSat2Product", FakeProduct):
-            good = {
-                "GOOD": [
-                    ("http://x.com/atl08.h5", "atl08", "2020-01-01", 1.0),
-                    ("http://x.com/atl03.h5", "atl03", "2020-01-01", 1.0),
-                ]
-            }
-            bad = {"BAD": [("http://x.com/f.h5", "atl08", "2020-01-01", 1.0)]}
-            all_granules = {**good, **bad}
-            result = downloader._filter_granules_with_all_products(all_granules)
-        self.assertIn("GOOD", result)
-        self.assertNotIn("BAD", result)
+        both = {
+            "BOTH": [
+                ("http://x.com/atl08.h5", "atl08", "2020-01-01", 1.0),
+                ("http://x.com/atl03.h5", "atl03", "2020-01-01", 1.0),
+            ]
+        }
+        atl08_only = {"ATL08_ONLY": [("http://x.com/f.h5", "atl08", "2020-01-01", 1.0)]}
+        all_granules = {**both, **atl08_only}
+        result = downloader._dedupe_products(all_granules)
+        # Both granules are kept, each with only the products it has.
+        self.assertIn("BOTH", result)
+        self.assertIn("ATL08_ONLY", result)
+        self.assertEqual(
+            {_normalize_entry(e)[1] for e in result["ATL08_ONLY"]}, {"atl08"}
+        )
 
 
 # ---------------------------------------------------------------------------
