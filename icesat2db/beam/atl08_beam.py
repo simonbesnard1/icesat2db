@@ -43,29 +43,30 @@ class ATL08Beam(beam_handler):
         # that occurred when the same dataset appeared twice in a boolean expression.
         def _h_te_uncertainty():
             v = self["land_segments/terrain/h_te_uncertainty"][()]
-            return (v < 3.4028235e38) | (v > -999)
+            return (v < np.float32(3.4028235e38)) & (v > -999)
 
         def _h_te_best_fit():
             v = self["land_segments/terrain/h_te_best_fit"][()]
-            return (v < 3.4028235e38) | (v > -999)
+            return (v < np.float32(3.4028235e38)) & (v > -999)
 
         def _h_te_median():
             v = self["land_segments/terrain/h_te_median"][()]
-            return (v < 3.4028235e38) | (v > -999)
+            return (v < np.float32(3.4028235e38)) & (v > -999)
 
         self.DEFAULT_QUALITY_FILTERS = {
             "h_te_uncertainty": _h_te_uncertainty,
             "h_te_best_fit": _h_te_best_fit,
             "h_te_median": _h_te_median,
-            "h_canopy": lambda: self["land_segments/canopy/h_canopy"][()]
-            < 3.4028235e38,
-            "h_canopy_uncertainty": lambda: self[
-                "land_segments/canopy/h_canopy_uncertainty"
-            ][()]
-            < 3.4028235e38,
+            "h_canopy": lambda: (
+                self["land_segments/canopy/h_canopy"][()] < 3.4028235e38
+            ),
+            "h_canopy_uncertainty": lambda: (
+                self["land_segments/canopy/h_canopy_uncertainty"][()] < 3.4028235e38
+            ),
             "urban_flag": lambda: self["land_segments/urban_flag"][()] == 0,
-            "segment_watermask": lambda: self["land_segments/segment_watermask"][()]
-            == 0,
+            "segment_watermask": lambda: (
+                self["land_segments/segment_watermask"][()] == 0
+            ),
         }
 
         # Fields where invalid values are replaced with NaN rather than dropping the segment.

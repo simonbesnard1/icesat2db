@@ -18,12 +18,13 @@ import tiledb
 from dask.distributed import Client
 from retry import retry
 
+from icesat2db.utils.atl03_atl08 import linkage_variables
+from icesat2db.utils.filters import TileDBFilterPolicy
 from icesat2db.utils.geo_processing import (
     _datetime_to_timestamp_days,
     convert_to_days_since_epoch,
 )
 from icesat2db.utils.tiledb_consolidation import SpatialConsolidationPlanner
-from icesat2db.utils.filters import TileDBFilterPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +198,17 @@ class IceSat2Database:
                 self._schema_cache = None
                 logger.info(f"Overwritten existing TileDB array at {uri}")
             else:
+                required = set(linkage_variables(self.config, self.product))
+                if required:
+                    with tiledb.open(uri, "r", ctx=self.ctx) as array:
+                        missing = required - {
+                            array.schema.attr(i).name for i in range(array.schema.nattr)
+                        }
+                    if missing:
+                        raise ValueError(
+                            f"Existing array lacks linkage attributes {sorted(missing)}. "
+                            "Re-ingest into a new array location with link_atl08 enabled."
+                        )
                 logger.info(f"TileDB array already exists at {uri}. Skipping.")
                 return
 
@@ -518,6 +530,12 @@ class IceSat2Database:
         cache = self._get_schema_cache()
         attr_dtypes = cache["attr_dtypes"]
         cols = set(granule_data.columns)
+        required = set(linkage_variables(self.config, self.product))
+        missing = required - (cols & cache["attrs"])
+        if missing:
+            raise ValueError(
+                f"Missing linkage columns or schema attributes: {sorted(missing)}"
+            )
 
         data: Dict[str, np.ndarray] = {}
 
@@ -608,9 +626,20 @@ class IceSat2Database:
             If required dimension columns are missing.
         """
         try:
-            granule_data = granule_data.drop_duplicates(
-                subset=["latitude", "longitude", "time"]
-            )
+            # Distinct photons/beams can share space-time coordinates. Paired
+            # ingestion supplies their original identity; preserve those rows.
+            if self.product == "atl03" and self.config.get("level_atl03", {}).get(
+                "link_atl08", False
+            ):
+                missing = (
+                    set(linkage_variables(self.config, self.product)) | {"beam_id"}
+                ) - set(granule_data.columns)
+                if missing:
+                    raise ValueError(f"Missing linkage columns: {sorted(missing)}")
+                identity = ["source_granule", "beam_id", "photon_index"]
+            else:
+                identity = ["latitude", "longitude", "time"]
+            granule_data = granule_data.drop_duplicates(subset=identity)
 
             self._validate_granule_data(granule_data)
 
@@ -831,4 +860,5 @@ class IceSat2Database:
             config.get(f"level_{product}", {}).get("variables", {}).items()
         ):
             variables_config[var_name] = var_info
+        variables_config.update(linkage_variables(config, product))
         return variables_config

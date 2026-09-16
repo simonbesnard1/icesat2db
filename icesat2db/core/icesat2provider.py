@@ -8,7 +8,6 @@
 
 import logging
 import re
-from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Union
 
 import geopandas as gpd
@@ -104,6 +103,51 @@ class IceSat2Provider(TileDBProvider):
             credentials,
             product=product,
         )
+
+    @staticmethod
+    def combine_photons(
+        photons: pd.DataFrame,
+        land_segments: pd.DataFrame,
+        variables: List[str],
+    ) -> pd.DataFrame:
+        """Attach selected ATL08 columns to an already queried photon subset.
+
+        Query ATL03 and ATL08 with their respective providers using
+        ``return_type="dataframe"``. Include ``atl08_segment_id`` and
+        ``atl08_source_granule`` for photons, and ``source_granule`` for ATL08.
+        ATL08 coverage must include the parent segment centres, which can lie
+        outside the photon query polygon. Missing/quality-filtered parents
+        remain NaN. Output columns use an ``atl08_`` prefix.
+
+        Source filenames prevent accidental joins across processing releases.
+        Duplicate parent keys raise instead of multiplying photon rows.
+        """
+        left_keys = ["atl08_source_granule", "atl08_segment_id"]
+        right_keys = ["source_granule", "segment_id"]
+        variables = list(dict.fromkeys(variables))
+        if set(variables) & set(right_keys):
+            raise ValueError("Select ATL08 measurements, not join keys")
+        for frame, required in (
+            (photons, left_keys),
+            (land_segments, right_keys + variables),
+        ):
+            missing = set(required) - set(frame.columns)
+            if missing:
+                raise ValueError(
+                    f"Missing linkage/measurement columns: {sorted(missing)}"
+                )
+        names = {name: f"atl08_{name}" for name in variables}
+        if set(names.values()) & set(photons.columns):
+            raise ValueError("Requested ATL08 output columns already exist")
+        parents = land_segments[right_keys + variables].rename(
+            columns={**dict(zip(right_keys, left_keys)), **names}
+        )
+        parents = parents.loc[parents["atl08_segment_id"].ge(0)]
+        result = photons.merge(
+            parents, on=left_keys, how="left", sort=False, validate="many_to_one"
+        )
+        result.index = photons.index
+        return result
 
     def query_nearest_shots(
         self,

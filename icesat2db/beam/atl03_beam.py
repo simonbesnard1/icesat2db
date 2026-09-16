@@ -14,6 +14,7 @@ import pandas as pd
 
 from icesat2db.beam.Beam import beam_handler
 from icesat2db.granule.Granule import granule_handler
+from icesat2db.utils.atl03_atl08 import link_beam
 from icesat2db.utils.segment_id import BEAM_ID_MAP, pack_segment_id
 
 
@@ -31,6 +32,8 @@ class ATL03Beam(beam_handler):
         field_mapping: Dict[str, str],
         confidence_column: int = 0,
         confidence_threshold: int = 3,
+        atl08_file=None,
+        retain_atl08_signal: bool = True,
     ):
         """
         Initialize the ATL03Beam class.
@@ -44,12 +47,18 @@ class ATL03Beam(beam_handler):
                 land ice, inland water). Defaults to 0 (land).
             confidence_threshold (int): Minimum signal confidence to keep
                 (0-4 scale: e.g. 3 = medium, 4 = high). Defaults to 3.
+            atl08_file: Open, acquisition/release-matched ATL08 HDF5 file. The
+                paired parser validates the files before constructing beams.
+            retain_atl08_signal (bool): With a companion file, also retain
+                ATL08 classes 1-3 regardless of ATL03 confidence (default True).
         """
         super().__init__(granule, beam, field_mapping)
 
         self._filtered_index: Optional[np.ndarray] = None
         self.confidence_column = confidence_column
         self.confidence_threshold = confidence_threshold
+        self.atl08_file = atl08_file
+        self.retain_atl08_signal = retain_atl08_signal
 
         def _signal_conf_filter():
             conf = self["heights/signal_conf_ph"][()]
@@ -68,7 +77,6 @@ class ATL03Beam(beam_handler):
             None if the beam has no photon data.
         """
         # Some beams exist as HDF5 groups but carry no heights/geolocation data
-        # (no valid returns on that pass) — skip them silently, same as ATL08.
         if "heights" not in self or "geolocation" not in self:
             return None
 
@@ -78,12 +86,10 @@ class ATL03Beam(beam_handler):
         if n_ph == 0:
             return None
 
-        # ATL03 photons are stored contiguously in along-track segment order, and
-        # sum(segment_ph_cnt) == n_photons by product spec, so repeating each
-        # geolocation segment's id across its photon count exactly recovers the
-        # photon -> segment mapping without needing ph_index_beg.
         seg_id = self["geolocation/segment_id"][()]
         seg_ph_cnt = self["geolocation/segment_ph_cnt"][()].astype(np.int64)
+        if np.any(seg_ph_cnt < 0) or seg_ph_cnt.sum() != n_ph:
+            raise ValueError("ATL03 segment photon counts do not match photon data")
         photon_seg_id = np.repeat(seg_id, seg_ph_cnt)
 
         rgt = int(self.parent_granule["orbit_info/rgt"][0])
@@ -98,10 +104,6 @@ class ATL03Beam(beam_handler):
             "beam_id": np.full(n_ph, self.beam_name),
         }
 
-        # Populate data dictionary with fields from field mapping. Photon-rate
-        # (heights/) fields are read as-is; segment-rate (geolocation/) fields
-        # are expanded to photon rate the same way segment_id is above;
-        # orbit_info fields are per-granule scalars broadcast to photon length.
         for key, source in self.field_mapper.items():
             sds_name = source["SDS_Name"]
             if "heights" in sds_name:
@@ -113,10 +115,27 @@ class ATL03Beam(beam_handler):
                 scalar = self.parent_granule[sds_name][0]
                 photon_data[key] = np.full(n_ph, scalar)
 
+        if self.atl08_file is not None:
+            photon_data.update(
+                link_beam(
+                    self,
+                    self.atl08_file.get(self.beam_name),
+                    seg_id,
+                    seg_ph_cnt,
+                    n_ph,
+                    rgt,
+                    cycle,
+                    beam_id,
+                )
+            )
+
         # Apply the signal-confidence filter and store the filtered index.
         self._filtered_index = self.apply_filter(
             photon_data, filters=self.DEFAULT_QUALITY_FILTERS
         )
+
+        if self.atl08_file is not None and self.retain_atl08_signal:
+            self._filtered_index |= photon_data["atl08_classed_pc_flag"] > 0
 
         photon_data_filtered = {
             key: value[self._filtered_index] for key, value in photon_data.items()

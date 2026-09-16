@@ -92,3 +92,7 @@ The development of icesat2DB was supported by the European Union through the [FO
 
 ## License
 This project is licensed under the EUROPEAN UNION PUBLIC LICENCE v.1.2 License - see the LICENSE file for details.
+
+For paired photon classification and land-segment matching, see the
+[ATL03/ATL08 linkage guide](doc/user/atl03_atl08_linkage.md) and
+[benchmark results](benchmarks/README.md).

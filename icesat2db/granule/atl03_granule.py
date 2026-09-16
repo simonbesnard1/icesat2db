@@ -6,10 +6,11 @@
 # SPDX-FileCopyrightText: 2026 Amelia Holcomb
 # SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
 
+
 from typing import Dict
 
-from icesat2db.beam.Beam import beam_handler
 from icesat2db.beam.atl03_beam import ATL03Beam
+from icesat2db.beam.Beam import beam_handler
 from icesat2db.granule.Granule import granule_handler
 
 
@@ -31,6 +32,8 @@ class ATL03Granule(granule_handler):
         field_mapping: Dict[str, str],
         confidence_column: int = 0,
         confidence_threshold: int = 3,
+        atl08_file=None,
+        retain_atl08_signal: bool = True,
     ):
         """
         Initialize an ATL03Granule object.
@@ -40,10 +43,14 @@ class ATL03Granule(granule_handler):
             field_mapping (Dict[str, str]): Dictionary containing the mapping of product variables to data fields.
             confidence_column (int): Surface-type column into ``heights/signal_conf_ph`` to filter on.
             confidence_threshold (int): Minimum signal confidence to keep.
+            atl08_file: Open matched ATL08 file; owned and closed by the caller.
+            retain_atl08_signal (bool): Also keep ATL08 ground/canopy signal.
         """
         self.field_mapping = (
             field_mapping  # Initialize early to avoid missing attributes
         )
+        self.atl08_file = atl08_file
+        self.retain_atl08_signal = retain_atl08_signal
         self.confidence_column = confidence_column
         self.confidence_threshold = confidence_threshold
 
@@ -98,4 +105,6 @@ class ATL03Granule(granule_handler):
             self.field_mapping,
             confidence_column=self.confidence_column,
             confidence_threshold=self.confidence_threshold,
+            atl08_file=self.atl08_file,
+            retain_atl08_signal=self.retain_atl08_signal,
         )

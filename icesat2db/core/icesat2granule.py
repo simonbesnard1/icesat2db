@@ -109,9 +109,15 @@ class IceSat2Granule:
         granule_dir = os.path.join(self.download_path, granule_key)
 
         try:
+            companion = dict(granules).get("atl08")
             for product, file in granules:
+                kwargs = {}
+                if product == "atl03" and self.data_info.get("level_atl03", {}).get(
+                    "link_atl08", False
+                ):
+                    kwargs["atl08_file"] = companion
                 data = granule_parser.parse_h5_file(
-                    file, product, data_info=self.data_info
+                    file, product, data_info=self.data_info, **kwargs
                 )
 
                 if data is not None:

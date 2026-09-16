@@ -721,6 +721,10 @@ level_atl08:
       units: "adimensional"
 
 level_atl03:
+  # Enable for a NEW database to link paired ATL03/ATL08 files during ingestion.
+  # Existing arrays need re-ingestion to store the computed linkage attributes.
+  link_atl08: false
+  retain_atl08_signal: true
   confidence_column: 0
   confidence_threshold: 3
   variables:

@@ -43,6 +43,13 @@ def configured_products(data_info: Dict[str, Any]) -> List[IceSat2Product]:
     ``level_atl03`` opts into ATL03 as well, without forcing every granule to
     have both.
     """
+    if (
+        data_info.get("level_atl03", {}).get("link_atl08", False)
+        and "level_atl08" not in data_info
+    ):
+        raise ValueError(
+            "link_atl08 requires both level_atl03 and level_atl08 configuration"
+        )
     return [
         product for product in IceSat2Product if f"level_{product.value}" in data_info
     ]
