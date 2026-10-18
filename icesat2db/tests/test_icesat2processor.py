@@ -5,7 +5,6 @@
 # SPDX-FileCopyrightText: 2026 Simon Besnard
 # SPDX-FileCopyrightText: 2026 Amelia Holcomb
 # SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-import concurrent
 import logging
 import geopandas as gpd
 import os
@@ -17,8 +16,19 @@ from unittest.mock import MagicMock, patch
 
 import yaml
 
-import icesat2db.downloader.authentication
 from icesat2db.core.icesat2processor import IceSat2Processor
+
+
+def _mock_earthdata_authentication(test_class):
+    """Stub the strict Earthdata check in IceSat2Processor.__init__ for a class.
+
+    Unit tests must not depend on the user's ~/.netrc or the network: the real
+    authenticator runs ``wget`` against urs.earthdata.nasa.gov, rewriting the
+    user's cookie file and leaving ``index.html`` in the working directory.
+    """
+    patcher = patch("icesat2db.core.icesat2processor.EarthDataAuthenticator")
+    patcher.start()
+    test_class.addClassCleanup(patcher.stop)
 
 
 class TestValidateAndParseDate(unittest.TestCase):
@@ -66,10 +76,7 @@ class TestCorrectErrorHandlingOfConfigFile(unittest.TestCase):
         cls.log_dir = os.path.join(cls.tmp_dir.name, "logs")
         cls.logger = logging.getLogger("test_logger")
         cls.logger.handlers = []
-        authenticator = icesat2db.downloader.authentication.EarthDataAuthenticator(
-            strict=False
-        )
-        authenticator._fetch_earthdata_cookies()
+        _mock_earthdata_authentication(cls)
 
         cls.valid_config_path = os.path.join(cls.tmp_dir.name, "config.yml")
         with open(cls.valid_config_path, "w") as f:
@@ -259,14 +266,20 @@ class TestDownloadCmrDataExceptions(unittest.TestCase):
 
         # create a valid temporary config file
         cls.tmp_dir = tempfile.TemporaryDirectory()
-        authenticator = icesat2db.downloader.authentication.EarthDataAuthenticator(
-            strict=False
-        )
-        authenticator._fetch_earthdata_cookies()
+        _mock_earthdata_authentication(cls)
+        cls.addClassCleanup(cls.tmp_dir.cleanup)
+        # Keep the database, downloads and progress logs out of the source tree.
+        with open("data/data_config.yml") as f:
+            config = yaml.safe_load(f)
+        config["data_dir"] = config["progress_dir"] = cls.tmp_dir.name
+        config["tiledb"]["local_path"] = os.path.join(cls.tmp_dir.name, "db")
+        config_path = os.path.join(cls.tmp_dir.name, "data_config.yml")
+        with open(config_path, "w") as f:
+            yaml.safe_dump(config, f)
         cls.valid_geometry = gpd.read_file("data/bounding_box.geojson")
         cls.processor = IceSat2Processor(
             geometry=cls.valid_geometry,
-            config_file="data/data_config.yml",
+            config_file=config_path,
             start_date="2021-01-01",
             end_date="2022-01-01",
         )
