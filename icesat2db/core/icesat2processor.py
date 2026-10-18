@@ -15,15 +15,15 @@ import traceback
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Set, Union
 import time
 
 import geopandas as gpd
 import pandas as pd
 import yaml
-from dask.distributed import Client, as_completed as dask_as_completed
+from dask.distributed import Client, wait as dask_wait
 import concurrent.futures
-from concurrent.futures import as_completed
+from concurrent.futures import wait as futures_wait, FIRST_COMPLETED
 
 from icesat2db.core.icesat2database import IceSat2Database
 from icesat2db.core.icesat2granule import IceSat2Granule
@@ -189,11 +189,18 @@ class IceSat2Processor:
         )
 
         self.progress_dir = self._ensure_directory(
-            os.path.join(self.data_info["progress_dir"], "progress")
+            os.path.join(
+                self.data_info.get("progress_dir", self.data_info["data_dir"]),
+                "progress",
+            )
         )
         self.report_every = int(self.data_info["tiledb"].get("report_every", 25))
-        flush_every = self.data_info["tiledb"].get("flush_every", None)
-        self.flush_every = int(flush_every) if flush_every is not None else None
+        self.flush_every = int(self.data_info["tiledb"].get("flush_every", 50))
+        if self.report_every < 1 or self.flush_every < 1:
+            raise ValueError("report_every and flush_every must be positive.")
+        # Products each pending granule still has to write (set by
+        # _filter_unprocessed_granules); companions are downloaded, not written.
+        self._write_products: Dict[str, Set[str]] = {}
 
         # Determine which products are configured for ingestion (a
         # 'level_<product>' block present in data_info) — drives both the
@@ -373,11 +380,12 @@ class IceSat2Processor:
         """
         Filter out (granule_id, product) work that has already been processed.
 
-        A granule's product list is narrowed to only the products not yet
-        marked processed in their respective writer — a granule that's
-        partially done (e.g. ATL08 written, ATL03 still pending) is not
-        re-written for the product(s) already completed, since TileDB arrays
-        allow duplicate rows and a redundant re-write would duplicate data.
+        A granule's product list is narrowed to the products not yet marked
+        processed in their respective writer, so a partially done granule (e.g.
+        ATL08 written, ATL03 still pending) does not rewrite completed products.
+        With ``link_atl08`` the ATL08 file of a pending ATL03 granule is still
+        downloaded as the linkage companion, but not written again; an ATL03
+        granule without any ATL08 file cannot be linked and is skipped.
 
         Parameters:
         ----------
@@ -387,40 +395,65 @@ class IceSat2Processor:
         Returns:
         --------
         dict
-            A dictionary of unprocessed (granule_id -> product_info) work.
+            A dictionary of unprocessed (granule_id -> product_info) downloads.
         """
         ids_by_product: Dict[str, list] = defaultdict(list)
         for granule_id, product_info in cmr_data.items():
-            for _, product, _, _ in product_info:
-                ids_by_product[product].append(granule_id)
+            for entry in product_info:
+                ids_by_product[entry[1]].append(granule_id)
 
         processed_by_product: Dict[str, dict] = {}
         for product, writer in self.database_writers.items():
             ids_for_product = ids_by_product.get(product, [])
             if ids_for_product:
+                writer.register_granule_sources(cmr_data)
                 processed_by_product[product] = writer.check_granules_status(
                     ids_for_product
                 )
 
+        linked = self.data_info.get("level_atl03", {}).get("link_atl08", False)
         unprocessed_granules = {}
+        self._write_products = {}
         for granule_id, product_info in cmr_data.items():
-            remaining = [
-                entry
-                for entry in product_info
-                if not processed_by_product.get(entry[1], {}).get(granule_id, False)
+            available = {entry[1] for entry in product_info}
+            todo = {
+                product
+                for product in available
+                if product in self.database_writers
+                and not processed_by_product.get(product, {}).get(granule_id, False)
+            }
+            if linked and "atl03" in todo and "atl08" not in available:
+                logger.warning(
+                    f"Granule {granule_id}: ATL03 skipped, no ATL08 companion to link."
+                )
+                todo.discard("atl03")
+            if not todo:
+                continue
+            needed = set(todo)
+            if linked and "atl03" in todo:
+                needed.add("atl08")
+            unprocessed_granules[granule_id] = [
+                entry for entry in product_info if entry[1] in needed
             ]
-            if remaining:
-                unprocessed_granules[granule_id] = remaining
+            self._write_products[granule_id] = todo
 
         return unprocessed_granules
 
     def _process_granules(self, unprocessed_cmr_data: dict):
+        """Process bounded work queues and record success only after persistence.
+
+        At most ``tiledb.max_in_flight`` granules are parsed concurrently, and
+        buffered frames are flushed every ``flush_every`` granules or once they
+        exceed ``tiledb.max_buffer_bytes``, so photon-rate ATL03 granules cannot
+        accumulate unbounded in memory. Each product is written to its own
+        array; a granule is checkpointed per product only after that product's
+        write succeeded.
+
+        Writes are serialized by this coordinator. Multiple independent processors
+        must not write to the same database concurrently.
         """
-        Process unprocessed granules in parallel, then write to TileDB in a
-        fragment-friendly way: accumulate per spatial window and write once per
-        window, per product (each product has its own TileDB array/writer).
-        """
-        temporal_batching = self.data_info["tiledb"].get("temporal_batching", None)
+        cfg = self.data_info["tiledb"]
+        temporal_batching = cfg.get("temporal_batching")
         if temporal_batching in ("daily", "weekly", "annual"):
             batches = _temporal_tiling(unprocessed_cmr_data, temporal_batching)
         elif temporal_batching is None:
@@ -429,302 +462,169 @@ class IceSat2Processor:
             raise ValueError(
                 "Invalid temporal batching option. Choose 'daily', 'weekly', 'annual', or null."
             )
-
-        def _append_ledger_row(
-            ledger,
-            gid,
-            timeframe,
-            started_ts,
-            finished_ts,
-            status,
-            metrics=None,
-            error_msg=None,
+        max_pending = int(cfg.get("max_in_flight", 4))
+        max_bytes = int(cfg.get("max_buffer_bytes", 256 * 1024**2))
+        if min(max_pending, max_bytes, self.flush_every, self.report_every) < 1:
+            raise ValueError("Queue, buffer, flush and report limits must be positive.")
+        is_dask = isinstance(self.parallel_engine, Client)
+        if not is_dask and not isinstance(
+            self.parallel_engine, concurrent.futures.Executor
         ):
-            metrics = metrics or {}
-            row = Row(
-                granule_id=gid,
-                timeframe=timeframe,
-                submitted_ts=ledger._submits.get(gid, finished_ts),
-                started_ts=metrics.get("started_ts", started_ts),
-                finished_ts=finished_ts,
-                duration_s=finished_ts - metrics.get("started_ts", started_ts),
-                status=status,
-                n_records=metrics.get("n_records"),
-                bytes_downloaded=metrics.get("bytes_downloaded"),
-                products=(
-                    ",".join(metrics.get("products", []))
-                    if metrics.get("products")
-                    else None
-                ),
-                error_msg=error_msg,
+            raise ValueError("Unsupported parallel engine.")
+        wait = dask_wait if is_dask else futures_wait
+        failures = []
+        interrupted = {
+            product: writer.interrupted_flush_granules()
+            for product, writer in self.database_writers.items()
+        }
+
+        for timeframe, granules in batches.items():
+            ledger = ProgressLedger(
+                os.path.join(self.progress_dir, timeframe), timeframe
             )
-            ledger.append(row)
+            remaining = iter(granules.items())
+            pending = {}
+            buffers = defaultdict(list)
+            completed = []  # (granule_id, metrics, products to checkpoint)
+            buffered_bytes = 0
+            counter = 0
 
-        def _flush_buffers(buffers_by_product, processed_ids_by_product, timeframe):
-            """
-            Concatenate buffered DataFrames per product, split into spatial
-            tiles, and write one TileDB fragment per tile per product-writer.
-            Granule ids are marked processed only for the writer(s) they
-            actually contributed to in this flush window.
-            """
-            for product, buffers in buffers_by_product.items():
-                if not buffers:
-                    continue
-                writer = self.database_writers[product]
-                try:
-                    combined = pd.concat(buffers, ignore_index=True)
-                    for _, tile_df in writer.spatial_chunking(combined):
-                        writer.write_granule(tile_df)
-                    ids_for_product = processed_ids_by_product.get(product)
-                    if ids_for_product:
-                        writer.mark_granules_as_processed_batch(ids_for_product)
-                except Exception as e:
-                    logger.error(
-                        f"Write phase failed for timeframe {timeframe}, product {product}: {e}",
-                        exc_info=True,
+            def record(gid, metrics, status, error=None):
+                finished = time.time()
+                started = metrics.get("started_ts", finished)
+                ledger.append(
+                    Row(
+                        granule_id=gid,
+                        timeframe=timeframe,
+                        submitted_ts=ledger._submits.get(gid, started),
+                        started_ts=started,
+                        finished_ts=finished,
+                        duration_s=finished - started,
+                        status=status,
+                        n_records=metrics.get("n_records"),
+                        bytes_downloaded=metrics.get("bytes_downloaded"),
+                        products=",".join(metrics.get("products", [])) or None,
+                        error_msg=error,
                     )
-                    raise
-
-        def _handle_result(
-            gid,
-            started_ts,
-            finished_ts,
-            ids_,
-            gdf_dict,
-            metrics,
-            ledger,
-            timeframe,
-            buffers_by_product,
-            processed_ids_by_product,
-        ):
-            ok = ids_ is not None
-
-            # Mark every product that was attempted for this granule as
-            # processed, even if its resulting DataFrame was empty — avoids
-            # retrying forever a granule with zero valid segments/photons.
-            if ok:
-                for product in metrics.get("products", []):
-                    processed_ids_by_product[product].append(ids_)
-
-            if gdf_dict:
-                for product, df in gdf_dict.items():
-                    if df is not None and not df.empty:
-                        buffers_by_product[product].append(df)
-
-            _append_ledger_row(
-                ledger,
-                gid,
-                timeframe,
-                started_ts,
-                finished_ts,
-                status="ok" if ok else "fail",
-                metrics=metrics,
-                error_msg=None,
-            )
-
-        # ---- Executor path ----
-        if isinstance(self.parallel_engine, concurrent.futures.Executor):
-            with self.parallel_engine as executor:
-                for timeframe, granules in batches.items():
-                    ledger = ProgressLedger(
-                        os.path.join(self.progress_dir, timeframe), timeframe
-                    )
-
-                    # Submit tasks
-                    future_map = {}
-                    for gid, pinf in granules.items():
-                        ledger.note_submit(gid)
-                        fut = executor.submit(
-                            IceSat2Processor.process_single_granule,
-                            gid,
-                            pinf,
-                            self.data_info,
-                            self.download_path,
-                        )
-                        future_map[fut] = gid
-
-                    buffers_by_product = defaultdict(list)
-                    processed_ids_by_product = defaultdict(list)
-                    counter = 0
-
-                    for fut in as_completed(future_map):
-                        # Pop immediately so the future (and its result) can be
-                        # GC'd once we're done with its data below.
-                        gid = future_map.pop(fut)
-                        started_ts = time.time()
-                        try:
-                            ids_, gdf_dict, metrics = fut.result()
-                            finished_ts = time.time()
-                            _handle_result(
-                                gid,
-                                started_ts,
-                                finished_ts,
-                                ids_,
-                                gdf_dict,
-                                metrics,
-                                ledger,
-                                timeframe,
-                                buffers_by_product,
-                                processed_ids_by_product,
-                            )
-
-                        except Exception as e:
-                            finished_ts = time.time()
-                            tb = traceback.format_exc()
-                            ledger.write_error(gid, tb)
-                            _append_ledger_row(
-                                ledger,
-                                gid,
-                                timeframe,
-                                started_ts,
-                                finished_ts,
-                                status="fail",
-                                metrics={},
-                                error_msg=str(e),
-                            )
-                            logger.error(f"Granule {gid} failed: {e}")
-
-                        finally:
-                            counter += 1
-                            if (
-                                self.flush_every
-                                and counter % self.flush_every == 0
-                                and any(buffers_by_product.values())
-                            ):
-                                try:
-                                    _flush_buffers(
-                                        buffers_by_product,
-                                        processed_ids_by_product,
-                                        timeframe,
-                                    )
-                                    buffers_by_product.clear()
-                                    processed_ids_by_product.clear()
-                                    _release_memory()
-                                except Exception as flush_exc:
-                                    logger.error(
-                                        f"Periodic flush failed (will retry at next flush): {flush_exc}"
-                                    )
-                            if counter % self.report_every == 0:
-                                ledger.write_status_md()
-                                ledger.write_html()
-
-                    # Final flush for remaining buffer
-                    if any(buffers_by_product.values()):
-                        try:
-                            _flush_buffers(
-                                buffers_by_product, processed_ids_by_product, timeframe
-                            )
-                        except Exception:
-                            # already logged; keep ledger finalization
-                            pass
-
-                    ledger.write_status_md()
-                    ledger.write_html()
-                    # Return pages from this year's allocation back to the OS
-                    # before starting the next temporal batch.
-                    _release_memory()
-            return
-
-        # ---- Dask path ----
-        if isinstance(self.parallel_engine, Client):
-            for timeframe, granules in batches.items():
-                ledger = ProgressLedger(
-                    os.path.join(self.progress_dir, timeframe), timeframe
                 )
 
-                future_map = {}
-                for gid, pinf in granules.items():
+            def write_products(gid, info):
+                return self._write_products.get(gid) or {
+                    entry[1] for entry in info if entry[1] in self.database_writers
+                }
+
+            def submit_more():
+                while len(pending) < max_pending:
+                    item = next(remaining, None)
+                    if item is None:
+                        break
+                    gid, info = item
                     ledger.note_submit(gid)
-                    fut = self.parallel_engine.submit(
+                    products = sorted(write_products(gid, info))
+                    options = {"pure": False} if is_dask else {}
+                    future = self.parallel_engine.submit(
                         IceSat2Processor.process_single_granule,
                         gid,
-                        pinf,
+                        info,
                         self.data_info,
                         self.download_path,
+                        products,
+                        **options,
                     )
-                    future_map[fut] = gid
+                    pending[future] = (gid, set(products))
 
-                buffers_by_product = defaultdict(list)
-                processed_ids_by_product = defaultdict(list)
-                counter = 0
+            def flush():
+                if not completed:
+                    return
+                try:
+                    for product, writer in self.database_writers.items():
+                        gids = [gid for gid, _, prods in completed if product in prods]
+                        if not gids:
+                            continue
+                        frames = buffers.get(product)
+                        if frames:
+                            # Only granules of a crashed write can already be stored.
+                            check_existing = not interrupted[product].isdisjoint(gids)
+                            writer.begin_flush(gids)
+                            combined = pd.concat(frames, ignore_index=True)
+                            for _, tile in writer.spatial_chunking(combined):
+                                writer.write_granule(
+                                    tile, check_existing=check_existing
+                                )
+                            del combined
+                        # Empty, successfully parsed granules also receive a checkpoint.
+                        writer.mark_granules_as_processed_batch(gids)
+                except Exception as exc:
+                    for gid, metrics, _ in completed:
+                        ledger.write_error(gid, traceback.format_exc())
+                        record(gid, metrics, "fail", str(exc))
+                    raise
+                for gid, metrics, _ in completed:
+                    record(gid, metrics, "ok")
+                buffers.clear()
+                completed.clear()
+                _release_memory()
 
-                # as_completed yields each future as it finishes — no serial blocking
-                for fut in dask_as_completed(future_map):
-                    gid = future_map.pop(fut)
-                    started_ts = time.time()
-                    try:
-                        ids_, gdf_dict, metrics = fut.result()
-                        finished_ts = time.time()
-                        _handle_result(
-                            gid,
-                            started_ts,
-                            finished_ts,
-                            ids_,
-                            gdf_dict,
-                            metrics,
-                            ledger,
-                            timeframe,
-                            buffers_by_product,
-                            processed_ids_by_product,
-                        )
-
-                    except Exception as e:
-                        finished_ts = time.time()
-                        tb = traceback.format_exc()
-                        ledger.write_error(gid, tb)
-                        _append_ledger_row(
-                            ledger,
-                            gid,
-                            timeframe,
-                            started_ts,
-                            finished_ts,
-                            status="fail",
-                            metrics={},
-                            error_msg=str(e),
-                        )
-                        logger.error(f"Dask task for {gid} failed: {e}")
-
-                    finally:
+            try:
+                submit_more()
+                while pending:
+                    done, _ = wait(list(pending), return_when=FIRST_COMPLETED)
+                    for future in done:
+                        gid, products = pending.pop(future)
+                        try:
+                            result_id, frames, metrics = future.result()
+                            if result_id != gid:
+                                raise RuntimeError(
+                                    f"Granule {gid} did not parse successfully."
+                                )
+                            completed.append((gid, metrics, products))
+                            for product, frame in (frames or {}).items():
+                                if product not in products:
+                                    continue
+                                if frame is not None and not frame.empty:
+                                    buffers[product].append(frame)
+                                    buffered_bytes += int(
+                                        frame.memory_usage(index=True, deep=True).sum()
+                                    )
+                            del frames
+                        except Exception as exc:
+                            failures.append(gid)
+                            ledger.write_error(gid, traceback.format_exc())
+                            record(gid, {}, "fail", str(exc))
+                            logger.error("Granule %s failed: %s", gid, exc)
+                        finally:
+                            if is_dask:
+                                future.release()
                         counter += 1
                         if (
-                            self.flush_every
-                            and counter % self.flush_every == 0
-                            and any(buffers_by_product.values())
+                            len(completed) >= self.flush_every
+                            or buffered_bytes >= max_bytes
                         ):
-                            try:
-                                _flush_buffers(
-                                    buffers_by_product,
-                                    processed_ids_by_product,
-                                    timeframe,
-                                )
-                                buffers_by_product.clear()
-                                processed_ids_by_product.clear()
-                                _release_memory()
-                            except Exception as flush_exc:
-                                logger.error(
-                                    f"Periodic flush failed (will retry at next flush): {flush_exc}"
-                                )
+                            flush()
+                            buffered_bytes = 0
                         if counter % self.report_every == 0:
                             ledger.write_status_md()
                             ledger.write_html()
-
-                if any(buffers_by_product.values()):
-                    try:
-                        _flush_buffers(
-                            buffers_by_product, processed_ids_by_product, timeframe
-                        )
-                    except Exception:
-                        pass
-
+                    done.clear()
+                    del future
+                    submit_more()
+                flush()
+            finally:
+                for future in pending:
+                    future.cancel()
+                    if is_dask:
+                        future.release()
                 ledger.write_status_md()
                 ledger.write_html()
-                _release_memory()
-            return
-
-        raise ValueError("Unsupported parallel engine.")
+        if failures:
+            raise RuntimeError(
+                f"{len(failures)} granule(s) failed; see progress logs: {failures[:10]}"
+            )
 
     @staticmethod
-    def process_single_granule(granule_id, product_info, data_info, download_path):
+    def process_single_granule(
+        granule_id, product_info, data_info, download_path, write_products=None
+    ):
         """
         Processes a single granule by downloading and processing sequentially.
 
@@ -738,36 +638,43 @@ class IceSat2Processor:
             Dictionary containing configuration and metadata.
         download_path : str
             Path to the directory where downloaded files are stored.
+        write_products : list of str, optional
+            Products whose records are returned for writing. Other downloaded
+            products (e.g. an already stored ATL08 companion) are only used for
+            linkage. Defaults to every downloaded product.
 
         Returns:
         --------
         tuple
-            A tuple of (granule_id, {product: DataFrame} or None, metrics).
+            A tuple of (granule_id, {product: DataFrame}, metrics). ``metrics
+            ["products"]`` lists the products to checkpoint for this granule.
         """
 
         started_ts = time.time()
         downloader = H5FileDownloader(download_path)
 
         bytes_dl = 0
-        prods = []
         download_results = []
-        for url, product, _, _ in product_info:
+        for entry in product_info:
+            url, product = entry[:2]
 
             res = downloader.download(granule_id, url, IceSat2Product(product))
-            # If your downloader can expose sizes, insert here:
-            if isinstance(res, tuple) and len(res) >= 2 and isinstance(res[1], int):
-                bytes_dl += int(res[1])
-            prods.append(str(product))
+            path = res[1][1]
+            if path and os.path.isfile(path):
+                bytes_dl += os.path.getsize(path)
             download_results.append(res)
 
+        if write_products is None:
+            write_products = [entry[1] for entry in product_info]
         granule_processor = IceSat2Granule(download_path, data_info)
         ids_, gdf_dict = granule_processor.process_granule(download_results)
-        n_records = sum(df.shape[0] for df in gdf_dict.values()) if gdf_dict else None
+        gdf_dict = {p: df for p, df in gdf_dict.items() if p in write_products}
+        n_records = sum(df.shape[0] for df in gdf_dict.values())
 
         metrics = {
             "started_ts": started_ts,
             "bytes_downloaded": bytes_dl or None,
-            "products": prods,
+            "products": [str(p) for p in write_products],
             "n_records": n_records,
         }
         return ids_, gdf_dict, metrics

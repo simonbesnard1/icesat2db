@@ -33,6 +33,14 @@ class IceSat2Product(Enum):
         return [product.value for product in cls]
 
 
+# Integer column identifying each stored record of a product: the packed
+# land-segment id for ATL08 and the packed photon id for ATL03.
+RECORD_ID = {
+    IceSat2Product.ATL08.value: "segment_id",
+    IceSat2Product.ATL03.value: "photon_id",
+}
+
+
 def configured_products(data_info: Dict[str, Any]) -> List[IceSat2Product]:
     """
     Return the IceSat2 products actually configured for ingestion, i.e. those

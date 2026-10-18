@@ -95,9 +95,12 @@ The `data_config.yml` file also includes settings for configuring the database c
       local_path: ''                                    # TileDB URI for storing data
       overwrite: true                                   # Whether to overwrite existing arrays
       temporal_batching: "weekly"                       # either daily, weekly, or annual
-      latitude_tile: 6                                  # spatial tile size in degrees (latitude)
-      longitude_tile: 6                                 # spatial tile size in degrees (longitude)
-      flush_every: 20000                                # flush buffers every N granules to bound memory
+      latitude_tile: 6                                  # schema tile size in degrees (latitude)
+      longitude_tile: 6                                 # schema tile size in degrees (longitude)
+      write_block_degrees: 30                           # one fragment per 30° block per write
+      max_in_flight: 4                                  # granules downloaded/parsed concurrently
+      flush_every: 50                                   # write after N granules ...
+      max_buffer_bytes: 268435456                       # ... or once buffered data exceeds 256 MB
       time_range:                                       # Global time range for data
         start_time: "2018-01-01"                        # Global start time for data
         end_time: "2030-12-31"                          # Global end time for data

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import h5py
+import numpy as np
 import pandas as pd
 
 from icesat2db.granule.atl03_granule import ATL03Granule
@@ -130,8 +131,15 @@ class ATL03GranuleParser(GranuleParser):
                         raise ValueError("ATL03/ATL08 orbit metadata differ")
             data = self.parse_granule(granule)
             if companion is not None:
-                data["atl08_source_granule"] = Path(self.atl08_file).name
+                data["atl08_source_granule"] = _constant_category(
+                    Path(self.atl08_file).name, len(data)
+                )
             return data
+
+
+def _constant_category(value: str, length: int) -> pd.Categorical:
+    """A per-row constant string stored in one byte per row."""
+    return pd.Categorical.from_codes(np.zeros(length, dtype=np.int8), [value])
 
 
 def parse_h5_file(
@@ -169,5 +177,5 @@ def parse_h5_file(
     parser = parser_class(file, data_info or {}, **kwargs)
     data = parser.parse()
     if (data_info or {}).get("level_atl03", {}).get("link_atl08", False):
-        data["source_granule"] = Path(file).name
+        data["source_granule"] = _constant_category(Path(file).name, len(data))
     return data

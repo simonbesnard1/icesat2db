@@ -15,7 +15,7 @@ import pandas as pd
 from icesat2db.beam.Beam import beam_handler
 from icesat2db.granule.Granule import granule_handler
 from icesat2db.utils.atl03_atl08 import link_beam
-from icesat2db.utils.segment_id import BEAM_ID_MAP, pack_segment_id
+from icesat2db.utils.segment_id import BEAM_ID_MAP, pack_photon_id, pack_segment_id
 
 
 class ATL03Beam(beam_handler):
@@ -91,6 +91,10 @@ class ATL03Beam(beam_handler):
         if np.any(seg_ph_cnt < 0) or seg_ph_cnt.sum() != n_ph:
             raise ValueError("ATL03 segment photon counts do not match photon data")
         photon_seg_id = np.repeat(seg_id, seg_ph_cnt)
+        # Zero-based position of each photon within its geolocation segment.
+        offsets = np.arange(n_ph, dtype=np.int64) - np.repeat(
+            np.cumsum(seg_ph_cnt) - seg_ph_cnt, seg_ph_cnt
+        )
 
         rgt = int(self.parent_granule["orbit_info/rgt"][0])
         cycle = int(self.parent_granule["orbit_info/cycle_number"][0])
@@ -101,7 +105,11 @@ class ATL03Beam(beam_handler):
             "longitude": self["heights/lon_ph"][()],
             "latitude": self["heights/lat_ph"][()],
             "segment_id": pack_segment_id(rgt, cycle, beam_id, photon_seg_id),
-            "beam_id": np.full(n_ph, self.beam_name),
+            "photon_id": pack_photon_id(rgt, cycle, beam_id, photon_seg_id, offsets),
+            # One byte per photon instead of one Python string per photon.
+            "beam_id": pd.Categorical.from_codes(
+                np.zeros(n_ph, dtype=np.int8), [self.beam_name]
+            ),
         }
 
         for key, source in self.field_mapper.items():

@@ -374,6 +374,8 @@ class TestFilterUnprocessedGranules(unittest.TestCase):
             mock_writer.check_granules_status.return_value = processed_map
             writers[product] = mock_writer
         obj.database_writers = writers
+        obj.data_info = {}
+        obj._write_products = {}
         return obj
 
     def test_all_unprocessed_returns_full_dict(self):

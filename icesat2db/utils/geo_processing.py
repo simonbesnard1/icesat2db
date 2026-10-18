@@ -164,7 +164,7 @@ def convert_to_days_since_epoch(
         A pandas Series representing the number of days since the Unix epoch.
     """
     # Ensure timestamps are converted to pandas DatetimeIndex
-    timestamps = pd.to_datetime(timestamps, utc=True)
+    timestamps = pd.DatetimeIndex(pd.to_datetime(timestamps, utc=True))
 
     # Define the Unix epoch
     epoch = pd.Timestamp("1970-01-01", tz="UTC")

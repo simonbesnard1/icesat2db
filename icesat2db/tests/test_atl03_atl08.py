@@ -221,14 +221,16 @@ def test_tiledb_roundtrip_and_old_schema_guard(paired_files, linked_config, tmp_
                 data.atl08_segment_id.tolist()
             )
             assert len(order) == len(data)
-            with pytest.raises(ValueError, match="Missing linkage"):
+            assert stored["photon_id"].dtype == np.int64
+            assert len(np.unique(stored["photon_id"])) == len(data)
+            with pytest.raises(ValueError, match="attribute missing.*photon_index"):
                 db._extract_variable_data(data.drop(columns="photon_index"))
     linked_config["tiledb"]["local_path"] = str(tmp_path / "old_db")
     linked_config["level_atl03"]["link_atl08"] = False
     old = IceSat2Database(linked_config, product="atl03")
     old._create_arrays()
     linked_config["level_atl03"]["link_atl08"] = True
-    with pytest.raises(ValueError, match="Re-ingest"):
+    with pytest.raises(ValueError, match="schema differs"):
         IceSat2Database(linked_config, product="atl03")._create_arrays()
 
 

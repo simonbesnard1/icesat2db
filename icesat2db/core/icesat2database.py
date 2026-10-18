@@ -8,8 +8,12 @@
 
 
 import concurrent.futures
+import gzip
+import hashlib
+import json
 import logging
 import os
+import time
 from typing import Any, Dict, Generator, Optional, Tuple
 
 import numpy as np
@@ -19,11 +23,13 @@ from dask.distributed import Client
 from retry import retry
 
 from icesat2db.utils.atl03_atl08 import linkage_variables
+from icesat2db.utils.constants import RECORD_ID
 from icesat2db.utils.filters import TileDBFilterPolicy
 from icesat2db.utils.geo_processing import (
     _datetime_to_timestamp_days,
     convert_to_days_since_epoch,
 )
+from icesat2db.utils.segment_id import PHOTON_ID_VARIABLE
 from icesat2db.utils.tiledb_consolidation import SpatialConsolidationPlanner
 
 logger = logging.getLogger(__name__)
@@ -52,12 +58,9 @@ class IceSat2Database:
     - Spatial domain bounds and array domain metadata are cached on __init__ so
       write_granule / spatial_chunking never re-open the array just for config lookups.
 
-    - allows_duplicates=True preserves all valid IceSat2 shots, including co-located
-      shots within the same UTC day. The old drop_duplicates() silently discarded
-      valid data.
-
-    - write_batch() amortises the TileDB open/close cost across many granules.
-      Prefer it over calling write_granule() in a loop for large ingestion jobs.
+    - allows_duplicates=True preserves co-located records within the same UTC
+      day. Records are deduplicated on their unique id (``segment_id`` for
+      ATL08, ``photon_id`` for ATL03), never on coordinates.
 
     - mark_granule_as_processed() now has retry logic (absent in old version).
 
@@ -90,10 +93,16 @@ class IceSat2Database:
         """
         self.config = config
         self.product = product
+        if product not in RECORD_ID:
+            raise ValueError(f"Unsupported IceSat2 product: {product}")
+        # Integer column that uniquely identifies every stored record.
+        self.record_id = RECORD_ID[product]
         self.variables_config = self._load_variables_config(config, product)
 
         cfg_td = config["tiledb"]
         storage_type = cfg_td.get("storage_type", "local").lower()
+        if storage_type not in {"local", "s3"}:
+            raise ValueError("storage_type must be 'local' or 's3'.")
 
         # ------------------------------------------------------------------ #
         # Performance flags (opt-in, default to fast/simple)
@@ -148,7 +157,7 @@ class IceSat2Database:
         }
 
         if storage_type != "s3":
-            return tiledb.Config(base)
+            return tiledb.Config({**base, **cfg_td.get("config_overrides", {})})
 
         if not credentials:
             raise ValueError("S3 credentials are required when storage_type == 's3'.")
@@ -159,22 +168,24 @@ class IceSat2Database:
                 **base,
                 "vfs.s3.aws_access_key_id": credentials["AccessKeyId"],
                 "vfs.s3.aws_secret_access_key": credentials["SecretAccessKey"],
+                "vfs.s3.aws_session_token": credentials.get("SessionToken", ""),
                 "vfs.s3.endpoint_override": cfg_td["url"],
                 "vfs.s3.use_virtual_addressing": "false",
                 "vfs.s3.use_multipart_upload": "true",
                 "vfs.s3.multipart_part_size": s3.get("multipart_part_size", "52428800"),
                 "vfs.s3.multipart_threshold": "52428800",
                 "vfs.s3.max_parallel_ops": "8",
-                "vfs.s3.region": "eu-central-1",
+                "vfs.s3.region": s3.get("region", "eu-central-1"),
                 "vfs.s3.scheme": "https",
                 "vfs.s3.backoff_scale": s3.get("backoff_scale", "2.0"),
                 "vfs.s3.backoff_max_ms": s3.get("backoff_max_ms", "120000"),
-                "sm.vfs.s3.connect_timeout_ms": s3.get("connect_timeout_ms", "60000"),
-                "sm.vfs.s3.request_timeout_ms": s3.get("request_timeout_ms", "600000"),
-                "sm.vfs.s3.connect_max_tries": s3.get("connect_max_tries", "5"),
+                "vfs.s3.connect_timeout_ms": s3.get("connect_timeout_ms", "60000"),
+                "vfs.s3.request_timeout_ms": s3.get("request_timeout_ms", "600000"),
+                "vfs.s3.connect_max_tries": s3.get("connect_max_tries", "5"),
                 "sm.io_concurrency_level": "8",
                 "sm.compute_concurrency_level": "8",
                 "sm.mem.total_budget": "10737418240",
+                **cfg_td.get("config_overrides", {}),
             }
         )
 
@@ -195,21 +206,16 @@ class IceSat2Database:
         if tiledb.array_exists(uri, ctx=self.ctx):
             if self.overwrite:
                 tiledb.remove(uri, ctx=self.ctx)
+                vfs = tiledb.VFS(ctx=self.ctx)
+                if vfs.is_file(self._sources_uri):
+                    vfs.remove_file(self._sources_uri)
                 self._schema_cache = None
                 logger.info(f"Overwritten existing TileDB array at {uri}")
             else:
-                required = set(linkage_variables(self.config, self.product))
-                if required:
-                    with tiledb.open(uri, "r", ctx=self.ctx) as array:
-                        missing = required - {
-                            array.schema.attr(i).name for i in range(array.schema.nattr)
-                        }
-                    if missing:
-                        raise ValueError(
-                            f"Existing array lacks linkage attributes {sorted(missing)}. "
-                            "Re-ingest into a new array location with link_atl08 enabled."
-                        )
-                logger.info(f"TileDB array already exists at {uri}. Skipping.")
+                self._validate_existing_array(uri)
+                logger.info(
+                    f"TileDB array already exists at {uri}. Validated for resume."
+                )
                 return
 
         try:
@@ -227,6 +233,115 @@ class IceSat2Database:
         except (ValueError, tiledb.TileDBError) as e:
             logger.error(f"Failed to create array: {e}")
             raise
+
+    def _ingestion_manifest(self) -> str:
+        """Describe data semantics, excluding credentials and operational settings.
+
+        Covers everything that changes which records are stored or how they are
+        labelled: the source collections, the product's level settings (photon
+        confidence filter, ATL08 linkage) and the variable definitions.
+        """
+        collections = self.config.get("earth_data_info", {}).get("CMR_PRODUCT_IDS", {})
+        level = self.config.get(f"level_{self.product}", {})
+        return json.dumps(
+            {
+                "policy_version": 1,
+                "product": self.product,
+                "collections": collections,
+                "level_settings": {k: v for k, v in level.items() if k != "variables"},
+                "link_atl08": self.config.get("level_atl03", {}).get(
+                    "link_atl08", False
+                ),
+                "variables": self.variables_config,
+            },
+            sort_keys=True,
+            default=str,
+        )
+
+    def _validate_existing_array(self, uri: str) -> None:
+        """Refuse to append incompatible data or relabel a legacy database."""
+        with tiledb.open(uri, "r", ctx=self.ctx) as array:
+            schema = array.schema
+            expected = self._create_domain()
+            attrs = self._create_attributes()
+            compatible = (
+                schema.sparse
+                and schema.allows_duplicates
+                and schema.ndim == expected.ndim
+                and schema.nattr == len(attrs)
+            )
+            if compatible:
+                compatible = all(
+                    schema.domain.dim(i).name == expected.dim(i).name
+                    and schema.domain.dim(i).dtype == expected.dim(i).dtype
+                    and schema.domain.dim(i).domain == expected.dim(i).domain
+                    for i in range(expected.ndim)
+                ) and all(
+                    schema.has_attr(attr.name)
+                    and schema.attr(attr.name).dtype == attr.dtype
+                    for attr in attrs
+                )
+            if not compatible:
+                raise ValueError(
+                    "Existing array schema differs from configuration; use a new database path."
+                )
+            if (
+                array.meta.get("icesat2db.ingestion_manifest")
+                != self._ingestion_manifest()
+            ):
+                raise ValueError(
+                    "Existing database has missing or incompatible ingestion provenance. "
+                    "Use a new database path; legacy arrays remain readable with IceSat2Provider."
+                )
+
+    @property
+    def _sources_uri(self) -> str:
+        """Sidecar holding each granule's pinned source files (writer-only state)."""
+        return f"{self.array_uri}_granule_sources.json.gz"
+
+    def register_granule_sources(self, granules: dict) -> None:
+        """Pin source URLs before writing, including interrupted, uncommitted batches.
+
+        Only this writer's product is pinned. The registry lives in a gzipped JSON
+        file next to the array rather than in array metadata: readers load all
+        metadata on every open, and putting tens of thousands of metadata keys in
+        one write scales quadratically.
+        """
+        from urllib.parse import urlsplit, urlunsplit
+
+        manifests = {}
+        for gid, entries in granules.items():
+            sources = []
+            for entry in entries:
+                url, product = entry[:2]
+                if product != self.product:
+                    continue
+                parts = urlsplit(url)
+                # Exclude expiring query parameters and credentials.
+                source = urlunsplit(
+                    (parts.scheme, parts.netloc.rsplit("@", 1)[-1], parts.path, "", "")
+                )
+                sources.append((product, source))
+            if sources:
+                manifests[gid] = json.dumps(sorted(sources))
+
+        vfs = tiledb.VFS(ctx=self.ctx)
+        registry = {}
+        if vfs.is_file(self._sources_uri):
+            with vfs.open(self._sources_uri, "rb") as f:
+                registry = json.loads(gzip.decompress(f.read()))
+        for gid, value in manifests.items():
+            previous = registry.get(gid)
+            if previous is not None and previous != value:
+                raise ValueError(
+                    f"Source files changed for granule {gid} ({self.product}); "
+                    "use a new database path."
+                )
+        missing = {gid: v for gid, v in manifests.items() if gid not in registry}
+        if missing:
+            registry.update(missing)
+            with vfs.open(self._sources_uri, "wb") as f:
+                f.write(gzip.compress(json.dumps(registry).encode()))
 
     def _create_domain(self) -> tiledb.Domain:
         """
@@ -365,6 +480,11 @@ class IceSat2Database:
             return
         try:
             with tiledb.open(self.array_uri, mode="w", ctx=self.ctx) as array:
+                manifest = self._ingestion_manifest()
+                array.meta["icesat2db.ingestion_manifest"] = manifest
+                array.meta["icesat2db.ingestion_fingerprint"] = hashlib.sha256(
+                    manifest.encode()
+                ).hexdigest()
                 for var_name, var_info in self.variables_config.items():
                     for key in ("units", "description", "dtype", "product_level"):
                         array.meta[f"{var_name}.{key}"] = var_info.get(key, "unknown")
@@ -439,16 +559,14 @@ class IceSat2Database:
         s = self.config["tiledb"]["spatial_range"]
         return s["lon_min"], s["lon_max"], s["lat_min"], s["lat_max"]
 
-    def spatial_chunking(
-        self,
-        dataset: pd.DataFrame,
-        tiles_across_lat: int = 5,
-        tiles_across_lon: int = 5,
-    ) -> Generator:
+    def spatial_chunking(self, dataset: pd.DataFrame) -> Generator:
         """
         Yield ((lat_min, lat_max, lon_min, lon_max), view) pairs.
 
-        Tile boundaries are derived from config — no array open required.
+        Each block becomes one fragment per write. The block size comes from
+        ``tiledb.write_block_degrees`` (default 30°), independent of the schema
+        tiles: a granule spans tens of degrees, so small blocks would split every
+        write into hundreds of tiny fragments.
         Yields cheap row-subsets of the original DataFrame (no copy).
         """
         if dataset.empty:
@@ -457,14 +575,12 @@ class IceSat2Database:
             raise ValueError("Dataset must contain 'latitude' and 'longitude' columns.")
 
         cfg_td = self.config.get("tiledb", {})
-        lat_tile = float(cfg_td.get("latitude_tile", 1))
-        lon_tile = float(cfg_td.get("longitude_tile", 1))
+        block_lat = block_lon = float(cfg_td.get("write_block_degrees", 30.0))
+        if block_lat <= 0:
+            raise ValueError("write_block_degrees must be positive.")
         s = cfg_td.get("spatial_range", {})
         lat_min_dom = float(s.get("lat_min", -90.0))
         lon_min_dom = float(s.get("lon_min", -180.0))
-
-        block_lat = lat_tile * tiles_across_lat
-        block_lon = lon_tile * tiles_across_lon
 
         lat_idx = np.floor(
             (dataset["latitude"].to_numpy() - lat_min_dom) / block_lat
@@ -475,7 +591,7 @@ class IceSat2Database:
 
         for (i_lat, i_lon), idx in dataset.groupby(
             [lat_idx, lon_idx], sort=False
-        ).groups.items():
+        ).indices.items():
             lat0 = lat_min_dom + i_lat * block_lat
             lon0 = lon_min_dom + i_lon * block_lon
             yield (lat0, lat0 + block_lat, lon0, lon0 + block_lon), dataset.take(idx)
@@ -530,18 +646,14 @@ class IceSat2Database:
         cache = self._get_schema_cache()
         attr_dtypes = cache["attr_dtypes"]
         cols = set(granule_data.columns)
-        required = set(linkage_variables(self.config, self.product))
-        missing = required - (cols & cache["attrs"])
-        if missing:
-            raise ValueError(
-                f"Missing linkage columns or schema attributes: {sorted(missing)}"
-            )
 
         data: Dict[str, np.ndarray] = {}
 
         for name in cache["sorted_data_attrs"]:
             if name not in cols:
-                continue
+                raise ValueError(
+                    f"Required database attribute missing from input: {name}"
+                )
             series = granule_data[name]
             target_dtype = attr_dtypes[name]
             # Fast path: no coercion needed
@@ -552,9 +664,12 @@ class IceSat2Database:
 
         # timestamp_ns — int64 nanoseconds since epoch
         if "timestamp_ns" in cache["attrs"]:
-            data["timestamp_ns"] = pd.to_datetime(
-                granule_data["time"], utc=True, errors="coerce"
-            ).to_numpy(dtype="int64", copy=False)
+            data["timestamp_ns"] = (
+                pd.to_datetime(granule_data["time"], utc=True, errors="raise")
+                .dt.as_unit("ns")
+                .astype("int64")
+                .to_numpy(copy=False)
+            )
 
         return data
 
@@ -566,7 +681,10 @@ class IceSat2Database:
         """
         dt = np.dtype(target_dtype)
         if dt.kind in ("U", "S"):
-            return s.fillna("").astype(str).to_numpy(dtype=dt)
+            # TileDB stores strings variable-length; an object array shares the
+            # Python strings instead of copying each row to a fixed-width cell
+            # (U80 alone costs 320 bytes per photon).
+            return s.astype("string").to_numpy(dtype=object, na_value="")
         if dt.kind == "M":
             return (
                 pd.to_datetime(s, utc=True, errors="coerce")
@@ -575,73 +693,93 @@ class IceSat2Database:
             )
         return s.to_numpy(dtype=dt, copy=False)
 
-    @retry(
-        (tiledb.TileDBError, ConnectionError),
-        tries=10,
-        delay=5,
-        backoff=3,
-        logger=logger,
-    )
-    def _write_to_tiledb(self, coords, data, mark_keys=None):
-        """
-        Write data (and optionally granule-processed metadata) in a single TileDB open.
+    _WRITE_TRIES, _WRITE_DELAY, _WRITE_BACKOFF, _WRITE_MAX_DELAY = 10, 5, 3, 60
 
-        Combining the data write and the metadata write into one open/close cycle
-        halves TileDB I/O overhead compared to calling write + mark separately.
-
-        Parameters
-        ----------
-        coords : dict
-            Dimension arrays (latitude, longitude, time).
-        data : dict
-            Attribute arrays.
-        mark_keys : list of str, optional
-            Granule keys to mark as processed in the same transaction.
+    def _write_to_tiledb(self, coords, data, check_existing: bool = True):
         """
+        Write data to the TileDB array, retrying transient failures.
+
+        Records already in the array are dropped first when ``check_existing`` is
+        set, and on every retry: a failed attempt may have committed before its
+        acknowledgment was lost. The check reads all record ids in the write's
+        bounding box, which grows with the database, so callers that know the
+        records are new (unprocessed granules) skip it on the first attempt.
+        One ingestion coordinator must own writes to an array at a time.
+        """
+        delay = self._WRITE_DELAY
+        for attempt in range(self._WRITE_TRIES):
+            try:
+                self._write_once(coords, data, check_existing or attempt > 0)
+                return
+            except (tiledb.TileDBError, ConnectionError) as exc:
+                if attempt == self._WRITE_TRIES - 1:
+                    raise
+                logger.warning(f"{exc}, retrying in {delay} seconds...")
+                time.sleep(delay)
+                delay = min(delay * self._WRITE_BACKOFF, self._WRITE_MAX_DELAY)
+
+    def _write_once(self, coords, data, check_existing: bool) -> None:
         cache = self._get_schema_cache()
+        ids = data[self.record_id]
+        keep = np.ones(len(ids), dtype=bool)
+        if check_existing:
+            with tiledb.open(self.array_uri, "r", ctx=self.ctx) as array:
+                ranges = tuple(
+                    slice(values.min(), values.max())
+                    for values in (coords[name] for name in cache["dim_names"])
+                )
+                query = array.query(
+                    attrs=[self.record_id], coords=False, return_incomplete=True
+                )
+                for existing in query.multi_index[ranges]:
+                    keep &= ~np.isin(ids, existing[self.record_id])
+            if not keep.any():
+                return
         with tiledb.open(self.array_uri, mode="w", ctx=self.ctx) as array:
-            dims = tuple(coords[name] for name in cache["dim_names"])
-            array[dims] = data
-            if mark_keys:
-                ts = pd.Timestamp.utcnow().isoformat()
-                for key in mark_keys:
-                    array.meta[f"granule_{key}_status"] = "processed"
-                    array.meta[f"granule_{key}_processed_date"] = ts
+            dims = tuple(coords[name][keep] for name in cache["dim_names"])
+            array[dims] = {name: values[keep] for name, values in data.items()}
 
-    def write_granule(self, granule_data: pd.DataFrame, mark_keys=None) -> None:
+    def write_granule(
+        self, granule_data: pd.DataFrame, check_existing: bool = True
+    ) -> None:
         """
-        Write parsed IceSat2 granule data to TileDB, filtering out-of-domain shots.
+        Write parsed IceSat2 granule data to TileDB, filtering out-of-domain records.
 
         Parameters
         ----------
         granule_data : pd.DataFrame
             Granule data with variable names matching the configuration.
-        mark_keys : list of str, optional
-            Granule IDs to mark as processed in the same TileDB open.
-            Pass this to avoid a second open/close just for metadata.
+        check_existing : bool, default True
+            Drop records already stored. Safe for replays; costs a read that grows
+            with the database, so ingestion skips it for granules known to be new.
 
         Raises
         ------
         ValueError
-            If required dimension columns are missing.
+            If required dimensions, attributes or record ids are missing or invalid.
         """
         try:
-            # Distinct photons/beams can share space-time coordinates. Paired
-            # ingestion supplies their original identity; preserve those rows.
-            if self.product == "atl03" and self.config.get("level_atl03", {}).get(
-                "link_atl08", False
-            ):
-                missing = (
-                    set(linkage_variables(self.config, self.product)) | {"beam_id"}
-                ) - set(granule_data.columns)
-                if missing:
-                    raise ValueError(f"Missing linkage columns: {sorted(missing)}")
-                identity = ["source_granule", "beam_id", "photon_index"]
-            else:
-                identity = ["latitude", "longitude", "time"]
-            granule_data = granule_data.drop_duplicates(subset=identity)
-
             self._validate_granule_data(granule_data)
+            rid = self.record_id
+            if rid not in granule_data or granule_data[rid].isna().any():
+                raise ValueError(f"Every record must have a {rid}.")
+            if granule_data[rid].dtype.kind not in "iu":
+                raise ValueError(
+                    f"{rid} must use an integer dtype to preserve its identity."
+                )
+            # Distinct photons/segments can share space-time coordinates; only the
+            # record id identifies a duplicate.
+            granule_data = granule_data.drop_duplicates(subset=[rid])
+            times = pd.to_datetime(granule_data["time"], utc=True, errors="raise")
+            if times.isna().any():
+                raise ValueError("Record times must not contain NaT.")
+            time_range = self.config["tiledb"]["time_range"]
+            days = convert_to_days_since_epoch(times)
+            if (
+                (days < _datetime_to_timestamp_days(time_range["start_time"]))
+                | (days > _datetime_to_timestamp_days(time_range["end_time"]))
+            ).any():
+                raise ValueError("Record times fall outside the database time domain.")
 
             min_lon, max_lon, min_lat, max_lat = self._spatial_bounds
             filtered_data = granule_data[
@@ -652,13 +790,11 @@ class IceSat2Database:
             ]
 
             if filtered_data.empty:
-                if mark_keys:
-                    self.mark_granules_as_processed_batch(mark_keys)
                 return
 
             coords = self._prepare_coordinates(filtered_data)
             data = self._extract_variable_data(filtered_data)
-            self._write_to_tiledb(coords, data, mark_keys=mark_keys)
+            self._write_to_tiledb(coords, data, check_existing)
 
         except Exception as e:
             logger.error(f"Failed to process and write granule data: {e}")
@@ -680,7 +816,7 @@ class IceSat2Database:
                 }
         except tiledb.TileDBError as e:
             logger.error(f"Failed to read TileDB metadata: {e}")
-            return {gid: False for gid in granule_ids}
+            raise
 
         statuses = {
             gid: metadata.get(f"granule_{gid}_status") == "processed"
@@ -698,6 +834,7 @@ class IceSat2Database:
         tries=10,
         delay=5,
         backoff=3,
+        max_delay=60,
         logger=logger,
     )
     def mark_granule_as_processed(self, granule_key: str) -> None:
@@ -705,19 +842,33 @@ class IceSat2Database:
         try:
             with tiledb.open(self.array_uri, mode="w", ctx=self.ctx) as array:
                 array.meta[f"granule_{granule_key}_status"] = "processed"
-                array.meta[f"granule_{granule_key}_processed_date"] = (
-                    pd.Timestamp.utcnow().isoformat()
-                )
+                array.meta[f"granule_{granule_key}_processed_date"] = pd.Timestamp.now(
+                    "UTC"
+                ).isoformat()
             logger.debug(f"Marked granule {granule_key} as processed")
         except tiledb.TileDBError as e:
             logger.error(f"Failed to mark granule {granule_key} as processed: {e}")
             raise
+
+    _FLUSH_MARKER = "icesat2db.flush_in_progress"
+
+    def begin_flush(self, granule_keys: list) -> None:
+        """Record granules whose write is starting; cleared when they are marked."""
+        with tiledb.open(self.array_uri, mode="w", ctx=self.ctx) as array:
+            array.meta[self._FLUSH_MARKER] = json.dumps(sorted(granule_keys))
+
+    def interrupted_flush_granules(self) -> set:
+        """Granules of a write that started but was never checkpointed."""
+        with tiledb.open(self.array_uri, mode="r", ctx=self.ctx) as array:
+            marker = array.meta.get(self._FLUSH_MARKER)
+        return set(json.loads(marker)) if marker else set()
 
     @retry(
         (tiledb.TileDBError, ConnectionError),
         tries=10,
         delay=5,
         backoff=3,
+        max_delay=60,
         logger=logger,
     )
     def mark_granules_as_processed_batch(self, granule_keys: list) -> None:
@@ -725,11 +876,12 @@ class IceSat2Database:
         if not granule_keys:
             return
         try:
-            ts = pd.Timestamp.utcnow().isoformat()
+            ts = pd.Timestamp.now("UTC").isoformat()
             with tiledb.open(self.array_uri, mode="w", ctx=self.ctx) as array:
                 for key in granule_keys:
                     array.meta[f"granule_{key}_status"] = "processed"
                     array.meta[f"granule_{key}_processed_date"] = ts
+                array.meta[self._FLUSH_MARKER] = "[]"
             logger.debug(f"Marked {len(granule_keys)} granules as processed")
         except tiledb.TileDBError as e:
             logger.error(f"Failed to mark granules as processed: {e}")
@@ -744,15 +896,23 @@ class IceSat2Database:
         tries=10,
         delay=5,
         backoff=3,
+        max_delay=60,
         logger=logger,
     )
     def consolidate_fragments(
         self,
         consolidation_type: str = "default",
         parallel_engine: Optional[object] = None,
+        max_fragments_per_group: int = 200,
+        max_passes: int = 10,
     ) -> None:
         """
         Consolidate fragments, metadata, and commit logs.
+
+        For ``consolidation_type="spatial"`` the method runs iteratively until
+        every spatial overlap group contains exactly one fragment (fully
+        converged) or ``max_passes`` is reached, so groups split to respect
+        ``max_fragments_per_group`` are merged in a later pass.
 
         Parameters
         ----------
@@ -760,6 +920,13 @@ class IceSat2Database:
             'default' or 'spatial'.
         parallel_engine : Executor or dask.distributed.Client, optional
             Parallelisation engine. Defaults to single-threaded.
+        max_fragments_per_group : int
+            Maximum fragments per single ``tiledb.consolidate`` call.
+            TileDB divides ``sm.memory_budget`` equally across all fragments
+            in a call; capping this prevents per-fragment memory exhaustion.
+            Default 200.  Set to 0 to disable.
+        max_passes : int
+            Safety cap on the number of spatial consolidation passes.
         """
         if consolidation_type not in {"default", "spatial"}:
             raise ValueError(
@@ -773,12 +940,32 @@ class IceSat2Database:
         try:
             if consolidation_type == "default":
                 cons_plan = self._generate_default_consolidation_plan()
+                self._execute_consolidation(cons_plan, parallel_engine)
             else:
-                cons_plan = SpatialConsolidationPlanner.compute(
-                    self.array_uri, self.ctx
-                )
-
-            self._execute_consolidation(cons_plan, parallel_engine)
+                for pass_num in range(1, max_passes + 1):
+                    cons_plan = SpatialConsolidationPlanner.compute(
+                        self.array_uri,
+                        self.ctx,
+                        max_fragments_per_group=max_fragments_per_group,
+                    )
+                    # Converged: every group is already a single fragment
+                    if all(node["num_fragments"] == 1 for node in cons_plan):
+                        logger.info(
+                            f"Spatial consolidation converged after "
+                            f"{pass_num - 1} pass(es)."
+                        )
+                        break
+                    n_frags = sum(n["num_fragments"] for n in cons_plan)
+                    logger.info(
+                        f"Spatial consolidation pass {pass_num}: "
+                        f"{n_frags} fragments → {len(cons_plan)} group(s)"
+                    )
+                    self._execute_consolidation(cons_plan, parallel_engine)
+                else:
+                    logger.warning(
+                        f"Spatial consolidation reached max_passes={max_passes} "
+                        "without fully converging."
+                    )
 
             for mode in ("array_meta", "fragment_meta", "commits"):
                 logger.info(f"Consolidating {mode}...")
@@ -814,7 +1001,8 @@ class IceSat2Database:
                 )
                 for plan_ in cons_plan
             ]
-            concurrent.futures.wait(futures)
+            for future in concurrent.futures.as_completed(futures):
+                future.result()
         elif isinstance(parallel_engine, Client):
             futures = [
                 parallel_engine.submit(
@@ -861,4 +1049,12 @@ class IceSat2Database:
         ):
             variables_config[var_name] = var_info
         variables_config.update(linkage_variables(config, product))
+        record_id = RECORD_ID.get(product)
+        if record_id == "photon_id":
+            variables_config.setdefault("photon_id", dict(PHOTON_ID_VARIABLE))
+        if variables_config and record_id and record_id not in variables_config:
+            raise ValueError(
+                f"level_{product} must define the '{record_id}' variable "
+                "that identifies each record."
+            )
         return variables_config

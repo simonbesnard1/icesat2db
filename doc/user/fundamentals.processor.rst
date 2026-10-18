@@ -71,7 +71,7 @@ The :py:class:`compute()` method of :py:class:`icesat2db.IceSat2Processor` initi
 
      - Both granule downloading and processing are performed concurrently.
      - Each worker processes data for a **temporal tile** as defined in `data_config.yml`.
-     - The number of workers is controlled by the `parallel_engine` setting, determining how many granules are processed simultaneously.
+     - The number of workers is controlled by the `parallel_engine` setting. At most ``max_in_flight`` granules (default 4) are downloaded and parsed at once, so finished results never pile up in memory faster than they are written.
 
    - **Granule Parsing & Quality Filtering**:
 
@@ -92,12 +92,20 @@ The :py:class:`compute()` method of :py:class:`icesat2db.IceSat2Processor` initi
      - **Validation**: The :py:meth:`_validate_granule_data` method ensures required dimensions and critical variables are present before writing.
      - **Coordinate Preparation**: The :py:meth:`_prepare_coordinates` method extracts dimension data (e.g., time, latitude, longitude).
      - **Variable Extraction**: The :py:meth:`_extract_variable_data` method separates scalar and profile variables for structured storage.
-     - **TileDB Writing**: The :py:meth:`_write_to_tiledb` method writes data with a retry mechanism to handle potential failures.
+     - **TileDB Writing**: The :py:meth:`_write_to_tiledb` method writes data with a retry mechanism to handle potential failures. Records are identified by an integer id (``segment_id`` for ATL08, ``photon_id`` for ATL03), so a retried write never stores a record twice.
+
+   - **Buffering and checkpoints**: Parsed granules are buffered and written every ``flush_every`` granules (default 50) or once the buffer exceeds ``max_buffer_bytes`` (default 256 MB), whichever comes first. A granule is marked processed only after its write succeeded. A parse or download failure is recorded in the progress ledger, is never marked processed, and makes :py:meth:`compute` raise at the end of the run, so it is retried on the next run.
 
    - **Metadata & Optimization**:
 
      - Metadata is stored alongside the data to support efficient querying.
      - After all granules are processed, the database undergoes **consolidation** to optimize query performance. The consolidation strategy can be configured in `data_config.yml`.
+
+5. **Resuming**:
+
+   Re-running the processor on an existing database skips processed granules. Before appending, the database checks that the existing array was built with the same schema and ingestion settings (collections, variables, photon confidence filter, ATL08 linkage); otherwise it refuses and asks for a new database path. Arrays created before this check was introduced carry no ingestion manifest and are refused for writing, but remain readable with :py:class:`icesat2db.IceSat2Provider`. The source file of every granule is also pinned in ``<array>_granule_sources.json.gz``; a granule whose source file changes (e.g. a new release) is refused instead of being mixed into the same array.
+
+   Only one processor may write to a database at a time.
 
 
 Advanced customization options

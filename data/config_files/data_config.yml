@@ -18,10 +18,22 @@ tiledb:
    memory_budget_var: "50000000000"  # 50GB for variable-sized attributes
   cell_order: "hilbert"
   capacity: 200000
-  latitude_tile: 6           # 6° × 5 tiles_across_lat = 30° spatial blocks
-  longitude_tile: 6          # 6° × 5 tiles_across_lon = 30° spatial blocks
-  flush_every: 20000
-  
+  latitude_tile: 6           # schema tile extent (degrees)
+  longitude_tile: 6          # schema tile extent (degrees)
+  write_block_degrees: 30    # one fragment per 30° block per write
+
+  # -----------------------------------------------------------------------
+  # Ingestion memory bounds
+  # max_in_flight: granules downloaded/parsed concurrently.
+  # flush_every / max_buffer_bytes: write buffered granules after this many
+  #   granules or once their DataFrames exceed this size, whichever first.
+  #   Granules are checkpointed only after their write succeeds. A single
+  #   ATL03 granule usually exceeds 256 MB, so ATL03 flushes per granule.
+  # -----------------------------------------------------------------------
+  max_in_flight: 4
+  flush_every: 50
+  max_buffer_bytes: 268435456   # 256 MB
+
   # -----------------------------------------------------------------------
   # Compression trade-off
   # use_filters: false (default) — write-optimised: Zstd(1) only, no pre-
@@ -759,6 +771,13 @@ level_atl03:
       profile_length: 5
       profile_labels: [0, 1, 2, 3, 4]
       profile_label_name: "surface_type"
+
+    photon_id:
+      SDS_Name: "photon_id"
+      description: "Unique photon id: RGT, cycle, beam, geolocation segment and photon offset within that segment, packed into int64"
+      long_name: "photon id"
+      dtype: "int64"
+      units: "adimensional"
 
     segment_id:
       SDS_Name: "segment_id"

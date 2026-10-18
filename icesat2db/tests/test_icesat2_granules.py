@@ -133,10 +133,16 @@ class TestIceSat2Granule(unittest.TestCase):
         )
         self.assertEqual(result, {})
 
-    def test_validate_dfs_drops_dataframe_missing_segment_id(self):
+    def test_validate_dfs_rejects_dataframe_missing_segment_id(self):
+        """Records without their id are an error, not silently dropped data."""
         df = pd.DataFrame({"latitude": [1.0, 2.0], "longitude": [-50.0, -51.0]})
-        result = IceSat2Granule._validate_dfs({IceSat2Product.ATL08.value: df}, "key")
-        self.assertEqual(result, {})
+        with self.assertRaisesRegex(ValueError, "segment_id"):
+            IceSat2Granule._validate_dfs({IceSat2Product.ATL08.value: df}, "key")
+
+    def test_validate_dfs_rejects_atl03_without_photon_id(self):
+        df = pd.DataFrame({"segment_id": [1], "latitude": [1.0]})
+        with self.assertRaisesRegex(ValueError, "photon_id"):
+            IceSat2Granule._validate_dfs({IceSat2Product.ATL03.value: df}, "key")
 
     def test_validate_dfs_keeps_valid_dataframe(self):
         df = pd.DataFrame({"segment_id": [1, 2], "latitude": [1.0, 2.0]})
@@ -145,14 +151,13 @@ class TestIceSat2Granule(unittest.TestCase):
         self.assertEqual(len(result[IceSat2Product.ATL08.value]), 2)
         self.assertIn("segment_id", result[IceSat2Product.ATL08.value].columns)
 
-    def test_validate_dfs_keeps_only_valid_products(self):
-        """A dict with one valid and one invalid product keeps only the valid one."""
+    def test_validate_dfs_keeps_valid_products_and_drops_empty(self):
+        """Valid products are kept; a product without records is omitted."""
         valid_df = pd.DataFrame({"segment_id": [1, 2], "latitude": [1.0, 2.0]})
-        invalid_df = pd.DataFrame({"latitude": [1.0]})  # missing segment_id
         result = IceSat2Granule._validate_dfs(
             {
                 IceSat2Product.ATL08.value: valid_df,
-                IceSat2Product.ATL03.value: invalid_df,
+                IceSat2Product.ATL03.value: pd.DataFrame(),
             },
             "key",
         )
@@ -161,10 +166,10 @@ class TestIceSat2Granule(unittest.TestCase):
 
     # ── parse_granules ────────────────────────────────────────────────────────
 
-    def test_parse_granules_nonexistent_file_returns_empty(self):
+    def test_parse_granules_nonexistent_file_raises(self):
         granules = [(IceSat2Product.ATL08.value, "/nonexistent/file.h5")]
-        result = self.granule.parse_granules(granules, "key_001")
-        self.assertEqual(result, {})
+        with self.assertRaises(FileNotFoundError):
+            self.granule.parse_granules(granules, "key_001")
 
     def test_parse_granules_valid_atl08_returns_dataframe(self):
         granules = [(IceSat2Product.ATL08.value, self.atl08_path)]
@@ -176,12 +181,19 @@ class TestIceSat2Granule(unittest.TestCase):
 
     # ── process_granule ───────────────────────────────────────────────────────
 
-    def test_process_granule_missing_product_returns_none_tuple(self):
-        """A None filepath signals a missing download → (None, None)."""
+    def test_process_granule_missing_product_raises(self):
+        """A None filepath signals a missing download, which must fail the granule."""
         row = [("key_002", ("ATL08", None))]
-        granule_id, result = self.granule.process_granule(row)
-        self.assertIsNone(granule_id)
-        self.assertIsNone(result)
+        with self.assertRaisesRegex(ValueError, "Missing HDF5"):
+            self.granule.process_granule(row)
+
+    def test_process_granule_rejects_mixed_granules(self):
+        row = [
+            ("key_a", (IceSat2Product.ATL08.value, self.atl08_path)),
+            ("key_b", (IceSat2Product.ATL03.value, self.atl08_path)),
+        ]
+        with self.assertRaisesRegex(ValueError, "different granules"):
+            self.granule.process_granule(row)
 
     def test_process_granule_valid_atl08_returns_dataframe(self):
         granule_key = "ATL08_20181014001049_02350102_007_01"
@@ -194,11 +206,13 @@ class TestIceSat2Granule(unittest.TestCase):
         self.assertFalse(df.empty)
         self.assertIn("segment_id", df.columns)
 
-    def test_process_granule_bad_file_returns_none_dataframe(self):
-        """An unreadable file path causes parse failure → (granule_key, None).
-        parse_granules catches the exception and returns {}, so process_granule
-        returns (granule_key, None) rather than (None, None)."""
+    def test_process_granule_bad_file_raises_and_keeps_download(self):
+        """A parse failure propagates instead of returning an empty success, which
+        the processor would checkpoint as processed (silently losing the granule).
+        The download directory is kept so a retry need not download again."""
+        granule_dir = os.path.join(self.granule.download_path, "key_003")
+        os.makedirs(granule_dir, exist_ok=True)
         row = [("key_003", (IceSat2Product.ATL08.value, "/bad/path.h5"))]
-        granule_id, result = self.granule.process_granule(row)
-        self.assertEqual(granule_id, "key_003")
-        self.assertIsNone(result)
+        with self.assertRaises(FileNotFoundError):
+            self.granule.process_granule(row)
+        self.assertTrue(os.path.isdir(granule_dir))

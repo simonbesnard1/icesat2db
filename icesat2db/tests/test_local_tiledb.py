@@ -222,9 +222,17 @@ class TestIceSat2Database(unittest.TestCase):
         self.assertEqual(result.dtype, np.float32)
 
     def test_coerce_series_to_string(self):
+        """Strings become an object array (TileDB stores them variable-length)
+        rather than a fixed-width copy per row."""
         s = pd.Series([1, None, 3])
         result = IceSat2Database._coerce_series("v", s, np.dtype("U10"))
-        self.assertTrue(np.issubdtype(result.dtype, np.str_))
+        self.assertEqual(result.dtype, object)
+        self.assertEqual(result.tolist(), ["1.0", "", "3.0"])
+
+    def test_coerce_categorical_to_string(self):
+        s = pd.Series(pd.Categorical(["gt1l", "gt1l", None]))
+        result = IceSat2Database._coerce_series("v", s, np.dtype("U4"))
+        self.assertEqual(result.tolist(), ["gt1l", "gt1l", ""])
 
     def test_schema_cache_is_populated_after_first_write(self):
         """_get_schema_cache should return non-empty dicts."""

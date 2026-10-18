@@ -15,8 +15,14 @@ level_atl03:
 
 The shipped configuration leaves `link_atl08: false` for compatibility. Use a
 **new TileDB storage location and re-ingest both products** when enabling it.
-Existing arrays without linkage attributes are rejected with an actionable error;
-no schema migration or changes to existing archives happen automatically.
+An existing array built with different settings (including a different
+`link_atl08`, `confidence_column` or `confidence_threshold`) is refused on
+resume; no schema migration or changes to existing archives happen automatically.
+
+If ATL08 of a granule is already stored but its ATL03 write did not complete,
+the next run downloads the ATL08 file again only to link the photons; ATL08 is
+not written twice. ATL03 granules without any ATL08 file cannot be linked and are
+skipped with a warning.
 
 The processor passes the matching ATL08 file into the ATL03 parser before its
 usual cleanup of downloaded files. A missing companion is an error in linked
@@ -49,6 +55,13 @@ Linked ingestion automatically adds these attributes to the ATL03 schema:
 
 ATL08 also stores `source_granule`. The existing ATL03 `segment_id` remains the
 packed **geolocation** segment ID; it does not become an ATL08 land-segment ID.
+
+Every ATL03 array, linked or not, also stores `photon_id`: RGT, cycle, beam,
+geolocation segment and the photon's offset within that segment packed into an
+int64 (see `icesat2db.utils.segment_id.pack_photon_id`). It identifies a photon
+independently of the granule file and is the key used to deduplicate replays.
+Photons of one pulse share time and nearly share position, so coordinates are
+never used for deduplication.
 
 Photon classification uses `ph_segment_id` and the original one-based indices:
 `ph_index_beg + classed_pc_indx - 2`. Land-segment association uses inclusive

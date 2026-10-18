@@ -30,7 +30,7 @@ For users accessing the database programmatically, interactions with the Ceph bu
 TileDB Database Configuration
 ------------------------------
 
-The database configuration defines key parameters for data storage, spatial tiling, and query efficiency. Data are written in **30×30-degree spatial tiles** (``latitude_tile: 6``, ``longitude_tile: 6``), producing approximately 60 occupied fragments globally. Annual temporal batching is used at ingest time so that one flush per year per tile is performed, minimising S3 open/close overhead while keeping memory usage bounded via the ``flush_every`` parameter.
+The database configuration defines key parameters for data storage, spatial tiling, and query efficiency. Data are written in **30×30-degree spatial blocks** (``write_block_degrees: 30``, independent of the schema tiles ``latitude_tile`` / ``longitude_tile``), producing approximately 60 occupied fragments globally. Annual temporal batching is used at ingest time to minimise S3 open/close overhead, while memory usage is bounded by ``max_in_flight``, ``flush_every`` and ``max_buffer_bytes``.
 
 Below is the structure of the configuration file used to build the TileDB database:
 
@@ -72,8 +72,8 @@ The configuration file contains:
 
 - **Storage Type**: Specifies ``s3`` for cloud-based Ceph storage.
 - **Temporal Batching**: ``annual`` — granules are batched by year before writing, reducing S3 open/close overhead.
-- **Spatial Tiling**: ``latitude_tile: 6`` and ``longitude_tile: 6`` define 30×30-degree write tiles, producing spatially localised TileDB fragments for efficient regional queries.
-- **flush_every**: Triggers a mid-batch write after every N granules to bound peak memory usage during ingest.
+- **Spatial Tiling**: ``latitude_tile`` and ``longitude_tile`` define the schema tiles; ``write_block_degrees`` (default 30) sets the block written as one fragment, producing spatially localised TileDB fragments for efficient regional queries.
+- **flush_every** / **max_buffer_bytes**: Trigger a mid-batch write after N granules or once the buffered data exceeds the byte limit, whichever comes first, to bound peak memory usage during ingest. ``max_in_flight`` caps the granules parsed concurrently.
 - **Time Range**: Defines the global temporal coverage (mission start to end).
 - **Spatial Range**: Sets the global bounding box (full ±90° latitude, ±180° longitude).
 - **Cell Order**: Hilbert space-filling curve ordering for optimised spatial locality within fragments.
