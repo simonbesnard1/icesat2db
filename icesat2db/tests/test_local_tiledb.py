@@ -234,3 +234,80 @@ class TestIceSat2Database(unittest.TestCase):
 
 
 suite = unittest.TestLoader().loadTestsFromTestCase(TestIceSat2Database)
+
+
+class TestIceSat2DatabaseMultiProduct(unittest.TestCase):
+    """
+    IceSat2Database's `product` parameter lets ATL08 and ATL03 (or any other
+    product) write to independent TileDB arrays under the same local_path,
+    without the default 'atl08' array name changing (backward compatible with
+    existing on-disk archives).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.temp_dir = tempfile.TemporaryDirectory()
+        base_tiledb = {
+            "storage_type": "local",
+            "local_path": cls.temp_dir.name,
+            "overwrite": True,
+            "dimensions": ["latitude", "longitude", "time"],
+            "spatial_range": {
+                "lat_min": -90.0,
+                "lat_max": 90.0,
+                "lon_min": -180.0,
+                "lon_max": 180.0,
+            },
+            "time_range": {"start_time": "2018-01-01", "end_time": "2030-12-31"},
+        }
+        cls.config = {
+            "tiledb": base_tiledb,
+            "level_atl08": {
+                "variables": {
+                    "segment_id": {"SDS_Name": "segment_id", "dtype": "int64"},
+                }
+            },
+            "level_atl03": {
+                "variables": {
+                    "segment_id": {"SDS_Name": "segment_id", "dtype": "int64"},
+                    "h_ph": {"SDS_Name": "heights/h_ph", "dtype": "float32"},
+                }
+            },
+        }
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temp_dir.cleanup()
+
+    def test_default_product_uses_unchanged_array_uri(self):
+        db = IceSat2Database(self.config)
+        self.assertEqual(Path(db.array_uri).name, "array_uri")
+
+    def test_atl08_product_matches_default_array_uri(self):
+        db = IceSat2Database(self.config, product="atl08")
+        self.assertEqual(Path(db.array_uri).name, "array_uri")
+
+    def test_atl03_product_uses_separate_array_uri(self):
+        db = IceSat2Database(self.config, product="atl03")
+        self.assertEqual(Path(db.array_uri).name, "array_uri_atl03")
+
+    def test_atl08_and_atl03_variables_config_are_independent(self):
+        db08 = IceSat2Database(self.config, product="atl08")
+        db03 = IceSat2Database(self.config, product="atl03")
+        self.assertIn("segment_id", db08.variables_config)
+        self.assertNotIn("h_ph", db08.variables_config)
+        self.assertIn("h_ph", db03.variables_config)
+
+    def test_two_product_arrays_coexist_without_collision(self):
+        db08 = IceSat2Database(self.config, product="atl08")
+        db03 = IceSat2Database(self.config, product="atl03")
+        db08._create_arrays()
+        db03._create_arrays()
+
+        self.assertNotEqual(db08.array_uri, db03.array_uri)
+        self.assertTrue(tiledb.array_exists(db08.array_uri, ctx=db08.ctx))
+        self.assertTrue(tiledb.array_exists(db03.array_uri, ctx=db03.ctx))
+
+        with tiledb.open(db03.array_uri, mode="r", ctx=db03.ctx) as array:
+            attr_names = {array.schema.attr(i).name for i in range(array.schema.nattr)}
+        self.assertIn("h_ph", attr_names)

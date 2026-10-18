@@ -18,12 +18,13 @@ import tiledb
 from dask.distributed import Client
 from retry import retry
 
+from icesat2db.utils.atl03_atl08 import linkage_variables
+from icesat2db.utils.filters import TileDBFilterPolicy
 from icesat2db.utils.geo_processing import (
     _datetime_to_timestamp_days,
     convert_to_days_since_epoch,
 )
 from icesat2db.utils.tiledb_consolidation import SpatialConsolidationPlanner
-from icesat2db.utils.filters import TileDBFilterPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,12 @@ class IceSat2Database:
       1000 (yielding microseconds), which broke nanosecond-precision deduplication.
     """
 
-    def __init__(self, config: Dict[str, Any], credentials: Optional[dict] = None):
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        credentials: Optional[dict] = None,
+        product: str = "atl08",
+    ):
         """
         Initialise IceSat2Database.
 
@@ -74,9 +80,17 @@ class IceSat2Database:
             Configuration dictionary.
         credentials : dict, optional
             AWS/S3 credentials. Required when storage_type == 's3'.
+        product : str, default 'atl08'
+            IceSat2 product this instance writes/reads (e.g. 'atl08', 'atl03').
+            Variables are loaded from ``config['level_<product>']``. The array
+            URI is ``array_uri`` for the default 'atl08' (unchanged, for
+            backward compatibility with existing on-disk archives) and
+            ``array_uri_<product>`` for any other product, so each product
+            gets its own array.
         """
         self.config = config
-        self.variables_config = self._load_variables_config(config)
+        self.product = product
+        self.variables_config = self._load_variables_config(config, product)
 
         cfg_td = config["tiledb"]
         storage_type = cfg_td.get("storage_type", "local").lower()
@@ -90,12 +104,13 @@ class IceSat2Database:
         # ------------------------------------------------------------------ #
         # Array URI
         # ------------------------------------------------------------------ #
+        array_name = "array_uri" if product == "atl08" else f"array_uri_{product}"
         if storage_type == "s3":
             bucket = cfg_td["s3_bucket"]
-            self.array_uri = os.path.join(f"s3://{bucket}", "array_uri")
+            self.array_uri = os.path.join(f"s3://{bucket}", array_name)
         else:
             base_path = cfg_td.get("local_path", "./")
-            self.array_uri = os.path.join(base_path, "array_uri")
+            self.array_uri = os.path.join(base_path, array_name)
 
         self.overwrite = cfg_td.get("overwrite", False)
 
@@ -183,6 +198,17 @@ class IceSat2Database:
                 self._schema_cache = None
                 logger.info(f"Overwritten existing TileDB array at {uri}")
             else:
+                required = set(linkage_variables(self.config, self.product))
+                if required:
+                    with tiledb.open(uri, "r", ctx=self.ctx) as array:
+                        missing = required - {
+                            array.schema.attr(i).name for i in range(array.schema.nattr)
+                        }
+                    if missing:
+                        raise ValueError(
+                            f"Existing array lacks linkage attributes {sorted(missing)}. "
+                            "Re-ingest into a new array location with link_atl08 enabled."
+                        )
                 logger.info(f"TileDB array already exists at {uri}. Skipping.")
                 return
 
@@ -504,6 +530,12 @@ class IceSat2Database:
         cache = self._get_schema_cache()
         attr_dtypes = cache["attr_dtypes"]
         cols = set(granule_data.columns)
+        required = set(linkage_variables(self.config, self.product))
+        missing = required - (cols & cache["attrs"])
+        if missing:
+            raise ValueError(
+                f"Missing linkage columns or schema attributes: {sorted(missing)}"
+            )
 
         data: Dict[str, np.ndarray] = {}
 
@@ -594,9 +626,20 @@ class IceSat2Database:
             If required dimension columns are missing.
         """
         try:
-            granule_data = granule_data.drop_duplicates(
-                subset=["latitude", "longitude", "time"]
-            )
+            # Distinct photons/beams can share space-time coordinates. Paired
+            # ingestion supplies their original identity; preserve those rows.
+            if self.product == "atl03" and self.config.get("level_atl03", {}).get(
+                "link_atl08", False
+            ):
+                missing = (
+                    set(linkage_variables(self.config, self.product)) | {"beam_id"}
+                ) - set(granule_data.columns)
+                if missing:
+                    raise ValueError(f"Missing linkage columns: {sorted(missing)}")
+                identity = ["source_granule", "beam_id", "photon_index"]
+            else:
+                identity = ["latitude", "longitude", "time"]
+            granule_data = granule_data.drop_duplicates(subset=identity)
 
             self._validate_granule_data(granule_data)
 
@@ -810,11 +853,12 @@ class IceSat2Database:
     # ---------------------------------------------------------------------- #
 
     @staticmethod
-    def _load_variables_config(config: dict) -> dict:
+    def _load_variables_config(config: dict, product: str) -> dict:
+        """Load variable definitions from ``config['level_<product>']['variables']``."""
         variables_config = {}
-        for level in ["level_atl08"]:
-            for var_name, var_info in (
-                config.get(level, {}).get("variables", {}).items()
-            ):
-                variables_config[var_name] = var_info
+        for var_name, var_info in (
+            config.get(f"level_{product}", {}).get("variables", {}).items()
+        ):
+            variables_config[var_name] = var_info
+        variables_config.update(linkage_variables(config, product))
         return variables_config

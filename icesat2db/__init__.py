@@ -16,8 +16,9 @@ try:
 except Exception:
     __version__ = "9999"
 
-from icesat2db.beam import Beam, atl08_beam
+from icesat2db.beam import Beam, atl03_beam, atl08_beam
 from icesat2db.beam.Beam import beam_handler
+from icesat2db.beam.atl03_beam import ATL03Beam
 from icesat2db.beam.atl08_beam import ATL08Beam
 from icesat2db.core import (
     icesat2database,
@@ -41,11 +42,13 @@ from icesat2db.granule import (
     Granule,
     granule_name,
     granule_parser,
+    atl03_granule,
     atl08_granule,
 )
 from icesat2db.granule.Granule import granule_handler
 from icesat2db.granule.granule_name import IceSat2NameMetadata
 from icesat2db.granule.granule_parser import GranuleParser
+from icesat2db.granule.atl03_granule import ATL03Granule
 from icesat2db.granule.atl08_granule import ATL08Granule
 from icesat2db.providers import tiledb_provider
 from icesat2db.providers.tiledb_provider import TileDBProvider
@@ -53,8 +56,11 @@ from icesat2db.utils import (
     constants,
     geo_processing,
     print_versions,
+    segment_id,
     tiledb_consolidation,
 )
+from icesat2db.utils.constants import IceSat2Product, configured_products
+from icesat2db.utils.segment_id import pack_segment_id
 from icesat2db.utils.tiledb_consolidation import (
     SpatialConsolidationPlan,
     SpatialConsolidationPlanner,
@@ -88,16 +94,24 @@ __all__ = [
     "granule_parser",
     "GranuleParser",
     "ATL08Granule",
+    "ATL03Granule",
     "Beam",
     "beam_handler",
     "atl08_beam",
     "ATL08Beam",
+    "atl03_beam",
+    "ATL03Beam",
     "granule_name",
     "Granule",
     "granule_handler",
     "IceSat2NameMetadata",
     "atl08_granule",
+    "atl03_granule",
     "TileDBProvider",
+    "IceSat2Product",
+    "configured_products",
+    "segment_id",
+    "pack_segment_id",
     "show_versions",
     "__version__",
 ]

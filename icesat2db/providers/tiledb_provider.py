@@ -37,12 +37,24 @@ class TileDBProvider:
         region: str = "eu-central-1",
         credentials: Optional[dict] = None,
         s3_config_overrides: Optional[Dict[str, str]] = None,
+        product: str = "atl08",
     ):
+        """
+        Parameters
+        ----------
+        product : str, default 'atl08'
+            IceSat2 product array to open. Matches IceSat2Database's array
+            naming: 'atl08' opens the default ``array_uri`` (backward
+            compatible with existing archives), any other product (e.g.
+            'atl03') opens ``array_uri_<product>``.
+        """
         if not storage_type or not isinstance(storage_type, str):
             raise ValueError("The 'storage_type' argument must be a non-empty string.")
 
         self.storage_type = storage_type.lower()
         self.s3_config_overrides = s3_config_overrides or {}
+        self.product = product
+        array_name = "array_uri" if product == "atl08" else f"array_uri_{product}"
 
         if self.storage_type == "s3":
             if not s3_bucket:
@@ -54,7 +66,7 @@ class TileDBProvider:
                     "The 'url' (S3 endpoint) must be provided when 'storage_type' is 's3'."
                 )
 
-            self.scalar_array_uri = f"s3://{s3_bucket}/array_uri"
+            self.scalar_array_uri = f"s3://{s3_bucket}/{array_name}"
             self.ctx = self._initialize_s3_context(credentials, url, region)
 
         elif self.storage_type == "local":
@@ -62,7 +74,7 @@ class TileDBProvider:
                 raise ValueError(
                     "The 'local_path' must be provided when 'storage_type' is set to 'local'."
                 )
-            self.scalar_array_uri = os.path.join(local_path, "array_uri")
+            self.scalar_array_uri = os.path.join(local_path, array_name)
             self.ctx = self._initialize_local_context()
 
         else:

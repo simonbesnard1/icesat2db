@@ -11,7 +11,7 @@ import logging
 import pathlib
 from collections import defaultdict
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 import threading
 from retry import retry
 
@@ -98,11 +98,26 @@ class CMRDataDownloader(IceSat2Downloader):
         start_date: datetime = None,
         end_date: datetime = None,
         earth_data_info=None,
+        required_products: Optional[List[IceSat2Product]] = None,
     ):
+        """
+        Parameters
+        ----------
+        required_products : list of IceSat2Product, optional
+            Products to query and download. Defaults to every member of
+            ``IceSat2Product`` (today's ATL08-only behavior when that's the
+            only configured level). Pass the products actually configured
+            for ingestion (see ``constants.configured_products``) so
+            products stay independent — a granule with only some of the
+            requested products is still kept, listing only what it has.
+        """
         self.geom = geom
         self.start_date = start_date
         self.end_date = end_date
         self.earth_data_info = earth_data_info
+        self.required_products = (
+            list(required_products) if required_products else list(IceSat2Product)
+        )
 
     @retry(
         (
@@ -122,15 +137,18 @@ class CMRDataDownloader(IceSat2Downloader):
     )
     def download(self) -> dict:
         """
-        Download granules across all IceSat2 products and ensure ID consistency.
+        Download granules across the configured IceSat2 products (see
+        ``required_products``). Products are independent: a granule is kept
+        as soon as it has at least one of them, listing only the products it
+        actually has — no all-products intersection is enforced.
         Returns: {granule_id: [(url, product, start_time, size_mb), ...]}
         """
         cmr_dict = defaultdict(list)
         per_product_counts = {}
         per_product_sizes_mb = {}
 
-        # 1) Query per product and stage everything (include size for post-intersection sum)
-        for product in IceSat2Product:
+        # 1) Query per required product and stage everything.
+        for product in self.required_products:
             try:
                 granule_query = GranuleQuery(
                     product,
@@ -175,63 +193,46 @@ class CMRDataDownloader(IceSat2Downloader):
                 f"start_date={self.start_date}, end_date={self.end_date}"
             )
 
-        # 2) Intersect to keep only granules that have all required products.
-        filtered_cmr_dict = self._filter_granules_with_all_products(cmr_dict)
-        if not filtered_cmr_dict:
-            raise ValueError("No granules with all required products found.")
+        # 2) Deduplicate multiple entries for the same (granule_id, product).
+        # No intersection requirement — a granule keeps whichever configured
+        # products it actually has.
+        deduped_cmr_dict = self._dedupe_products(cmr_dict)
 
-        # 3) True counts/sizes AFTER intersection.
-        n_intersection = len(filtered_cmr_dict)
+        n_granules = len(deduped_cmr_dict)
         total_size_mb = sum(
-            sz for entries in filtered_cmr_dict.values() for _, _, _, sz in entries
+            sz for entries in deduped_cmr_dict.values() for _, _, _, sz in entries
         )
 
-        # 4) Clear logging (and a sanity note)
-        if per_product_counts:
-            min_per_prod = min(per_product_counts.values())
-            if n_intersection > min_per_prod:
-                logger.warning(
-                    "Intersection (%d) > min per-product count (%d) — check product set / inputs.",
-                    n_intersection,
-                    min_per_prod,
-                )
-
         logger.info(
-            "Intersection has %d granule IDs across %d products. "
+            "Found %d granule ID(s) with at least one of %d configured product(s). "
             "Estimated download: %.2f GB (%.2f TB). ",
-            n_intersection,
-            len(IceSat2Product),
+            n_granules,
+            len(self.required_products),
             total_size_mb / 1024,
             total_size_mb / 1_048_576,
         )
 
-        return filtered_cmr_dict
+        return deduped_cmr_dict
 
-    def _filter_granules_with_all_products(self, granules: dict) -> dict:
+    @staticmethod
+    def _dedupe_products(granules: dict) -> dict:
         """
-        Keep only granule IDs that have all required products.
-        Deduplicates multiple entries for the same (granule_id, product).
+        Deduplicate multiple entries for the same (granule_id, product),
+        keeping whichever products each granule id actually has.
         Accepts tuples of len 3 or 4 and normalizes to len 4.
         """
-        required_products = {p.value for p in IceSat2Product}
-        filtered_granules = {}
+        deduped_granules = {}
 
         for granule_id, product_info in granules.items():
-            # Normalize shapes & dedupe per product
             by_product = {}
             for t in product_info:
                 url, product, start_time, size_mb = _normalize_entry(t)
                 # keep first seen per product; change policy if you prefer newest/largest
                 by_product.setdefault(product, (url, product, start_time, size_mb))
 
-            # Check intersection condition
-            if not required_products.issubset(by_product.keys()):
-                continue
+            deduped_granules[granule_id] = list(by_product.values())
 
-            # Keep only required products (ignore extras)
-            filtered_granules[granule_id] = [by_product[p] for p in required_products]
-
-        return filtered_granules
+        return deduped_granules
 
 
 class H5FileDownloader:

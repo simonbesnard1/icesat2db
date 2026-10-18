@@ -1,0 +1,41 @@
+{
+  "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+  "python": "3.12.13",
+  "numpy": "2.4.6",
+  "pandas": "3.0.3",
+  "cpu_count": 20,
+  "repeats": 3,
+  "atl03": "icesat2db/tests/data/ATL03_20181014001049_02350102_007_01.h5",
+  "atl08": "icesat2db/tests/data/ATL08_20181014001049_02350102_007_01.h5",
+  "beam": "gt1l",
+  "results": [
+    {
+      "method": "ingest_base",
+      "photons": 9287489,
+      "retained_photons": 1226,
+      "additional_atl08_signal": 0,
+      "classified_retained_photons": null,
+      "median_seconds": 5.035532023000087,
+      "times_seconds": [
+        5.033565950000138,
+        5.035532023000087,
+        5.0515155610000875
+      ],
+      "peak_rss_mib": 816.62109375
+    },
+    {
+      "method": "ingest_linked",
+      "photons": 9287489,
+      "retained_photons": 6594,
+      "additional_atl08_signal": 5368,
+      "classified_retained_photons": 5669,
+      "median_seconds": 5.117370164000022,
+      "times_seconds": [
+        5.117370164000022,
+        5.127073674000258,
+        5.091588483999658
+      ],
+      "peak_rss_mib": 1022.48828125
+    }
+  ]
+}

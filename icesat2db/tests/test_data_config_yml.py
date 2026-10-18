@@ -8,6 +8,7 @@
 
 import os
 import unittest
+from pathlib import Path
 
 import yaml
 
@@ -73,3 +74,57 @@ class TestDataConfig(unittest.TestCase):
 
 
 suite = unittest.TestLoader().loadTestsFromTestCase(TestDataConfig)
+
+
+class TestATL03DataConfig(unittest.TestCase):
+    """
+    Validate the level_atl03 block in the production config
+    (data/config_files/data_config.yml). Deliberately not added to
+    icesat2db/tests/data/data_config.yml — that fixture is shared by many
+    existing ATL08-only tests, and adding level_atl03 there would change what
+    IceSat2Processor considers "configured products" for every one of them.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.config_path = (
+            Path(__file__).resolve().parents[2]
+            / "data"
+            / "config_files"
+            / "data_config.yml"
+        )
+        if not cls.config_path.exists():
+            raise FileNotFoundError(f"Config file not found: {cls.config_path}")
+        with open(cls.config_path, "r") as f:
+            cls.config = yaml.safe_load(f)
+
+    def test_level_atl03_section_present(self):
+        self.assertIn("level_atl03", self.config)
+
+    def test_confidence_filter_settings_present(self):
+        level_atl03 = self.config["level_atl03"]
+        self.assertIn("confidence_column", level_atl03)
+        self.assertIn("confidence_threshold", level_atl03)
+        self.assertIsInstance(level_atl03["confidence_column"], int)
+        self.assertIsInstance(level_atl03["confidence_threshold"], int)
+
+    def test_required_variables_present(self):
+        variables = self.config["level_atl03"]["variables"]
+        for name in ("h_ph", "dist_ph_along", "quality_ph", "segment_id", "beam_id"):
+            self.assertIn(name, variables, f"'{name}' variable is missing")
+            self.assertIn("SDS_Name", variables[name])
+            self.assertIn("dtype", variables[name])
+
+    def test_signal_conf_ph_is_profile_expanded(self):
+        signal_conf = self.config["level_atl03"]["variables"]["signal_conf_ph"]
+        self.assertTrue(signal_conf.get("is_profile"))
+        self.assertEqual(signal_conf.get("profile_length"), 5)
+        self.assertEqual(len(signal_conf.get("profile_labels", [])), 5)
+
+    def test_cmr_product_id_configured(self):
+        cmr_ids = self.config["earth_data_info"]["CMR_PRODUCT_IDS"]
+        self.assertIn("ATL03", cmr_ids)
+        self.assertTrue(cmr_ids["ATL03"], "ATL03 CMR concept id must not be empty")
+
+
+suite_atl03 = unittest.TestLoader().loadTestsFromTestCase(TestATL03DataConfig)
