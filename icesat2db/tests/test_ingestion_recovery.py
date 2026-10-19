@@ -54,6 +54,24 @@ def make_config(tmp_path):
     }
 
 
+def test_s3_ingest_writes_skip_multipart(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        IceSat2Database, "_get_tiledb_spatial_domain", lambda self: None
+    )
+    config = make_config(tmp_path)
+    config["tiledb"].update(
+        storage_type="s3", s3_bucket="bucket", url="https://s3.example"
+    )
+    creds = {"AccessKeyId": "a", "SecretAccessKey": "b"}
+    db = IceSat2Database(config, product="atl08", credentials=creds)
+    assert db.write_ctx.config()["vfs.s3.use_multipart_upload"] == "false"
+    # Consolidation and other operations keep multipart uploads for large files.
+    assert db.ctx.config()["vfs.s3.use_multipart_upload"] == "true"
+    config["tiledb"]["s3_settings"] = {"ingest_multipart_upload": True}
+    db = IceSat2Database(config, product="atl08", credentials=creds)
+    assert db.write_ctx.config()["vfs.s3.use_multipart_upload"] == "true"
+
+
 @pytest.fixture
 def config(tmp_path):
     return make_config(tmp_path)
