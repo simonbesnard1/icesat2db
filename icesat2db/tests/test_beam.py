@@ -196,10 +196,11 @@ class TestATL08Beam(unittest.TestCase):
         self.assertIs(first, second)
 
     def test_main_data_no_fill_values_in_h_canopy(self):
+        """Terrain-only segments are kept; their canopy fill values become NaN."""
         df = self.beam.main_data
         if "h_canopy" in df.columns:
             fill = np.float32(3.4028235e38)
-            self.assertTrue((df["h_canopy"] < fill).all())
+            self.assertFalse((df["h_canopy"] >= fill).any())
 
     def test_main_data_segment_id_is_int64(self):
         df = self.beam.main_data

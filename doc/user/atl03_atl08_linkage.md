@@ -78,35 +78,45 @@ By default, linked ingestion keeps photons passing the ATL03 confidence filter
 still adding links. Matching always uses the original indices before filtering.
 ATL08 noise (`0`) does not automatically bypass the confidence filter.
 
-ATL08 land-segment quality filtering remains independent of photon classification.
-A photon can retain a link to a parent filtered out of the stored ATL08 array.
-The terrain validity filters now correctly require both lower and upper bounds;
-this can reduce the number of ingested ATL08 rows compared with the previous code.
+ATL08 ingestion keeps every land segment with a valid terrain height, including
+terrain-only, water and urban segments (see the quality filtering guide), so
+photon parents are rarely missing from the stored ATL08 array. Note that ATL08
+reports only the 100 m segments meeting its own criteria: classified photons in
+gaps between reported segments keep `atl08_segment_id = -1`.
 
 ## Querying combined measurements
 
-Query each product with its own `IceSat2Provider` and `return_type="dataframe"`.
-Request `atl08_segment_id` and `atl08_source_granule` with the photon measurements,
-and `source_granule` with the ATL08 measurements. The normal provider also returns
-`segment_id`. Then combine the selected subsets:
+Use `get_linked_photons` on the ATL03 provider with the ATL08 provider of the
+same database:
 
 ```python
 from icesat2db import IceSat2Provider
 
-combined = IceSat2Provider.combine_photons(
-    photon_subset, segment_subset, variables=["h_canopy", "h_te_best_fit"]
+photons = IceSat2Provider(storage_type="local", local_path=db, product="atl03")
+segments = IceSat2Provider(storage_type="local", local_path=db, product="atl08")
+
+combined = photons.get_linked_photons(
+    segments,
+    photon_variables=["h_ph", "atl08_classed_pc_flag", "atl08_ph_h"],
+    segment_variables=["h_canopy", "h_te_best_fit"],
+    geometry=area,
+    start_time="2020-01-01",
+    end_time="2020-12-31",
+    segment_filters={"segment_watermask": "== 0", "h_canopy": ">= 0"},
+    atl08_classed_pc_flag="in [1, 2, 3]",  # ATL03 query-time filter
 )
 # Additional columns: atl08_h_canopy, atl08_h_te_best_fit
 ```
 
-This is a left join on parent ID **and exact ATL08 filename**. Photon order and
-index are preserved, including repeated indices. Missing parents produce missing
-measurements. Duplicate parent keys raise rather than multiplying photons.
+A parent segment centre can lie up to ~70 m from its photons, outside the photon
+area. The ATL08 query is therefore widened by `buffer_m` (default 150 m) and by one
+day; the exact key join means the wider query never attaches a wrong parent.
+Photons whose parent fails `segment_filters` keep NaN ATL08 values.
 
-Fetch enough ATL08 coverage to include parent segment centres outside the photon
-query polygon. Applying an identical tight polygon to both products can exclude
-those centres. The helper operates on supplied DataFrames; it does not perform
-additional database queries automatically.
+The join itself is `IceSat2Provider.combine_photons`, also usable on DataFrames you
+queried yourself: a left join on parent ID **and exact ATL08 filename**. Photon
+order and index are preserved, including repeated indices. Missing parents produce
+missing measurements. Duplicate parent keys raise rather than multiplying photons.
 
 Benchmark results and reproducible commands are in
 [the benchmark report](../../benchmarks/README.md).

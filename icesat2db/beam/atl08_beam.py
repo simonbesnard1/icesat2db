@@ -39,38 +39,27 @@ class ATL08Beam(beam_handler):
 
         self._filtered_index: Optional[np.ndarray] = None  # Cache for filtered indices
 
-        # Each lambda reads its HDF5 dataset exactly once, avoiding the double-read
-        # that occurred when the same dataset appeared twice in a boolean expression.
-        def _h_te_uncertainty():
-            v = self["land_segments/terrain/h_te_uncertainty"][()]
-            return (v < np.float32(3.4028235e38)) & (v > -999)
-
+        # Only a segment without a valid terrain height is dropped: it has no
+        # usable surface. Everything else (terrain-only segments, water, urban)
+        # is kept and filtered at query time with IceSat2Provider.
         def _h_te_best_fit():
             v = self["land_segments/terrain/h_te_best_fit"][()]
-            return (v < np.float32(3.4028235e38)) & (v > -999)
+            return (v < self._FILL) & (v > self._INVALID_LOW)
 
-        def _h_te_median():
-            v = self["land_segments/terrain/h_te_median"][()]
-            return (v < np.float32(3.4028235e38)) & (v > -999)
+        self.DEFAULT_QUALITY_FILTERS = {"h_te_best_fit": _h_te_best_fit}
 
-        self.DEFAULT_QUALITY_FILTERS = {
-            "h_te_uncertainty": _h_te_uncertainty,
-            "h_te_best_fit": _h_te_best_fit,
-            "h_te_median": _h_te_median,
-            "h_canopy": lambda: (
-                self["land_segments/canopy/h_canopy"][()] < 3.4028235e38
-            ),
-            "h_canopy_uncertainty": lambda: (
-                self["land_segments/canopy/h_canopy_uncertainty"][()] < 3.4028235e38
-            ),
-            "urban_flag": lambda: self["land_segments/urban_flag"][()] == 0,
-            "segment_watermask": lambda: (
-                self["land_segments/segment_watermask"][()] == 0
-            ),
-        }
-
-        # Fields where invalid values are replaced with NaN rather than dropping the segment.
-        self.FILL_TO_NAN_FIELDS = ["h_te_best_fit_20m", "h_canopy_20m"]
+    # ATL08 float fill value; any float field at or above it becomes NaN.
+    _FILL = np.float32(3.4028235e38)
+    # Heights at or below this are invalid (lowest land surface is ~ -430 m).
+    _INVALID_LOW = np.float32(-999)
+    # Fields with the additional low invalid bound.
+    LOW_INVALID_FIELDS = (
+        "h_te_best_fit",
+        "h_te_best_fit_20m",
+        "h_te_median",
+        "h_te_uncertainty",
+        "h_canopy_20m",
+    )
 
     def construct_segment_id(self) -> np.ndarray:
         """
@@ -122,15 +111,18 @@ class ATL08Beam(beam_handler):
                 scalar = self.parent_granule[sds_name][0]
                 land_data[key] = np.full(n_segs, scalar)
 
-        # Replace fill/invalid values with NaN for sub-segment fields — keeps the
-        # parent segment but marks individual 20m values that failed the validity
-        # check (v >= 3.4028235e38 or v <= -999) as missing.
-        _FILL = np.float32(3.4028235e38)
-        for field in self.FILL_TO_NAN_FIELDS:
-            if field in land_data:
-                v = land_data[field].astype(np.float32)
-                v[(v >= _FILL) | (v <= np.float32(-999))] = np.nan
-                land_data[field] = v
+        # Invalid values become NaN instead of dropping the segment, so a
+        # terrain-only segment keeps its terrain fields with NaN canopy fields.
+        for key in self.field_mapper:
+            value = land_data.get(key)
+            if not isinstance(value, np.ndarray) or value.dtype.kind != "f":
+                continue
+            value = value.astype(np.float32)
+            invalid = ~np.isfinite(value) | (value >= self._FILL)
+            if key in self.LOW_INVALID_FIELDS:
+                invalid |= value <= self._INVALID_LOW
+            value[invalid] = np.nan
+            land_data[key] = value
 
         # Apply quality filters and store filtered index
         self._filtered_index = self.apply_filter(

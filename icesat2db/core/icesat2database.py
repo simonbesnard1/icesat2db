@@ -245,7 +245,8 @@ class IceSat2Database:
         level = self.config.get(f"level_{self.product}", {})
         return json.dumps(
             {
-                "policy_version": 1,
+                # 2: ATL08 keeps terrain-only, water and urban segments.
+                "policy_version": 2,
                 "product": self.product,
                 "collections": collections,
                 "level_settings": {k: v for k, v in level.items() if k != "variables"},

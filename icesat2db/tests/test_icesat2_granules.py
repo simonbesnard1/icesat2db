@@ -13,6 +13,7 @@ import unittest
 import warnings
 
 import h5py
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -60,18 +61,15 @@ class TestCase(unittest.TestCase):
             # all beams present
             self.assertEqual(len(present_beams), 6)
 
+            total = 0
             for beam in present_beams:
                 hdf_len = len(f[beam]["land_segments"]["latitude_20m"])
-
-                # parsed data must not exceed original size
-                self.assertLessEqual(
-                    len(data),
-                    hdf_len * len(present_beams),  # rough upper bound
-                    "Parsed data larger than previous",
-                )
-
                 # basic sanity: original beam not empty
                 self.assertGreater(hdf_len, 0)
+                total += hdf_len
+
+            # parsed data must not exceed the segments in the file
+            self.assertLessEqual(len(data), total, "Parsed data larger than file")
 
     def test_parse_granule_atl08(self):
         data = parse_h5_file(
@@ -83,8 +81,11 @@ class TestCase(unittest.TestCase):
         # Some of the data is correct
         data_orig = h5py.File(ATL08_NAME, "r")
         # original ATL08 values (first segment, first 20m bin)
-        lat = data_orig["gt1l"]["land_segments"]["latitude_20m"][0][0]
-        lon = data_orig["gt1l"]["land_segments"]["longitude_20m"][0][0]
+        # first valid 20 m bin: fill values are stored as NaN
+        lats = data_orig["gt1l"]["land_segments"]["latitude_20m"][:, 0]
+        first = int(np.argmax(lats < np.float32(3.4028235e38)))
+        lat = lats[first]
+        lon = data_orig["gt1l"]["land_segments"]["longitude_20m"][first][0]
 
         # match against flattened column
         row = data.loc[data["latitude_20m_1"] == lat]

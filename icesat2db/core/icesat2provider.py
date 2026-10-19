@@ -8,6 +8,7 @@
 
 import logging
 import re
+import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
 import geopandas as gpd
@@ -34,6 +35,23 @@ DEFAULT_DIMS = ["segment_id"]
 _INDEX_SUFFIX_RE = re.compile(r"^(.+)_(\d+)$")
 # Matches friendly single-label renames: _p50 (profile) or _50m (subsegment)
 _FRIENDLY_SUFFIX_RE = re.compile(r"^(.+)_(?:p\d+|\d+m)$")
+
+
+def _buffer_degrees(geometry: gpd.GeoDataFrame, buffer_m: float) -> gpd.GeoDataFrame:
+    """Widen a WGS84 geometry by at least ``buffer_m`` metres everywhere.
+
+    Uses one degree distance, taken at the geometry's highest latitude where a
+    degree of longitude is shortest, so the buffer is never too small and works
+    for any area size without a projection.
+    """
+    geometry = check_and_format_shape(geometry, simplify=False)
+    max_lat = min(float(np.abs(geometry.total_bounds[[1, 3]]).max()), 89.0)
+    degrees = buffer_m / (111_320.0 * np.cos(np.radians(max_lat)))
+    with warnings.catch_warnings():
+        # Buffering in degrees is intended here; see the docstring.
+        warnings.filterwarnings("ignore", "Geometry is in a geographic CRS")
+        buffered = geometry.buffer(degrees)
+    return gpd.GeoDataFrame(geometry=buffered, crs=geometry.crs)
 
 
 class IceSat2Provider(TileDBProvider):
@@ -148,6 +166,104 @@ class IceSat2Provider(TileDBProvider):
         )
         result.index = photons.index
         return result
+
+    def get_linked_photons(
+        self,
+        segment_provider: "IceSat2Provider",
+        photon_variables: List[str],
+        segment_variables: List[str],
+        geometry: gpd.GeoDataFrame,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        buffer_m: float = 150.0,
+        segment_filters: Optional[Dict[str, str]] = None,
+        use_polygon_filter: bool = "auto",
+        **photon_filters,
+    ) -> Optional[pd.DataFrame]:
+        """Query ATL03 photons in an area with selected ATL08 segment values attached.
+
+        Call on an ATL03 provider (built with ``link_atl08`` ingestion) and pass the
+        ATL08 provider of the same database. The ATL08 query area is the photon
+        geometry widened by ``buffer_m`` metres, because a photon's parent segment
+        centre lies up to ~70 m from it and can fall outside the photon area. Its
+        time window is widened by one day for segments straddling midnight. Joins
+        use exact keys (:meth:`combine_photons`), so the wider ATL08 query never
+        attaches a wrong parent.
+
+        Parameters
+        ----------
+        segment_provider : IceSat2Provider
+            Provider of the ATL08 array.
+        photon_variables, segment_variables : list of str
+            Variables to return; ATL08 values get an ``atl08_`` prefix.
+        geometry : geopandas.GeoDataFrame
+            Area of the photon query.
+        start_time, end_time : str, optional
+            Photon time range (ISO 8601 dates).
+        buffer_m : float, default 150
+            Widening of the ATL08 query area in metres.
+        segment_filters : dict, optional
+            Query-time ATL08 filters, e.g. ``{"segment_watermask": "== 0"}`` or
+            ``{"h_canopy": ">= 0"}`` for vegetated segments. Photons whose parent
+            is filtered out keep NaN ATL08 values.
+        **photon_filters
+            Query-time ATL03 filters, e.g. ``atl08_classed_pc_flag="in [1, 2, 3]"``.
+
+        Returns
+        -------
+        pandas.DataFrame or None
+            One row per photon, or None if no photon matches.
+        """
+        if self.product != "atl03" or segment_provider.product != "atl08":
+            raise ValueError(
+                "Call get_linked_photons on an ATL03 provider with an ATL08 segment_provider."
+            )
+        if buffer_m < 0:
+            raise ValueError("buffer_m must be non-negative.")
+        keys = ["atl08_segment_id", "atl08_source_granule"]
+        photons = self.get_data(
+            list(dict.fromkeys([*photon_variables, *keys])),
+            geometry,
+            start_time,
+            end_time,
+            return_type="dataframe",
+            use_polygon_filter=use_polygon_filter,
+            **photon_filters,
+        )
+        if photons is None:
+            return None
+
+        # Widen by a day, clamped to the ATL08 array's time domain.
+        epoch = pd.Timestamp("1970-01-01")
+        t_min, t_max = (
+            epoch + pd.Timedelta(days=int(v))
+            for v in segment_provider._get_array().schema.domain.dim("time").domain
+        )
+        one_day = pd.Timedelta(days=1)
+        seg_start = (
+            max(pd.Timestamp(start_time) - one_day, t_min).strftime("%Y-%m-%d")
+            if start_time
+            else None
+        )
+        seg_end = (
+            min(pd.Timestamp(end_time) + one_day, t_max).strftime("%Y-%m-%d")
+            if end_time
+            else None
+        )
+        segments = segment_provider.get_data(
+            list(dict.fromkeys([*segment_variables, "source_granule"])),
+            _buffer_degrees(geometry, buffer_m),
+            seg_start,
+            seg_end,
+            return_type="dataframe",
+            use_polygon_filter=use_polygon_filter,
+            **(segment_filters or {}),
+        )
+        if segments is None:
+            segments = pd.DataFrame(
+                columns=["source_granule", "segment_id", *segment_variables]
+            )
+        return self.combine_photons(photons, segments, segment_variables)
 
     def query_nearest_shots(
         self,

@@ -174,26 +174,128 @@ def test_pipeline_and_provider_join(paired_files, linked_config, tmp_path):
         )
 
 
-@pytest.mark.parametrize("field", ["h_te_uncertainty", "h_te_best_fit", "h_te_median"])
 @pytest.mark.parametrize("invalid", [-999.0, np.finfo(np.float32).max, np.nan])
-def test_terrain_validity_filter(paired_files, linked_config, field, invalid):
+def test_segment_without_terrain_height_is_dropped(
+    paired_files, linked_config, invalid
+):
     _, b = paired_files
     with h5py.File(b, "a") as f:
-        f[f"gt1l/land_segments/terrain/{field}"][0] = invalid
+        f["gt1l/land_segments/terrain/h_te_best_fit"][0] = invalid
     data = parse_h5_file(b, "atl08", linked_config)
     assert len(data) == 1
     assert data.h_canopy.iloc[0] == 20
 
 
+@pytest.mark.parametrize("field", ["h_te_uncertainty", "h_te_median"])
+@pytest.mark.parametrize("invalid", [-999.0, np.finfo(np.float32).max, np.nan])
+def test_other_invalid_terrain_values_become_nan(
+    paired_files, linked_config, field, invalid
+):
+    _, b = paired_files
+    with h5py.File(b, "a") as f:
+        f[f"gt1l/land_segments/terrain/{field}"][0] = invalid
+    linked_config["level_atl08"]["variables"][field] = {
+        "SDS_Name": f"land_segments/terrain/{field}",
+        "dtype": "float32",
+    }
+    data = parse_h5_file(b, "atl08", linked_config).sort_values("h_canopy")
+    assert len(data) == 2
+    assert np.isnan(data[field].iloc[0]) and data[field].iloc[1] == 1
+
+
+def test_terrain_only_water_and_urban_segments_are_kept(paired_files, linked_config):
+    """Vegetation, water and urban filtering happen at query time, not at ingest."""
+    _, b = paired_files
+    with h5py.File(b, "a") as f:
+        f["gt1l/land_segments/canopy/h_canopy"][0] = np.finfo(np.float32).max
+        f["gt1l/land_segments/urban_flag"][1] = 1
+        f["gt1l/land_segments/segment_watermask"][1] = 1
+    data = parse_h5_file(b, "atl08", linked_config).sort_values("segment_id")
+    assert len(data) == 2
+    assert np.isnan(data.h_canopy.iloc[0]) and data.h_canopy.iloc[1] == 20
+
+
+def _ingest_pair(paired_files, linked_config, tmp_path):
+    linked_config["tiledb"] = {
+        "storage_type": "local",
+        "local_path": str(tmp_path / "db"),
+        "dimensions": ["latitude", "longitude", "time"],
+        "config_overrides": {
+            "sm.compute_concurrency_level": "2",
+            "sm.io_concurrency_level": "2",
+        },
+        "spatial_range": {
+            "lat_min": -90,
+            "lat_max": 90,
+            "lon_min": -180,
+            "lon_max": 180,
+        },
+        "time_range": {"start_time": "2018-01-01", "end_time": "2030-01-01"},
+    }
+    a, b = paired_files
+    for product, path in (("atl03", a), ("atl08", b)):
+        db = IceSat2Database(linked_config, product=product)
+        db._create_arrays()
+        db.write_granule(parse_h5_file(path, product, linked_config, atl08_file=b))
+    return [
+        IceSat2Provider(
+            storage_type="local", local_path=str(tmp_path / "db"), product=p
+        )
+        for p in ("atl03", "atl08")
+    ]
+
+
+def test_get_linked_photons_finds_parents_outside_the_photon_area(
+    paired_files, linked_config, tmp_path
+):
+    """The photons at 50.0091-50.01°N belong to the segment centred at 50.01°N;
+    a box ending at 50.0095 excludes that centre, so only the buffer finds it."""
+    import geopandas as gpd
+    from shapely.geometry import box
+
+    photons, segments = _ingest_pair(paired_files, linked_config, tmp_path)
+    area = gpd.GeoDataFrame(geometry=[box(9.9995, 49.9995, 10.0095, 50.0095)], crs=4326)
+    kwargs = dict(
+        photon_variables=["h_ph", "beam_id", "photon_index"],
+        segment_variables=["h_canopy"],
+        geometry=area,
+        # Synthetic delta_time counts seconds from 2018-01-01.
+        start_time="2018-01-01",
+        end_time="2018-01-01",
+    )
+    linked = photons.get_linked_photons(segments, **kwargs)
+    unbuffered = photons.get_linked_photons(segments, buffer_m=0, **kwargs)
+    gt1l = linked.loc[linked.beam_id == "gt1l"].sort_values("photon_index")
+    assert gt1l.photon_index.tolist() == [0, 1, 4, 6, 10]
+    np.testing.assert_allclose(gt1l.atl08_h_canopy, [10, 10, 10, np.nan, 20])
+    assert linked.atl08_h_canopy.notna().sum() == 4
+    assert unbuffered.atl08_h_canopy.notna().sum() == 3
+    # Query-time segment filter: the parent is excluded, the photon kept.
+    filtered = photons.get_linked_photons(
+        segments, segment_filters={"h_canopy": "< 15"}, **kwargs
+    )
+    assert len(filtered) == len(linked)
+    assert filtered.atl08_h_canopy.notna().sum() == 3
+
+
+def test_get_linked_photons_requires_matching_products(
+    paired_files, linked_config, tmp_path
+):
+    photons, segments = _ingest_pair(paired_files, linked_config, tmp_path)
+    with pytest.raises(ValueError, match="ATL03 provider"):
+        segments.get_linked_photons(photons, [], [], None)
+
+
 def test_tiledb_roundtrip_and_old_schema_guard(paired_files, linked_config, tmp_path):
     import tiledb
 
-    # Keep the test's contexts small on machines exposing many CPU cores.
-    tiledb.default_ctx(
-        {"sm.compute_concurrency_level": "2", "sm.io_concurrency_level": "2"}
-    )
     linked_config["tiledb"] = {
         "storage_type": "local",
+        # Keep the test's contexts small on machines exposing many CPU cores.
+        "config_overrides": {
+            "sm.compute_concurrency_level": "2",
+            "sm.io_concurrency_level": "2",
+        },
         "local_path": str(tmp_path / "db"),
         "dimensions": ["latitude", "longitude", "time"],
         "spatial_range": {
