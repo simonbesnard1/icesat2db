@@ -130,15 +130,17 @@ class IceSat2Database:
             storage_type, cfg_td, credentials
         )
         self.ctx = tiledb.Ctx(self.tiledb_config)
-        # Ingest writes use single-request uploads: multipart adds an existence
-        # check per file (a 404 for every new file in each fragment) and more
-        # round trips. Their files are small; consolidation, which can write
-        # multi-GB files, keeps multipart uploads through self.ctx.
+        # Multipart uploads add an existence check per file (a 404 for every new
+        # file in each fragment), so ATL08 ingest writes, with ~120 small files
+        # per fragment, use single-request uploads. Those buffer each file in
+        # memory and fail on very large files, so ATL03 photon writes (few, huge
+        # files) and consolidation keep multipart uploads.
         self.write_ctx = self.ctx
         if storage_type == "s3":
+            default = "true" if self.product == "atl03" else "false"
             write_config = tiledb.Config(dict(self.tiledb_config.items()))
             write_config["vfs.s3.use_multipart_upload"] = str(
-                cfg_td.get("s3_settings", {}).get("ingest_multipart_upload", "false")
+                cfg_td.get("s3_settings", {}).get("ingest_multipart_upload", default)
             ).lower()
             self.write_ctx = tiledb.Ctx(write_config)
 

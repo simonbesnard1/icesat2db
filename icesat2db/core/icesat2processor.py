@@ -414,6 +414,7 @@ class IceSat2Processor:
         linked = self.data_info.get("level_atl03", {}).get("link_atl08", False)
         unprocessed_granules = {}
         self._write_products = {}
+        no_companion = []
         for granule_id, product_info in cmr_data.items():
             available = {entry[1] for entry in product_info}
             todo = {
@@ -423,9 +424,10 @@ class IceSat2Processor:
                 and not processed_by_product.get(product, {}).get(granule_id, False)
             }
             if linked and "atl03" in todo and "atl08" not in available:
-                logger.warning(
+                logger.debug(
                     f"Granule {granule_id}: ATL03 skipped, no ATL08 companion to link."
                 )
+                no_companion.append(granule_id)
                 todo.discard("atl03")
             if not todo:
                 continue
@@ -436,6 +438,14 @@ class IceSat2Processor:
                 entry for entry in product_info if entry[1] in needed
             ]
             self._write_products[granule_id] = todo
+
+        if no_companion:
+            # ATL08 exists only where there is land, so this is expected for
+            # granules over ocean or ice; one line instead of one per granule.
+            logger.info(
+                f"{len(no_companion)} ATL03 granule(s) skipped: no ATL08 companion "
+                f"to link (e.g. {', '.join(no_companion[:5])})."
+            )
 
         return unprocessed_granules
 

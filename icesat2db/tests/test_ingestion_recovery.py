@@ -67,6 +67,9 @@ def test_s3_ingest_writes_skip_multipart(tmp_path, monkeypatch):
     assert db.write_ctx.config()["vfs.s3.use_multipart_upload"] == "false"
     # Consolidation and other operations keep multipart uploads for large files.
     assert db.ctx.config()["vfs.s3.use_multipart_upload"] == "true"
+    # ATL03 photon files are too large for single-request uploads.
+    db = IceSat2Database(config, product="atl03", credentials=creds)
+    assert db.write_ctx.config()["vfs.s3.use_multipart_upload"] == "true"
     config["tiledb"]["s3_settings"] = {"ingest_multipart_upload": True}
     db = IceSat2Database(config, product="atl08", credentials=creds)
     assert db.write_ctx.config()["vfs.s3.use_multipart_upload"] == "true"
