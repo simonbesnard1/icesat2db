@@ -20,7 +20,7 @@ Ceph Object Storage Configuration
 The TileDB global database utilises a Ceph object storage backend to efficiently manage and distribute ICESat-2 ATL08 data. Below are the key characteristics of the Ceph bucket:
 
 - **Bucket Name:** ``dog-ext.icesat2db.icesat2-atl08-v007``
-- **Access Endpoint:** ``https://s3.gfz-potsdam.de``
+- **Access Endpoint:** ``https://s3.gfz.de``
 - **Region:** ``eu-central-1``
 - **Access Control:** Public
 - **Query Support:** Optimized for spatial and temporal queries
@@ -40,7 +40,7 @@ Below is the structure of the configuration file used to build the TileDB databa
    tiledb:
      storage_type: 's3'
      s3_bucket: "dog-ext.icesat2db.icesat2-atl08-v007"
-     url: "https://s3.gfz-potsdam.de"
+     url: "https://s3.gfz.de"
      overwrite: false
      temporal_batching: "annual"
      latitude_tile: 6
@@ -250,7 +250,7 @@ The `icesat2DB` Python package simplifies access to the TileDB global database. 
    provider = isdb.IceSat2Provider(
        storage_type='s3',
        s3_bucket="dog-ext.icesat2db.icesat2-atl08-v007",
-       url="https://s3.gfz-potsdam.de"
+       url="https://s3.gfz.de"
    )
 
    # Load region of interest (ROI)
@@ -392,7 +392,7 @@ The key steps are:
     provider = idb.IceSat2Provider(
         storage_type='s3',
         s3_bucket="dog-ext.icesat2db.icesat2-atl08-v007",
-        url="https://s3.gfz-potsdam.de"
+        url="https://s3.gfz.de"
     )
 
     # ── Hex centers: vectorised, land-clipped, no polygons yet ────────────────────
@@ -617,7 +617,7 @@ Each query is repeated three times and the median wall-clock time is recorded.
     provider = idb.IceSat2Provider(
         storage_type="s3",
         s3_bucket="dog-ext.icesat2db.icesat2-atl08-v007",
-        url="https://s3.gfz-potsdam.de",
+        url="https://s3.gfz.de",
     )
 
     areas_km2, times_s, n_shots = [], [], []
