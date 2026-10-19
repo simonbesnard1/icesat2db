@@ -395,3 +395,44 @@ def test_randomized_mapping_against_dictionary_oracle():
         for s in ids
     ]
     np.testing.assert_array_equal(interval_indices(ids, begins, ends), expected)
+
+
+def test_linked_granule_through_real_download_path(
+    paired_files, linked_config, tmp_path
+):
+    """Regression: the downloader used to save files as ATL03.h5/ATL08.h5, so the
+    pairing check (which reads NASA filenames) failed every real linked granule.
+    Run the processor's per-granule path with only the network mocked."""
+    from unittest.mock import MagicMock, patch
+
+    from icesat2db.core.icesat2processor import IceSat2Processor
+
+    files = {path.name: path.read_bytes() for path in paired_files}
+
+    def get(url, headers=None, **kwargs):
+        payload = files[url.rsplit("/", 1)[-1]]
+        response = MagicMock()
+        response.headers = {"Content-Range": f"bytes 0-1/{len(payload)}"}
+        response.content = payload
+        return response
+
+    session = MagicMock()
+    session.get.side_effect = get
+    product_info = [
+        (f"https://host/ATLAS/{name[:5]}/007/{name}", name[:5].lower(), "2020-01-01", 1)
+        for name in files
+    ]
+    with patch(
+        "icesat2db.downloader.data_downloader._get_session", return_value=session
+    ):
+        gid, frames, metrics = IceSat2Processor.process_single_granule(
+            "0001_01_01", product_info, linked_config, str(tmp_path / "dl")
+        )
+    assert gid == "0001_01_01"
+    assert set(frames) == {"atl03", "atl08"}
+    a, b = paired_files
+    assert set(frames["atl03"].source_granule) == {a.name}
+    assert set(frames["atl03"].atl08_source_granule) == {b.name}
+    assert set(frames["atl08"].source_granule) == {b.name}
+    assert (frames["atl03"].atl08_segment_id >= 0).any()
+    assert not (tmp_path / "dl" / "0001_01_01").exists()  # cleaned up after success

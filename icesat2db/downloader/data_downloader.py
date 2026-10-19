@@ -13,6 +13,7 @@ from collections import defaultdict
 from datetime import datetime
 from typing import List, Optional, Tuple
 import threading
+from urllib.parse import urlsplit
 from retry import retry
 
 logger = logging.getLogger(__name__)
@@ -272,8 +273,14 @@ class H5FileDownloader:
         product_name = getattr(product, "name", str(product))
         product_value = getattr(product, "value", str(product))
 
-        final_path = granule_dir / f"{product_name}.h5"
-        temp_path = granule_dir / f"{product_name}.h5.part"
+        # Keep NASA's filename: it encodes acquisition time, track, cycle, region
+        # and release, which the ATL03/ATL08 pairing check and the stored
+        # source_granule provenance rely on.
+        file_name = pathlib.PurePosixPath(urlsplit(url).path).name
+        if not file_name.endswith(".h5"):
+            file_name = f"{product_name}.h5"
+        final_path = granule_dir / file_name
+        temp_path = granule_dir / f"{file_name}.part"
 
         # -----------------------------
         # Fast path: valid existing file

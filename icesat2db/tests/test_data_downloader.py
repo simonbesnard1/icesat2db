@@ -7,6 +7,7 @@
 # SPDX-FileCopyrightText: 2026 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
 
 import pathlib
+import shutil
 import tempfile
 import threading
 import unittest
@@ -269,14 +270,14 @@ class TestH5FileDownloader(unittest.TestCase):
             dest_dir.mkdir()
             import shutil
 
-            shutil.copy(src, dest_dir / "ATL08.h5")
+            shutil.copy(src, dest_dir / src.name)
 
             # download() should return without making any HTTP request
             with patch(
                 "icesat2db.downloader.data_downloader._get_session"
             ) as mock_sess:
                 result_key, (result_product, result_path) = dl.download(
-                    granule_key, "http://example.com/fake.h5", product
+                    granule_key, f"http://example.com/data/{src.name}", product
                 )
                 # _get_session() is always called to obtain the session object,
                 # but no HTTP request should be made on the fast path.
@@ -314,6 +315,54 @@ class TestH5FileDownloader(unittest.TestCase):
 
             expected_dir = pathlib.Path(tmpdir) / granule_key
             self.assertTrue(expected_dir.exists())
+
+    def test_download_keeps_nasa_filename(self):
+        """The saved file keeps the URL's granule name (not ATL03.h5), which the
+        ATL03/ATL08 pairing check and source_granule provenance need."""
+        src = (
+            pathlib.Path(__file__).parent
+            / "data"
+            / "ATL08_20181014001049_02350102_007_01.h5"
+        )
+        payload = src.read_bytes()
+
+        def get(url, headers=None, **kwargs):
+            response = MagicMock()
+            response.headers = {"Content-Range": f"bytes 0-1/{len(payload)}"}
+            response.content = payload
+            return response
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            session = MagicMock()
+            session.get.side_effect = get
+            with patch(
+                "icesat2db.downloader.data_downloader._get_session",
+                return_value=session,
+            ):
+                _, (_, path) = H5FileDownloader(tmpdir).download(
+                    "G1",
+                    f"https://host/ATL08/007/{src.name}?token=x",
+                    IceSat2Product.ATL08,
+                )
+            self.assertEqual(pathlib.Path(path).name, src.name)
+            self.assertFalse(list(pathlib.Path(tmpdir, "G1").glob("*.part")))
+
+    def test_download_falls_back_to_product_name(self):
+        """URLs without a .h5 filename still get a usable name."""
+        src = (
+            pathlib.Path(__file__).parent
+            / "data"
+            / "ATL08_20181014001049_02350102_007_01.h5"
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = pathlib.Path(tmpdir) / "G1"
+            dest.mkdir()
+            shutil.copy(src, dest / "ATL08.h5")
+            with patch("icesat2db.downloader.data_downloader._get_session"):
+                _, (_, path) = H5FileDownloader(tmpdir).download(
+                    "G1", "https://host/download?id=1", IceSat2Product.ATL08
+                )
+            self.assertEqual(pathlib.Path(path).name, "ATL08.h5")
 
 
 if __name__ == "__main__":
