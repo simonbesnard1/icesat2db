@@ -86,6 +86,7 @@ class IceSat2Provider(TileDBProvider):
         region: Optional[str] = "eu-central-1",
         credentials: Optional[dict] = None,
         product: str = "atl08",
+        config_overrides: Optional[Dict[str, str]] = None,
     ):
         """
         Initialize IceSat2Provider with URIs for scalar and profile data arrays, configured based on storage type.
@@ -107,6 +108,11 @@ class IceSat2Provider(TileDBProvider):
             TileDBProvider for the array naming convention. Each product's
             array is independent — querying ATL03 alongside ATL08 requires
             two separate IceSat2Provider instances.
+        config_overrides : dict, optional
+            TileDB configuration applied on top of the defaults, for local
+            and S3 databases (e.g. ``{"sm.memory_budget": "536870912"}``).
+            The S3 defaults suit a large batch server; lower them in a
+            container or a shared web service.
 
         Notes
         -----
@@ -120,6 +126,7 @@ class IceSat2Provider(TileDBProvider):
             region,
             credentials,
             product=product,
+            config_overrides=config_overrides,
         )
 
     @staticmethod

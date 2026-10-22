@@ -369,6 +369,27 @@ class TestTileDBProviderLowLevel(unittest.TestCase):
         array = self.provider._get_array()
         self.assertTrue(array.isopen)
 
+    # ── config_overrides ──────────────────────────────────────────────────────
+
+    def test_config_overrides_reach_local_context(self):
+        provider = IceSat2Provider(
+            storage_type="local",
+            local_path=self.temp_dir.name,
+            config_overrides={"py.init_buffer_bytes": "1048576"},
+        )
+        self.assertEqual(provider.ctx.config()["py.init_buffer_bytes"], "1048576")
+
+    def test_config_overrides_reach_s3_context(self):
+        provider = IceSat2Provider(
+            storage_type="s3",
+            s3_bucket="bucket",
+            url="https://s3.example.org",
+            config_overrides={"sm.memory_budget": "536870912"},
+        )
+        config = provider.ctx.config()
+        self.assertEqual(config["sm.memory_budget"], "536870912")
+        self.assertEqual(config["vfs.s3.endpoint_override"], "https://s3.example.org")
+
     # ── get_available_variables ───────────────────────────────────────────────
 
     def test_get_available_variables_returns_non_empty_dataframe(self):

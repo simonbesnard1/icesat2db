@@ -127,6 +127,27 @@ In the following example, we filter for night-time acquisitions with no cloud/bl
 
 Quality filters are passed as key-value pairs where the key is the variable name and the value is the condition string (e.g., ``'night_flag': "== 1"``). This adds flexibility to refine the query based on specific criteria, improving the relevance of the retrieved data.
 
+Memory and TileDB settings
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The provider's defaults for S3 databases are sized for a large batch server
+(10 GB memory budget, 2 GiB initial buffer per attribute). In a container or a
+shared web service, pass smaller values with ``config_overrides``; it works for
+both local and S3 providers:
+
+.. code-block:: python
+
+    provider = isdb.IceSat2Provider(
+        storage_type="s3",
+        s3_bucket="dog-ext.icesat2db.icesat2-atl08-v007",
+        url="https://s3.gfz.de",
+        config_overrides={
+            "sm.memory_budget": str(512 * 1024**2),
+            "sm.mem.total_budget": str(2 * 1024**3),
+            "py.init_buffer_bytes": str(64 * 1024**2),
+        },
+    )
+
 Supported output formats
 ------------------------
 

@@ -38,6 +38,7 @@ class TileDBProvider:
         credentials: Optional[dict] = None,
         s3_config_overrides: Optional[Dict[str, str]] = None,
         product: str = "atl08",
+        config_overrides: Optional[Dict[str, str]] = None,
     ):
         """
         Parameters
@@ -47,12 +48,17 @@ class TileDBProvider:
             naming: 'atl08' opens the default ``array_uri`` (backward
             compatible with existing archives), any other product (e.g.
             'atl03') opens ``array_uri_<product>``.
+        config_overrides : dict, optional
+            TileDB configuration applied on top of the defaults, for local
+            and S3 databases alike (e.g. smaller memory budgets on a
+            shared server).
         """
         if not storage_type or not isinstance(storage_type, str):
             raise ValueError("The 'storage_type' argument must be a non-empty string.")
 
         self.storage_type = storage_type.lower()
         self.s3_config_overrides = s3_config_overrides or {}
+        self.config_overrides = config_overrides or {}
         self.product = product
         array_name = "array_uri" if product == "atl08" else f"array_uri_{product}"
 
@@ -140,6 +146,7 @@ class TileDBProvider:
 
         # Allow targeted overrides (for experiments)
         base_config.update(self.s3_config_overrides)
+        base_config.update(self.config_overrides)
 
         return tiledb.Ctx(base_config)
 
@@ -152,6 +159,7 @@ class TileDBProvider:
                 "sm.num_tiledb_threads": "32",
                 "sm.compute_concurrency_level": "32",
                 "sm.io_concurrency_level": "32",
+                **self.config_overrides,
             }
         )
 
