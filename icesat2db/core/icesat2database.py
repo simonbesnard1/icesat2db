@@ -697,8 +697,12 @@ class IceSat2Database:
         if dt.kind in ("U", "S"):
             # TileDB stores strings variable-length; an object array shares the
             # Python strings instead of copying each row to a fixed-width cell
-            # (U80 alone costs 320 bytes per photon).
-            return s.astype("string").to_numpy(dtype=object, na_value="")
+            # (U80 alone costs 320 bytes per photon). Factorizing reuses one
+            # string object per distinct value (8 bytes per row), whereas
+            # converting Arrow-backed strings creates a new object for every row.
+            codes, uniques = pd.factorize(s)
+            values = np.array([str(v) for v in uniques] + [""], dtype=object)
+            return values[codes]  # missing values (code -1) become ""
         if dt.kind == "M":
             return (
                 pd.to_datetime(s, utc=True, errors="coerce")
@@ -757,9 +761,11 @@ class IceSat2Database:
             if self.write_ctx is self.ctx
             else tiledb.Ctx(self.write_ctx.config())
         )
+        if not keep.all():  # masking copies every column; skip it for new data
+            coords = {name: values[keep] for name, values in coords.items()}
+            data = {name: values[keep] for name, values in data.items()}
         with tiledb.open(self.array_uri, mode="w", ctx=write_ctx) as array:
-            dims = tuple(coords[name][keep] for name in cache["dim_names"])
-            array[dims] = {name: values[keep] for name, values in data.items()}
+            array[tuple(coords[name] for name in cache["dim_names"])] = data
 
     def write_granule(
         self, granule_data: pd.DataFrame, check_existing: bool = True
