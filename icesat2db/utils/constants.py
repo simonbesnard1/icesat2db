@@ -41,25 +41,51 @@ RECORD_ID = {
 }
 
 
+def product_enabled(data_info: Dict[str, Any], product: str) -> bool:
+    """
+    Whether ``product`` (e.g. ``"atl03"``) is ingested: its ``level_<product>``
+    block is present and does not set ``enabled: false``.
+    """
+    key = f"level_{product}"
+    if key not in data_info:
+        return False
+    enabled = (data_info[key] or {}).get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise ValueError(f"{key}.enabled must be true or false, got {enabled!r}.")
+    return enabled
+
+
+def atl08_linked(data_info: Dict[str, Any]) -> bool:
+    """
+    Whether photons are linked to ATL08: ``level_atl03.link_atl08`` is set and
+    ATL03 is actually ingested. Disabling ATL03 therefore also disables the
+    linkage columns (e.g. ``source_granule``) of the ATL08 array.
+    """
+    return product_enabled(data_info, IceSat2Product.ATL03.value) and bool(
+        (data_info.get("level_atl03") or {}).get("link_atl08", False)
+    )
+
+
 def configured_products(data_info: Dict[str, Any]) -> List[IceSat2Product]:
     """
-    Return the IceSat2 products actually configured for ingestion, i.e. those
-    with a ``level_<product>`` block present in ``data_info``.
+    Return the IceSat2 products ingested: those with a ``level_<product>``
+    block that is not disabled with ``enabled: false``.
 
-    Products are independent: a config with only ``level_atl08`` requires and
-    downloads only ATL08 (today's default behavior), while adding
-    ``level_atl03`` opts into ATL03 as well, without forcing every granule to
-    have both.
+    Products are independent: a config with only ``level_atl08`` (or with
+    ``level_atl03.enabled: false``) requires and downloads only ATL08, while an
+    enabled ``level_atl03`` opts into ATL03 as well, without forcing every
+    granule to have both.
     """
-    if (
-        data_info.get("level_atl03", {}).get("link_atl08", False)
-        and "level_atl08" not in data_info
+    if atl08_linked(data_info) and not product_enabled(
+        data_info, IceSat2Product.ATL08.value
     ):
         raise ValueError(
-            "link_atl08 requires both level_atl03 and level_atl08 configuration"
+            "link_atl08 requires both level_atl03 and level_atl08 to be enabled"
         )
     return [
-        product for product in IceSat2Product if f"level_{product.value}" in data_info
+        product
+        for product in IceSat2Product
+        if product_enabled(data_info, product.value)
     ]
 
 

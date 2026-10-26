@@ -19,7 +19,7 @@ from icesat2db.granule.atl03_granule import ATL03Granule
 from icesat2db.granule.atl08_granule import ATL08Granule
 from icesat2db.granule.Granule import granule_handler
 from icesat2db.utils.atl03_atl08 import validate_pair
-from icesat2db.utils.constants import IceSat2Product
+from icesat2db.utils.constants import IceSat2Product, atl08_linked
 
 
 class GranuleParser:
@@ -101,7 +101,7 @@ class ATL03GranuleParser(GranuleParser):
         self.variables = level_info.get("variables", [])
         self.confidence_column = level_info.get("confidence_column", 0)
         self.confidence_threshold = level_info.get("confidence_threshold", 3)
-        self.link_atl08 = level_info.get("link_atl08", False)
+        self.link_atl08 = atl08_linked(self.data_info)
         self.retain_atl08_signal = level_info.get("retain_atl08_signal", True)
 
     def parse(self) -> pd.DataFrame:
@@ -176,6 +176,6 @@ def parse_h5_file(
     kwargs = {"atl08_file": atl08_file} if parser_class is ATL03GranuleParser else {}
     parser = parser_class(file, data_info or {}, **kwargs)
     data = parser.parse()
-    if (data_info or {}).get("level_atl03", {}).get("link_atl08", False):
+    if atl08_linked(data_info or {}):
         data["source_granule"] = _constant_category(Path(file).name, len(data))
     return data

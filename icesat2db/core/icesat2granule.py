@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 import pandas as pd
 
 from icesat2db.granule import granule_parser
-from icesat2db.utils.constants import RECORD_ID
+from icesat2db.utils.constants import RECORD_ID, atl08_linked
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ class IceSat2Granule:
         """
         data_dict = {}
         companion = dict(granules).get("atl08")
-        linked = self.data_info.get("level_atl03", {}).get("link_atl08", False)
+        linked = atl08_linked(self.data_info)
         for product, file in granules:
             kwargs = {}
             if product == "atl03" and linked:

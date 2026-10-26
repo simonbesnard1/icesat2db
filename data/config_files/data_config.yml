@@ -733,6 +733,10 @@ level_atl08:
       units: "adimensional"
 
 level_atl03:
+  # ATL03 is large: ~1.1 GB per granule against ~80 MB for ATL08 (~470 TB for the
+  # global v007 archive). Set enabled: true to ingest photons; with false only
+  # ATL08 is downloaded and stored.
+  enabled: false
   # Enable for a NEW database to link paired ATL03/ATL08 files during ingestion.
   # Existing arrays need re-ingestion to store the computed linkage attributes.
   link_atl08: false

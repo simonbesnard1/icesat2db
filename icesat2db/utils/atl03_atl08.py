@@ -7,12 +7,13 @@ from pathlib import Path
 import numpy as np
 
 from icesat2db.granule.granule_name import parse_granule_filename
+from icesat2db.utils.constants import atl08_linked
 from icesat2db.utils.segment_id import pack_segment_id
 
 
 def linkage_variables(config, product):
     """Computed attributes enabled together with paired ingestion."""
-    if not config.get("level_atl03", {}).get("link_atl08", False):
+    if not atl08_linked(config):
         return {}
     fields = {"source_granule": ("U80", "Source filename including release/revision")}
     if product == "atl03":

@@ -23,7 +23,7 @@ from dask.distributed import Client
 from retry import retry
 
 from icesat2db.utils.atl03_atl08 import linkage_variables
-from icesat2db.utils.constants import RECORD_ID
+from icesat2db.utils.constants import RECORD_ID, atl08_linked
 from icesat2db.utils.filters import TileDBFilterPolicy
 from icesat2db.utils.geo_processing import (
     _datetime_to_timestamp_days,
@@ -262,10 +262,12 @@ class IceSat2Database:
                 "policy_version": 2,
                 "product": self.product,
                 "collections": collections,
-                "level_settings": {k: v for k, v in level.items() if k != "variables"},
-                "link_atl08": self.config.get("level_atl03", {}).get(
-                    "link_atl08", False
-                ),
+                # "enabled" decides whether the array is built at all, not
+                # what it holds; leaving it out keeps resumes stable.
+                "level_settings": {
+                    k: v for k, v in level.items() if k not in ("variables", "enabled")
+                },
+                "link_atl08": atl08_linked(self.config),
                 "variables": self.variables_config,
             },
             sort_keys=True,

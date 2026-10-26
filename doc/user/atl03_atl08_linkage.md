@@ -1,10 +1,17 @@
 # Combining ATL03 and ATL08
 
+ATL03 is optional. Each ATL03 granule is ~1.1 GB against ~80 MB for ATL08
+(~470 TB for the global v007 archive), so the shipped configuration sets
+`level_atl03.enabled: false` and ingests ATL08 only. Set `enabled: true` to add
+photons. A disabled ATL03 also disables `link_atl08`, so the ATL08 array then
+has no linkage columns; switching ATL03 on later therefore needs a new database.
+
 Enable paired ingestion in a configuration containing both `level_atl03` and
 `level_atl08`:
 
 ```yaml
 level_atl03:
+  enabled: true
   link_atl08: true
   retain_atl08_signal: true
   confidence_column: 0

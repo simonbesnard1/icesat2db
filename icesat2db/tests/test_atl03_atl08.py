@@ -436,3 +436,67 @@ def test_linked_granule_through_real_download_path(
     assert set(frames["atl08"].source_granule) == {b.name}
     assert (frames["atl03"].atl08_segment_id >= 0).any()
     assert not (tmp_path / "dl" / "0001_01_01").exists()  # cleaned up after success
+
+
+def test_atl03_can_be_disabled(linked_config, tmp_path):
+    """level_atl03.enabled: false ingests ATL08 only, without linkage columns."""
+    from icesat2db.utils.constants import atl08_linked, product_enabled
+
+    assert [p.value for p in configured_products(linked_config)] == ["atl08", "atl03"]
+    assert atl08_linked(linked_config)
+    linked_config["level_atl03"]["enabled"] = False
+    assert [p.value for p in configured_products(linked_config)] == ["atl08"]
+    assert not product_enabled(linked_config, "atl03")
+    assert not atl08_linked(linked_config)
+
+    linked_config["tiledb"] = {
+        "storage_type": "local",
+        "local_path": str(tmp_path / "db"),
+        "dimensions": ["latitude", "longitude", "time"],
+        "spatial_range": {
+            "lat_min": -90,
+            "lat_max": 90,
+            "lon_min": -180,
+            "lon_max": 180,
+        },
+        "time_range": {"start_time": "2018-01-01", "end_time": "2030-01-01"},
+    }
+    db = IceSat2Database(linked_config, product="atl08")
+    assert "source_granule" not in db.variables_config
+    assert '"link_atl08": false' in db._ingestion_manifest()
+    db._create_arrays()
+    # The switch itself is not part of the stored provenance: an ATL08-only
+    # database built from a config without level_atl03 resumes with this one.
+    del linked_config["level_atl03"]
+    IceSat2Database(linked_config, product="atl08")._create_arrays()
+
+
+@pytest.mark.parametrize("value", ["false", 0, None])
+def test_enabled_must_be_boolean(linked_config, value):
+    linked_config["level_atl03"]["enabled"] = value
+    with pytest.raises(ValueError, match="enabled must be true or false"):
+        configured_products(linked_config)
+
+
+def test_link_requires_enabled_atl08(linked_config):
+    linked_config["level_atl08"]["enabled"] = False
+    with pytest.raises(ValueError, match="level_atl08 to be enabled"):
+        configured_products(linked_config)
+
+
+def test_disabled_atl03_is_not_downloaded(linked_config, tmp_path):
+    """The processor neither queries CMR for nor writes a disabled product."""
+    from unittest.mock import MagicMock
+
+    from icesat2db.core.icesat2processor import IceSat2Processor
+
+    linked_config["level_atl03"]["enabled"] = False
+    proc = IceSat2Processor.__new__(IceSat2Processor)
+    proc.data_info = linked_config
+    proc.database_writers = {"atl08": MagicMock()}
+    proc.database_writers["atl08"].check_granules_status.return_value = {}
+    pending = proc._filter_unprocessed_granules(
+        {"G1": [("u8", "atl08", "2020-01-01", 1), ("u3", "atl03", "2020-01-01", 1)]}
+    )
+    assert pending == {"G1": [("u8", "atl08", "2020-01-01", 1)]}
+    assert proc._write_products == {"G1": {"atl08"}}

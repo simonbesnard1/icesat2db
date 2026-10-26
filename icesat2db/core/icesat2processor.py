@@ -29,7 +29,11 @@ from icesat2db.core.icesat2database import IceSat2Database
 from icesat2db.core.icesat2granule import IceSat2Granule
 from icesat2db.downloader.authentication import EarthDataAuthenticator
 from icesat2db.downloader.data_downloader import CMRDataDownloader, H5FileDownloader
-from icesat2db.utils.constants import IceSat2Product, configured_products
+from icesat2db.utils.constants import (
+    IceSat2Product,
+    atl08_linked,
+    configured_products,
+)
 from icesat2db.utils.geo_processing import _temporal_tiling, check_and_format_shape
 from icesat2db.utils.progress_ledger import ProgressLedger, Row
 
@@ -411,7 +415,7 @@ class IceSat2Processor:
                     ids_for_product
                 )
 
-        linked = self.data_info.get("level_atl03", {}).get("link_atl08", False)
+        linked = atl08_linked(self.data_info)
         unprocessed_granules = {}
         self._write_products = {}
         no_companion = []
